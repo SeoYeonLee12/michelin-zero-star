@@ -13,3 +13,5 @@ COPY ${JAR_FILE} app.jar
 
 # 5. 실행 명령어 (프로필은 docker-compose에서 주입받음)
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+
+

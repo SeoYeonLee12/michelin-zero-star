@@ -6,6 +6,8 @@ services:
       dockerfile: Dockerfile
     networks:
       - app-net
+    depends_on:
+      - db
 
   db:
     image: mysql:8.0
