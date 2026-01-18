@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: michelin-zero-star
+
+  profiles:
+    active: local

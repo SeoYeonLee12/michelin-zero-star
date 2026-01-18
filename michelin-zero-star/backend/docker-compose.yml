@@ -1,0 +1,24 @@
+services:
+  backend:
+    container_name: michelin-backend
+    build:
+      context: ./michelin-zero-star
+      dockerfile: Dockerfile
+    networks:
+      - app-net
+
+  db:
+    image: mysql:8.0
+    container_name: michelin-db
+    volumes:
+      - db_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    driver: bridge
+
+volumes:
+  db_data:
