@@ -1,0 +1,87 @@
+# [Network]
+# 추후 Redis, Postgres, Backend 컨테이너가 추가될 때
+# 이 네트워크 안에 두면 내부 통신(DNS)이 가능
+networks:
+  mzs-network:
+    driver: bridge
+
+services:
+  #===============================================#
+  # - AI Setting 
+  #===============================================#
+  # 1. Elasticsearch
+  elasticsearch:
+    # [Build] 커스텀 Dockerfile 사용 (Nori 플러그인 포함)
+    build:
+      context: .
+      dockerfile: infra/elasticsearch/Dockerfile
+    container_name: mzs-es
+    
+    # [Network]
+    networks:
+      - mzs-network
+    
+    # [Port]
+    # 호스트: 컨테이너
+    # 보안상 배포 시에는 "127.0.0.1:9200:9200"으로 변경하여 외부 접근을 막는 것이 좋음
+    ports:
+      - "9200:9200"
+    
+    # [Environment]
+    environment:
+      # 1) 클러스터 설정
+      # single-node: 개발용 (단일 노드).
+      # 운영 시에는 노드 추가 후 'cluster.initial_master_nodes' 설정을 고려
+      - discovery.type=single-node
+      
+      # 2) 보안 설정 (Security)
+      # true: 배포 시 (ID/PW 필수)
+      # false: 개발 시 (편의성 위주)
+      - xpack.security.enabled=false
+      
+      # [Future] 배포 시 아래 주석을 해제하고 .env 파일에 비밀번호를 설정
+      # - ELASTIC_PASSWORD=${ES_PASSWORD}
+      
+      # 3) 메모리 설정 (JVM Heap)
+      # 최소(Xms)와 최대(Xmx)를 동일하게 맞추는 것이 성능상 유리
+      # 운영 서버가 4GB 램 이상이라면 "-Xms2g -Xmx2g" 권장.
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+
+    # [Ulimits]
+    # ES는 많은 파일을 열기 때문에 운영체제 제한을 풀기 (프로덕션 필수)
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    
+    # [Volume]
+    # 컨테이너가 삭제되어도 데이터는 유지되도록 로컬 볼륨에 저장합니다.
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+    # [Healthcheck]
+    # # 다른 컨테이너(API 서버 등)가 ES가 켜진 뒤에 실행되도록 할 때 유용.
+    # healthcheck:
+    #   test: ["CMD-SHELL", "curl -f http://localhost:9200 || exit 1"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 5
+
+  # 2. Kibana (데이터 시각화 및 디버깅 도구)
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.1
+    container_name: mzs-kibana
+    networks:
+      - mzs-network
+    ports:
+      - "5601:5601"
+    environment:
+      # 컨테이너 이름(elasticsearch)으로 내부 통신
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+
+# [Volume Definition]
+volumes:
+  es_data:
+    driver: local
