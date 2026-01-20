@@ -1,9 +1,9 @@
-package com.michelin0.michelinzerostar.recipe.domain;
+package com.michelin0.michelinzerostar.domain.recipe.domain;
 
 import static com.michelin0.michelinzerostar.global.SqlRestrictionClause.DELETED_AT_IS_NULL;
 
+import com.michelin0.michelinzerostar.domain.recipe.enums.RecipeType;
 import com.michelin0.michelinzerostar.global.domain.SoftDeleteDomain;
-import com.michelin0.michelinzerostar.recipe.enums.RecipeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;

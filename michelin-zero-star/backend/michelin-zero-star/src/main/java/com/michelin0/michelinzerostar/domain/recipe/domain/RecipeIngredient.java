@@ -1,4 +1,4 @@
-package com.michelin0.michelinzerostar.recipe.domain;
+package com.michelin0.michelinzerostar.domain.recipe.domain;
 
 import com.michelin0.michelinzerostar.global.domain.BaseDomain;
 import jakarta.persistence.Column;
