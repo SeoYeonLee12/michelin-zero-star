@@ -42,7 +42,7 @@ public class User extends SoftDeleteDomain {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private UserRole role; // USER, CHEF
+    private UserRole role; // USER
 
     @Enumerated(EnumType.STRING)
     @Column(name = "social_provider")
@@ -52,7 +52,7 @@ public class User extends SoftDeleteDomain {
     private String socialId; // 소셜 로그인 고유 ID
 
     @Column(name = "total_star", nullable = false)
-    private Double totalStar; // 누적 미슐랭 스타 (기본값 0.0 필요)
+    private Double totalStar; // 누적 미슐랭 스타
 
     @Builder
     public User(String email, String password, String name, String nickname,
@@ -66,10 +66,9 @@ public class User extends SoftDeleteDomain {
         this.role = role;
         this.socialProvider = socialProvider;
         this.socialId = socialId;
-        this.totalStar = (totalStar != null) ? totalStar : 0.0; // null이면 0.0 초기화
+        this.totalStar = (totalStar != null) ? totalStar : 0.0;
     }
 
-    // 비즈니스 로직 메서드 (예: 정보 수정)가 필요하면 아래에 추가
     public void updatePassword(String encodedPassword) {
         this.password = encodedPassword;
     }
