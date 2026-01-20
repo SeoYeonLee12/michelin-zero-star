@@ -4,3 +4,8 @@ spring:
 
   profiles:
     active: local
+
+jwt:
+  secret: "djNyeVMzY3IzdEszeUYwck1pY2hlbGluWmVyMFN0YXJQcjBqM2N0TXVzdEJlTDBuZ0Vub3VnaFRvUEBzc3=="
+  access-token-validity-in-seconds: 1800
+  refresh-token-validity-in-seconds: 1209600
