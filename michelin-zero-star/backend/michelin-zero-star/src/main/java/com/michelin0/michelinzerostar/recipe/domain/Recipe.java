@@ -12,6 +12,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.util.Objects;
 import lombok.AccessLevel;
@@ -60,6 +62,10 @@ public class Recipe extends SoftDeleteDomain {
     @Column(name = "recipe_type", nullable = false)
     @Enumerated(EnumType.STRING)
     private RecipeType recipeType;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @Embedded
     private Nutrition nutrition;
