@@ -3,6 +3,7 @@ package com.michelin0.michelinzerostar.domain.recipe.domain;
 import static com.michelin0.michelinzerostar.global.SqlRestrictionClause.DELETED_AT_IS_NULL;
 
 import com.michelin0.michelinzerostar.domain.recipe.enums.RecipeType;
+import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.global.domain.SoftDeleteDomain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
@@ -64,7 +65,7 @@ public class Recipe extends SoftDeleteDomain {
     private RecipeType recipeType;
 
     @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "users_id", nullable = false)
     private User user;
 
     @Embedded

@@ -1,6 +1,6 @@
 package com.michelin0.michelinzerostar.domain.user.entity;
 
-import com.michelin0.michelinzerostar.global.entity.SoftDeleteDomain;
+import com.michelin0.michelinzerostar.global.domain.SoftDeleteDomain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

@@ -1,4 +1,4 @@
-package com.michelin0.michelinzerostar.global.entity;
+package com.michelin0.michelinzerostar.global.domain;
 
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.MappedSuperclass;
