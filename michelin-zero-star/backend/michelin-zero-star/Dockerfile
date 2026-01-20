@@ -1,17 +1,37 @@
-# 1. Base Image
+# =======================================
+# 1. 빌드 단계 (Builder Stage)
+# =======================================
+FROM bellsoft/liberica-openjdk-alpine:21 AS builder
+
+# 작업 디렉토리 생성
+WORKDIR /build
+
+# Gradle 빌드에 필요한 파일들만 먼저 복사 (캐시 효율을 위해)
+COPY gradlew .
+COPY gradle gradle
+COPY build.gradle .
+COPY settings.gradle .
+
+# gradlew 실행 권한 부여 (윈도우/맥 호환성 이슈 방지)
+RUN chmod +x ./gradlew
+
+# 종속성 다운로드 (소스 코드가 바뀌어도 종속성은 캐시되어 빌드 속도 향상)
+RUN ./gradlew dependencies --no-daemon
+
+# 소스 코드 복사 및 빌드 실행 (테스트는 생략 -x test)
+COPY src src
+RUN ./gradlew clean build -x test --no-daemon
+
+# =======================================
+# 2. 실행 단계 (Runtime Stage)
+# =======================================
 FROM bellsoft/liberica-openjdk-alpine:21
 
-# 2. 작업 디렉토리 설정
 WORKDIR /app
 
-# 3. 빌드된 JAR 파일 변수 설정 (Gradle 빌드 기준)
-# (나중에 ./gradlew build 명령어로 생긴 jar 파일을 가져옵니다)
-ARG JAR_FILE=build/libs/*.jar
+# 빌드 단계(builder)에서 생성된 JAR 파일만 쏙 가져옴
+# (일반적으로 build/libs 안에 생성됨)
+COPY --from=builder /build/build/libs/*-SNAPSHOT.jar app.jar
 
-# 4. 호스트의 JAR 파일을 컨테이너 내부로 복사
-COPY ${JAR_FILE} app.jar
-
-# 5. 실행 명령어 (프로필은 docker-compose에서 주입받음)
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
-
-
+# 실행 명령어
+ENTRYPOINT ["java", "-jar", "app.jar"]
