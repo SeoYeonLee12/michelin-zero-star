@@ -1,0 +1,96 @@
+services:
+  #===============================================#
+  # 1. Backend Application
+  #===============================================#
+  backend:
+    container_name: michelin-backend
+    build:
+      context: ./backend/michelin-zero-star
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "${PROD_APP_PORT}:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      # [DB 연결 정보]
+      - DB_HOST=${PROD_DB_HOST}
+      - DB_PORT=${PROD_DB_PORT}
+      - DB_NAME=${PROD_DB_NAME}
+      - DB_USER=${PROD_DB_USER}
+      - DB_PW=${PROD_DB_PASSWORD}
+    networks:
+      - mzs-network
+    depends_on:
+      - db
+      - elasticsearch
+
+  #===============================================#
+  # 2. Database (MySQL)
+  #===============================================#
+  db:
+    image: mysql:8.0
+    container_name: michelin-db
+    restart: always
+    volumes:
+      - db_data:/var/lib/mysql
+    environment:
+      MYSQL_TCP_PORT: ${PROD_DB_PORT}
+      MYSQL_ROOT_PASSWORD: ${PROD_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${PROD_DB_NAME}
+      MYSQL_USER: ${PROD_DB_USER}
+      MYSQL_PASSWORD: ${PROD_DB_PASSWORD}
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - mzs-network
+
+  #===============================================#
+  # 3. AI / Search Engine (Elasticsearch)
+  #===============================================#
+  elasticsearch:
+    build:
+      context: .
+      dockerfile: infra/elasticsearch/Dockerfile
+    container_name: mzs-es
+    restart: always
+    networks:
+      - mzs-network
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+  #===============================================#
+  # 4. Monitoring (Kibana)
+  #===============================================#
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.1
+    container_name: mzs-kibana
+    restart: always
+    networks:
+      - mzs-network
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+
+#===============================================#
+# Network & Volume Definition
+#===============================================#
+networks:
+  mzs-network:
+    driver: bridge
+
+volumes:
+  db_data:
+  es_data:
+    driver: local
