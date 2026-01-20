@@ -1,7 +1,4 @@
 .idea/
 
-# docker-compose-local
-docker-compose-local.yml
-
 # env file
 .env
