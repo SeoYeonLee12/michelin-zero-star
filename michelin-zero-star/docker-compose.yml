@@ -18,11 +18,14 @@ services:
       - DB_NAME=${PROD_DB_NAME}
       - DB_USER=${PROD_DB_USER}
       - DB_PW=${PROD_DB_PASSWORD}
+      # 백엔드가 AI서버를 부를 때 사용할 주소 (같은 네트워라 이렇게 부름)
+      - AI_SERVER_URL=http://ai-serving:8000
     networks:
       - mzs-network
     depends_on:
       - db
       - elasticsearch
+      - ai-serving # AI 서버가 켜져야 백엔드도 의미 있음
 
   #===============================================#
   # 2. Database (MySQL)
@@ -84,6 +87,30 @@ services:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     depends_on:
       - elasticsearch
+
+  #===============================================#
+  # 5. AI Serving Server (FastAPI)
+  #===============================================#
+  ai-serving:
+    container_name: mzs-ai
+    build:
+      context: ./ai-serving # Dockerfile이 있는 폴더 경로
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "8000:8000" # 호스트:컨테이너
+    environment:
+      # Docker 내부에서는 'localhost'가 아니라 '서비스명'
+      - ES_URL=http://elasticsearch:9200
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PROJECT_NAME="Michelin Zero Star AI"
+    volumes:
+      # [개발 편의] 로컬 코드를 컨테이너에 연결 (코드 수정 시 즉시 반영)
+      - ./ai-serving:/app
+    networks:
+      - mzs-network
+    depends_on:
+      - elasticsearch # ES가 켜진 뒤에 실행
 
 #===============================================#
 # Network & Volume Definition
