@@ -16,8 +16,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -73,12 +71,6 @@ public class Recipe extends SoftDeleteDomain {
     @Embedded
     private Nutrition nutrition;
 
-    private List<RecipeIngredient> ingredients;
-
-    private List<RecipeStep> steps;
-
-    private List<RecipeTag> tags;
-
     public Recipe(String title, String mainImageUrl, String description, Integer cookTime,
             Integer servings, RecipeType recipeType, Nutrition nutrition
     ) {
@@ -93,9 +85,6 @@ public class Recipe extends SoftDeleteDomain {
         this.recipeType = (recipeType == null) ? RecipeType.USER : recipeType;
         this.nutrition = Objects.requireNonNullElse(nutrition,
                 new Nutrition(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0));
-        this.ingredients = new ArrayList<>();
-        this.steps = new ArrayList<>();
-        this.tags = new ArrayList<>();
     }
 
 

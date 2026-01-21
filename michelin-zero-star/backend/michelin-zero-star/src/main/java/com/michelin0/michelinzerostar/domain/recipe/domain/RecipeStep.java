@@ -6,7 +6,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -31,8 +30,7 @@ public class RecipeStep {
     @Column(name = "step_number", nullable = false)
     private Integer stepNumber;
 
-    @Lob
-    @Column(name = "description", nullable = false)
+    @Column(name = "description", nullable = false, columnDefinition = "TEXT")
     private String recipeDescription;
 
     @Column(name = "timer_seconds", nullable = false)
@@ -41,8 +39,7 @@ public class RecipeStep {
     @Column(name = "media_url", nullable = false)
     private String stepImageUrl;
 
-    @Lob
-    @Column(name = "tip")
+    @Column(name = "tip", columnDefinition = "TEXT")
     private String cookingTip;
 
     public RecipeStep(Recipe recipe, Integer stepNumber, String recipeDescription,
