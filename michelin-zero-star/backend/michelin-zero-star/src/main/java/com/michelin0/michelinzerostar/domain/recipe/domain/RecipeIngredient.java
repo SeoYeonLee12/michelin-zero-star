@@ -1,6 +1,8 @@
 package com.michelin0.michelinzerostar.domain.recipe.domain;
 
 import com.michelin0.michelinzerostar.global.domain.BaseDomain;
+import com.michelin0.michelinzerostar.global.exception.errorcode.RecipeErrorCode;
+import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -31,12 +33,20 @@ public class RecipeIngredient extends BaseDomain {
     private String amount;
 
     @ManyToOne
-    @JoinColumn(name = "recipe_id")
+    @JoinColumn(name = "recipe_id", nullable = false)
     private Recipe recipe;
 
-    public RecipeIngredient(String ingredientName, String amount, Recipe recipe) {
+    public RecipeIngredient(String ingredientName, String amount) {
         this.ingredientName = ingredientName;
         this.amount = amount;
+
+    }
+
+    public void assignToRecipe(Recipe recipe) {
+        if (this.recipe == null) {
+            throw new GlobalException(RecipeErrorCode.ALREADY_ASSIGNED_INGREDIENT);
+        }
         this.recipe = recipe;
+
     }
 }

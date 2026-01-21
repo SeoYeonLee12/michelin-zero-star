@@ -1,5 +1,7 @@
 package com.michelin0.michelinzerostar.domain.recipe.domain;
 
+import com.michelin0.michelinzerostar.global.exception.errorcode.RecipeErrorCode;
+import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -31,7 +33,7 @@ public class RecipeStep {
     private Integer stepNumber;
 
     @Column(name = "description", nullable = false, columnDefinition = "TEXT")
-    private String recipeDescription;
+    private String stepDescription;
 
     @Column(name = "timer_seconds", nullable = false)
     private Integer timerSeconds;
@@ -42,13 +44,19 @@ public class RecipeStep {
     @Column(name = "tip", columnDefinition = "TEXT")
     private String cookingTip;
 
-    public RecipeStep(Recipe recipe, Integer stepNumber, String recipeDescription,
+    public RecipeStep(Integer stepNumber, String stepDescription,
             Integer timerSeconds, String stepImageUrl, String cookingTip) {
-        this.recipe = recipe;
         this.stepNumber = stepNumber;
-        this.recipeDescription = recipeDescription;
+        this.stepDescription = stepDescription;
         this.timerSeconds = timerSeconds;
         this.stepImageUrl = stepImageUrl;
         this.cookingTip = cookingTip;
+    }
+
+    public void assignToRecipe(Recipe recipe) {
+        if (this.recipe != null) {
+            throw new GlobalException(RecipeErrorCode.ALREADY_ASSIGNED_STEP);
+        }
+        this.recipe = recipe;
     }
 }
