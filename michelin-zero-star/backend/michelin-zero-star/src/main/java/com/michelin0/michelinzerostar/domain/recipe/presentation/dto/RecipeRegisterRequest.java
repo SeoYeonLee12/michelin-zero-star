@@ -45,7 +45,7 @@ public record RecipeRegisterRequest(
         String cookingTip
 
 ) {
-
+        //TODO modify to dto 2 command
     public RecipeRegisterCommand toCommand() {
         return new RecipeRegisterCommand;
     }
