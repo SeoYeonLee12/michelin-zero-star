@@ -1,5 +1,6 @@
 from elasticsearch import AsyncElasticsearch, ConnectionError
 from app.core.config import settings
+import asyncio # 시간 지연을 위해 필요
 
 class ElasticClient:
     """
@@ -27,38 +28,35 @@ class ElasticClient:
         print(f"Elasticsearch Configured: {settings.ES_URL}")
 
     async def check_connection(self):
-        """
-        healthcheck용
-        연결 상태 확인 및 인덱스 존재 여부 체크 (로그 출력용)
-        - 클라이언트 초기화 여부
-        - ES 서버 Ping 테스트
-        - 특정 인덱스 존재 여부 확인
-        """
         if not self.client:
-            print("⚠️ connect()가 호출되지 않아 client가 없습니다.")
+            print("⚠️ Elasticsearch client is not initialized.")
             return
 
-        try:
-            # 1. Ping 테스트
-            if await self.client.ping():
-                print("✅ Elasticsearch Ping 테스트 성공!")
-            else:
-                print("❌ Elasticsearch Ping 테스트 실패 (서버는 있으나 정상 응답이 아닙니다.)")
-
-            # 2. 인덱스 확인 ('michelin_recipes'가 있는지)
-            index_name = "michelin_recipes"
-            exists = await self.client.indices.exists(index=index_name)
-            if exists:
-                print(f"Index '{index_name}' 찾음")
-            else:
-                print(f"Index '{index_name}' 찾지 못함.")
+        print("⏳ Waiting for Elasticsearch to be ready...")
+        
+        # 5초 간격으로 최대 10번(50초) 시도
+        for i in range(10):
+            try:
+                # 1. Ping 테스트
+                if await self.client.ping():
+                    print("✅ Elasticsearch Ping Success!")
+                    
+                    # 2. 인덱스 확인
+                    index_name = "michelin_recipes"
+                    if await self.client.indices.exists(index=index_name):
+                        print(f"✅ Index '{index_name}' found.")
+                    else:
+                        print(f"ℹ️ Index '{index_name}' not found yet. (Wait for data team)")
+                    return # 성공하면 함수 종료
                 
-        # ES 서버와의 연결 자체가 실패했을 경우
-        except ConnectionError as e:
-            print(f"🚨 Elasticsearch Connection Error: {e}")
-        # 그 외 예상하지 못한 에러 발생시
-        except Exception as e:
-            print(f"🚨 Unexpected ES Error: {e}")
+            except Exception as e:
+                # 아직 ES가 안 켜졌으면 에러가 남 -> 무시하고 대기
+                pass
+            
+            print(f"🔄 ES Connecting... ({i+1}/10)")
+            await asyncio.sleep(5) # 5초 대기
+            
+        print("❌ Elasticsearch Connection Failed after 50s.")
 
     async def close(self):
         """

@@ -103,6 +103,7 @@ services:
       # Docker 내부에서는 'localhost'가 아니라 '서비스명'
       - ES_URL=http://elasticsearch:9200
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PYTHONUNBUFFERED=1
       - PROJECT_NAME="Michelin Zero Star AI"
     volumes:
       # [개발 편의] 로컬 코드를 컨테이너에 연결 (코드 수정 시 즉시 반영)
