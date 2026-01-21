@@ -33,8 +33,7 @@ public class RecipeTag extends BaseDomain {
     @Column(name = "tag_name", nullable = false)
     private String tagName;
 
-    public RecipeTag(Recipe recipe, String tagName) {
-        this.recipe = recipe;
+    public RecipeTag(String tagName) {
         this.tagName = tagName;
     }
 
