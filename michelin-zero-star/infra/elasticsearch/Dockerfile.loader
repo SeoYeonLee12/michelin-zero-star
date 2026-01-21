@@ -1,0 +1,10 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir "elasticsearch>=8.11.0,<9.0.0" requests
+
+COPY transform_and_load.py .
+COPY merged_recipes_final.json .
+
+CMD ["python", "transform_and_load.py"]

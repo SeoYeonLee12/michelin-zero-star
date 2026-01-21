@@ -61,7 +61,7 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
     ulimits:
       memlock:
         soft: -1
@@ -69,6 +69,27 @@ services:
     volumes:
       - es_data:/usr/share/elasticsearch/data
 
+  
+  #===============================================#
+  # 3-1. Elasticsearch Data Loader
+  #===============================================#
+  es-data-loader:
+    build:
+      context: ./infra/elasticsearch
+      dockerfile: Dockerfile.loader
+    container_name: mzs-es-loader
+    networks:
+      - mzs-network
+    environment:
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+      - GMS_KEY=${GMS_KEY}
+    depends_on:
+      - elasticsearch
+    restart: "no"
+  
+  
+  
   #===============================================#
   # 4. Monitoring (Kibana)
   #===============================================#
