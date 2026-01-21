@@ -7,3 +7,4 @@ langchain-openai==0.0.5
 langchain-community==0.0.13
 elasticsearch==8.11.0
 openai==1.10.0
+elasticsearch==8.11.0

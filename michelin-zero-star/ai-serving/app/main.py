@@ -1,10 +1,39 @@
+from contextlib import asynccontextmanager # 서버 종료/시작시점 관리를 FastAPI가 제공하는 방식 대신 Fast API의 lifespan에 연결
+'''
+FastAPI 서버 시작
+ └─ lifespan 시작 코드 실행
+     ├─ Elasticsearch 연결
+     ├─ 연결 상태 체크
+     └─ 서버 정상 기동
+
+FastAPI 서버 종료
+ └─ lifespan 종료 코드 실행
+     ├─ Elasticsearch 연결 종료
+     └─ 리소스 정리
+'''
 from fastapi import FastAPI
 from app.core.config import settings
+from app.core.database import es_client
+# 아직 rag_router가 완성되지 않았으므로 주석 처리
+# from app.api import rag_router 
 
-app = FastAPI(title=settings.PROJECT_NAME) # 프로젝트 이름 설정 -> Swagger 등에 표시될 수 있도록
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # [시작] 서버 뜰 때 실행
+    print("🚀 Server Starting...")
+    es_client.connect()
+    await es_client.check_connection() # 연결 테스트 수행
+    # --- 이단계까지는 아직 요청 안 받음 & 서버 인프라 준비 단계 --- #
+    yield # 실제로 요청을 받기 시작
+    # [종료] 서버 꺼질 때 실행
+    print("💤 Server Shutting down...")
+    await es_client.close()
 
-# GET 요청 처리 엔드포인트 (서버 상태 확인 용도로 사용)
-@app.get("/") 
+app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan) # Fast API 애플리케이션 생성
+
+@app.get("/")
 def health_check():
-    # 서버가 정상 실행함을 알리는 응답 반환
     return {"status": "ok", "message": "AI Server is running"}
+
+# 라우터 등록 -> 등록 예정
+# app.include_router(rag_router.router, prefix="/api/chat", tags=["Chatbot"])
