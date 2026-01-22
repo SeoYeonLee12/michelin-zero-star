@@ -20,8 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuthService {
 
-    // Manager를 직접 주입받지 않고, Configuration을 주입받습니다.
-    private final AuthenticationConfiguration authenticationConfiguration;
+    final AuthenticationConfiguration authenticationConfiguration;
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;

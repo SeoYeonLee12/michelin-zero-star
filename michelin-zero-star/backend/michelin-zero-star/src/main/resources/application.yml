@@ -17,7 +17,6 @@ spring:
             scope:
               - email
               - profile
-              - account_email # 구글은 기본적으로 openid, profile, email을 제공하므로 account_email은 선택사항이나 유지해둠
 
           kakao:
             client-id: "a1f418f12dfefbde9916ccaa1897631a"

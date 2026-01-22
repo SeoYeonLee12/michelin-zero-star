@@ -56,34 +56,32 @@ public class SecurityConfig {
                 .sessionManagement(
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // 인증 불필요 경로 (로그인 페이지, 정적 리소스, API 등)
+                        // 인증 불필요 경로 (API 테스트 위주로 정리)
                         .requestMatchers(
                                 "/api/v1/auth/**",
-                                "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html",
-                                "/api-docs/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
                                 "/error",
-                                "/favicon.ico",
-                                "/login.html",    // 커스텀 로그인 페이지
-                                "/callback.html",
-                                "/css/**", "/js/**", "/images/**" // 정적 리소스 경로 추가 권장
+                                "/favicon.ico"
                         ).permitAll()
 
-                        // 그 외는 인증 필요
+                        // 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()
                 )
 
-                // JWT 필터 추가
+                // JWT 필터
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
                         UsernamePasswordAuthenticationFilter.class)
 
                 // 소셜 로그인 설정
                 .oauth2Login(oauth2 -> oauth2
-                        .loginPage("/login.html")
+                        // .loginPage("/login.html")  <-- [삭제] Postman 테스트 시 불필요한 리다이렉트 방지
 
                         .userInfoEndpoint(userInfo -> userInfo
-                                .userService(customOAuth2UserService) // 사용자 정보 처리
+                                .userService(customOAuth2UserService)
                         )
-                        .successHandler(oAuth2SuccessHandler) // 로그인 성공 후 JWT 발급
+                        .successHandler(oAuth2SuccessHandler)
                 );
 
         return http.build();
