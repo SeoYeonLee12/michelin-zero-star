@@ -72,4 +72,15 @@ public class User extends SoftDeleteDomain {
     public void updatePassword(String encodedPassword) {
         this.password = encodedPassword;
     }
+
+    public User updateProfile(String name, String profileImageUrl) {
+        if (name != null && !name.isBlank()) {
+            this.name = name;
+        }
+
+        if (profileImageUrl != null && !profileImageUrl.isBlank()) {
+            this.profileImageUrl = profileImageUrl;
+        }
+        return this;
+    }
 }
