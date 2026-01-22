@@ -20,13 +20,11 @@ public record RecipeRegisterRequest(
         String mainImageUrl,
         @NotBlank(message = "설명을 입력하세요.")
         String recipeDescription,
-        @NotBlank(message = "전체 요리 시간을 입력하세요.")
+        @NotNull(message = "전체 요리 시간을 입력하세요.")
         Integer cookTime,
         @Min(value = 1)
         @NotNull(message = "인분 수를 입력하세요.")
         Integer servings,
-        @NotNull
-        Long userId,
         Double calorie,
         Double carbohydrate,
         Double protein,
@@ -45,7 +43,7 @@ public record RecipeRegisterRequest(
         List<RecipeStepRegisterRequest> steps
 ) {
 
-    public RecipeRegisterCommand toCommand() {
+    public RecipeRegisterCommand toCommand(Long userId) {
 
         List<RecipeIngredientRegisterCommand> ingredientCommands = ingredients.stream()
                 .map(RecipeIngredientRegisterRequest::toCommand).toList();
