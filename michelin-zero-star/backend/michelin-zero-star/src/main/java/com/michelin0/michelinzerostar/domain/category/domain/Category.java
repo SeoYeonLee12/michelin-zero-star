@@ -25,4 +25,7 @@ public class Category extends BaseDomain {
     @Column(name = "category_name", nullable = false)
     private String categoryName;
 
+    public Category(String categoryName) {
+        this.categoryName = categoryName;
+    }
 }
