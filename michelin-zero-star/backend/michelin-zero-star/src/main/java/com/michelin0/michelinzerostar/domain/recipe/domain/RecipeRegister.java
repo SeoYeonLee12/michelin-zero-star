@@ -1,5 +1,8 @@
 package com.michelin0.michelinzerostar.domain.recipe.domain;
 
+import com.michelin0.michelinzerostar.domain.category.domain.Category;
+import com.michelin0.michelinzerostar.domain.category.domain.RecipeCategory;
+import com.michelin0.michelinzerostar.domain.category.domain.RecipeCategoryRepository;
 import com.michelin0.michelinzerostar.global.exception.errorcode.RecipeErrorCode;
 import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
 import java.util.List;
@@ -11,29 +14,42 @@ import org.springframework.stereotype.Component;
 public class RecipeRegister {
 
     private final RecipeRepository recipeRepository;
-    private final RecipeStepRepository recipeStepRepository;
-    private final RecipeTagRepository recipeTagRepository;
-    private final RecipeIngredientRepository recipeIngredientRepository;
+    private final RecipeIngredientRepository ingredientRepository;
+    private final RecipeStepRepository stepRepository;
+    private final RecipeTagRepository tagRepository;
+    private final RecipeCategoryRepository recipeCategoryRepository;
+    private final CategoryRepository categoryRepository;
 
     public Long recipeRegist(Recipe recipe,
-            List<RecipeStep> recipeSteps,
-            List<RecipeTag> recipeTags,
-            List<RecipeIngredient> recipeIngredients
+            List<RecipeStep> steps,
+            List<RecipeTag> tags,
+            List<RecipeIngredient> ingredients,
+            List<Long> categoryIds
     ) {
+        
         if (recipeRepository.existsByUserIdAndTitle(recipe.getUser().getId(), recipe.getTitle())) {
             throw new GlobalException(RecipeErrorCode.RECIPE_ALREADY_EXISTS);
         }
-        Recipe newRecipe = recipeRepository.save(recipe);
-        recipe.registerIngredients(recipeIngredients);
-        recipe.registerSteps(recipeSteps);
-        recipe.registerTags(recipeTags);
 
-        recipeIngredientRepository.saveAll(recipeIngredients);
-        recipeStepRepository.saveAll(recipeSteps);
-        recipeTagRepository.saveAll(recipeTags);
+        Recipe savedRecipe = recipeRepository.save(recipe);
 
-        return newRecipe.getRecipeId();
+        ingredients.forEach(ingredient -> ingredient.assignToRecipe(savedRecipe));
+        steps.forEach(step -> step.assignToRecipe(savedRecipe));
+        tags.forEach(tag -> tag.assignToRecipe(savedRecipe));
 
+        List<Category> searchedCategories = categoryRepository.findAllById(categoryIds);
+        if (searchedCategories.size() != categoryIds.size()) {
+            throw new GlobalException(RecipeErrorCode.CATEGORY_NOT_FOUND);
+        }
+        List<RecipeCategory> recipeCategories = searchedCategories.stream()
+                .map(category -> new RecipeCategory(savedRecipe, category))
+                .toList();
+
+        ingredientRepository.saveAll(ingredients);
+        stepRepository.saveAll(steps);
+        tagRepository.saveAll(tags);
+        recipeCategoryRepository.saveAll(recipeCategories);
+
+        return savedRecipe.getRecipeId();
     }
-
 }

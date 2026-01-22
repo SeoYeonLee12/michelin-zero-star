@@ -32,4 +32,9 @@ public class RecipeCategory extends BaseDomain {
     @ManyToOne
     @JoinColumn(name = "categories_id")
     private Category category;
+
+    public RecipeCategory(Recipe recipe, Category category) {
+        this.recipe = recipe;
+        this.category = category;
+    }
 }

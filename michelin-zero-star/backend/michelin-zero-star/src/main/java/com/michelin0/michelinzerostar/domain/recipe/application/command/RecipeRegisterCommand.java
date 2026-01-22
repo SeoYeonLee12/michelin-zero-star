@@ -26,7 +26,8 @@ public record RecipeRegisterCommand(
         Double calcium,
         List<RecipeStepRegisterCommand> steps,
         List<RecipeTagRegisterCommand> tags,
-        List<RecipeIngredientRegisterCommand> ingredients
+        List<RecipeIngredientRegisterCommand> ingredients,
+        List<Long> categoryIds
 ) {
 
     public Recipe toRecipe(User user) {
@@ -62,4 +63,6 @@ public record RecipeRegisterCommand(
                 .map(cmd -> new RecipeTag(cmd.tagName()))
                 .toList();
     }
+
+
 }

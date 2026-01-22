@@ -3,6 +3,7 @@ package com.michelin0.michelinzerostar.domain.recipe.presentation;
 import com.michelin0.michelinzerostar.domain.recipe.application.RecipeService;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.RecipeRegisterRequest;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.RecipeRegisterResponse;
+import com.michelin0.michelinzerostar.global.security.auth.CustomUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,9 +23,11 @@ public class RecipeController {
 
     @PostMapping
     public ResponseEntity<RecipeRegisterResponse> enrolledRecipes(
-            @AuthenticationPrincipal Long userId,
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestBody @Valid RecipeRegisterRequest recipeRegisterRequest) {
-        Long recipeId = recipeService.saveRecipe(recipeRegisterRequest.toCommand(userId));
+        Long recipeId = recipeService.saveRecipe(
+                recipeRegisterRequest.toCommand(userDetails.getUser()
+                        .getId()));
         return ResponseEntity.status(HttpStatus.CREATED).body(new RecipeRegisterResponse(recipeId));
 
     }

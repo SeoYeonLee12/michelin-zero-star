@@ -23,7 +23,7 @@ public record RecipeRegisterRequest(
         @NotNull(message = "전체 요리 시간을 입력하세요.")
         Integer cookTime,
         @Min(value = 1)
-        @NotNull(message = "인분 수를 입력하세요.")
+        @NotNull(message = "인분 수를 입력하1세요.")
         Integer servings,
         Double calorie,
         Double carbohydrate,
@@ -40,7 +40,9 @@ public record RecipeRegisterRequest(
         List<RecipeTagRegisterRequest> tags,
         @Valid
         @NotEmpty(message = "단계를 입력해주세요.")
-        List<RecipeStepRegisterRequest> steps
+        List<RecipeStepRegisterRequest> steps,
+        @NotNull(message = "카테고리는 하나 이상 선택해주세요.")
+        List<Long> categoryIds
 ) {
 
     public RecipeRegisterCommand toCommand(Long userId) {
@@ -56,7 +58,7 @@ public record RecipeRegisterRequest(
 
         return new RecipeRegisterCommand(title, mainImageUrl, recipeDescription, cookTime, servings,
                 userId, calorie, carbohydrate, protein, saturatedFat, cholesterol, sodium, calcium,
-                stepCommands, tagCommands, ingredientCommands);
+                stepCommands, tagCommands, ingredientCommands, categoryIds);
     }
 
 }

@@ -43,7 +43,7 @@ public class RecipeIngredient extends BaseDomain {
     }
 
     public void assignToRecipe(Recipe recipe) {
-        if (this.recipe == null) {
+        if (this.recipe != null) {
             throw new GlobalException(RecipeErrorCode.ALREADY_ASSIGNED_INGREDIENT);
         }
         this.recipe = recipe;
