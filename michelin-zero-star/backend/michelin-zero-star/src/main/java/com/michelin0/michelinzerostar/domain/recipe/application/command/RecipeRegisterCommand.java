@@ -24,9 +24,9 @@ public record RecipeRegisterCommand(
         Double cholesterol,
         Double sodium,
         Double calcium,
-        List<RecipeStepCommand> steps,
-        List<RecipeTagCommand> tags,
-        List<RecipeIngredientCommand> ingredients
+        List<RecipeStepRegisterCommand> steps,
+        List<RecipeTagRegisterCommand> tags,
+        List<RecipeIngredientRegisterCommand> ingredients
 ) {
 
     public Recipe toRecipe(User user) {

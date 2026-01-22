@@ -1,9 +1,15 @@
 package com.michelin0.michelinzerostar.domain.recipe.presentation.dto;
 
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeIngredientRegisterCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeRegisterCommand;
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeStepRegisterCommand;
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeTagRegisterCommand;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import java.util.List;
 import org.hibernate.validator.constraints.URL;
 
 public record RecipeRegisterRequest(
@@ -13,7 +19,7 @@ public record RecipeRegisterRequest(
         @URL(message = "URL 형식이 아닙니다.")
         String mainImageUrl,
         @NotBlank(message = "설명을 입력하세요.")
-        String description,
+        String recipeDescription,
         @NotBlank(message = "전체 요리 시간을 입력하세요.")
         Integer cookTime,
         @Min(value = 1)
@@ -28,26 +34,31 @@ public record RecipeRegisterRequest(
         Double cholesterol,
         Double sodium,
         Double calcium,
-        @NotBlank(message = "재료 명을 입력하세요.")
-        String ingredientName,
-        @NotBlank(message = "재료 양을 입력하세요.")
-        String ingredientAmount,
-        @NotBlank(message = "태그를 입력하세요.")
-        String tagName,
-        @NotBlank(message = "단계 번호를 입력하세요.")
-        Integer stepNumber,
-        @NotBlank(message = "단계를 설명해주세요.")
-        String stepDescription,
-        @NotBlank(message = "현재 단계의 소요 시간(분)을 입력해주세요.")
-        Integer timerSeconds,
-        @NotBlank(message = "현재 단계의 이미지를 등록해주세요.")
-        String stepImageUrl,
-        String cookingTip
-
+        @Valid
+        @NotEmpty(message = "재료는 필수입니다.")
+        List<RecipeIngredientRegisterRequest> ingredients,
+        @Valid
+        @NotEmpty(message = "태그를 입력해주세요")
+        List<RecipeTagRegisterRequest> tags,
+        @Valid
+        @NotEmpty(message = "단계를 입력해주세요.")
+        List<RecipeStepRegisterRequest> steps
 ) {
-        //TODO modify to dto 2 command
+
     public RecipeRegisterCommand toCommand() {
-        return new RecipeRegisterCommand;
+
+        List<RecipeIngredientRegisterCommand> ingredientCommands = ingredients.stream()
+                .map(RecipeIngredientRegisterRequest::toCommand).toList();
+
+        List<RecipeStepRegisterCommand> stepCommands = steps.stream()
+                .map(RecipeStepRegisterRequest::toCommand).toList();
+
+        List<RecipeTagRegisterCommand> tagCommands = tags.stream()
+                .map(RecipeTagRegisterRequest::toCommand).toList();
+
+        return new RecipeRegisterCommand(title, mainImageUrl, recipeDescription, cookTime, servings,
+                userId, calorie, carbohydrate, protein, saturatedFat, cholesterol, sodium, calcium,
+                stepCommands, tagCommands, ingredientCommands);
     }
 
 }
