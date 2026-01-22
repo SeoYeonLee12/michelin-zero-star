@@ -1,3 +1,4 @@
 pymysql
 requests
 python-dotenv
+cryptography
