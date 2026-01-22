@@ -60,9 +60,9 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
         User user = userRepository.findByEmailAndSocialProvider(attributes.getEmail(),
                         attributes.getSocialProvider())
                 .map(entity -> {
-                    // 1. 업데이트 수행 (void)
+                    // 업데이트 수행 (void)
                     entity.updateProfile(attributes.getName(), attributes.getProfileImageUrl());
-                    // 2. 수행 후 엔티티 자신을 반환 (이게 핵심!)
+                    // 수행 후 엔티티 자신을 반환
                     return entity;
                 })
                 .orElse(attributes.toEntity()); // 없으면 새로 생성

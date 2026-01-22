@@ -56,26 +56,30 @@ public class SecurityConfig {
                 .sessionManagement(
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // 1. 인증 불필요 경로 (로그인, Swagger, 에러페이지)
+                        // 인증 불필요 경로 (로그인 페이지, 정적 리소스, API 등)
                         .requestMatchers(
                                 "/api/v1/auth/**",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html",
                                 "/api-docs/**",
-                                "/error",  // 에러 페이지 허용
-                                "/favicon.ico",// 파비콘 허용
-                                "/login.html",
-                                "/callback.html"
+                                "/error",
+                                "/favicon.ico",
+                                "/login.html",    // 커스텀 로그인 페이지
+                                "/callback.html",
+                                "/css/**", "/js/**", "/images/**" // 정적 리소스 경로 추가 권장
                         ).permitAll()
 
-                        // 2. 그 외는 인증 필요
+                        // 그 외는 인증 필요
                         .anyRequest().authenticated()
                 )
-                // 3. JWT 필터 추가
+
+                // JWT 필터 추가
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
                         UsernamePasswordAuthenticationFilter.class)
 
                 // 소셜 로그인 설정
                 .oauth2Login(oauth2 -> oauth2
+                        .loginPage("/login.html")
+
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService) // 사용자 정보 처리
                         )
