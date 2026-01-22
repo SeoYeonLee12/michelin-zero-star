@@ -144,7 +144,6 @@ data-pipeline/.env
 # 6. Crawling Data (임시 데이터 파일)
 # ===============================================
 *.csv
-*.json
 *.xlsx
 # 단, 설정 파일용 json은 예외 처리하고 싶다면 아래처럼 추가
 # !data-pipeline/config/*.json
