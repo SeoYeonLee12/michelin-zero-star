@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>로그인 성공</title>
+  <style>
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      padding: 20px;
+      line-height: 1.6;
+      background-color: #f9f9f9;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    /* 환영 문구 스타일 */
+    h1 {
+      color: #2c3e50;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 10px;
+    }
+
+    .welcome-text {
+      font-size: 1.2rem;
+      color: #555;
+      margin-bottom: 30px;
+    }
+
+    .user-name {
+      color: #3498db;
+      font-weight: bold;
+      font-size: 1.5rem;
+    }
+
+    .token-box {
+      background: #f4f4f4;
+      padding: 15px;
+      border-radius: 5px;
+      word-break: break-all;
+      border: 1px solid #ddd;
+      margin-bottom: 20px;
+      font-family: monospace; /* 토큰은 고정폭 글꼴로 */
+      color: #d63031;
+    }
+
+    .label {
+      font-weight: bold;
+      color: #333;
+      margin-top: 15px;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>로그인 성공</h1>
+  <p class="welcome-text">
+    <span id="userName" class="user-name"></span>쉐프님, 환영합니다!
+  </p>
+
+  <span class="label">Access Token:</span>
+  <div class="token-box" id="accessToken"></div>
+
+  <span class="label">Refresh Token:</span>
+  <div class="token-box" id="refreshToken"></div>
+</div>
+
+<script>
+  // URL 파라미터 가져오기
+  const urlParams = new URLSearchParams(window.location.search);
+
+  const accessToken = urlParams.get('accessToken');
+  const refreshToken = urlParams.get('refreshToken');
+  const name = urlParams.get('name'); // 이름 가져오기
+
+  // 화면에 출력하기
+  document.getElementById('userName').textContent = name ? name : "방문자"; // 이름이 없으면 '방문자'
+  document.getElementById('accessToken').textContent = accessToken ? accessToken : "토큰 없음";
+  document.getElementById('refreshToken').textContent = refreshToken ? refreshToken : "토큰 없음";
+
+  console.log("User:", name);
+</script>
+</body>
+</html>

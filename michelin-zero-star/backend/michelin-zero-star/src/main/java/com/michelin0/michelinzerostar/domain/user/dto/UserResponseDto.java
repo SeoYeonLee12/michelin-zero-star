@@ -1,0 +1,25 @@
+package com.michelin0.michelinzerostar.domain.user.dto;
+
+import com.michelin0.michelinzerostar.domain.user.entity.User;
+import com.michelin0.michelinzerostar.domain.user.entity.UserRole;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Getter
+@NoArgsConstructor
+public class UserResponseDto {
+
+    private String email;
+    private String name;
+    private String nickname;
+    private String profileImageUrl;
+    private UserRole role;
+
+    public UserResponseDto(User user) {
+        this.email = user.getEmail();
+        this.name = user.getName();
+        this.nickname = user.getNickname();
+        this.profileImageUrl = user.getProfileImageUrl();
+        this.role = user.getRole();
+    }
+}

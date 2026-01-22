@@ -4,6 +4,10 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
+/**
+ * 내부 서버 오류나 공통적인 에러 상황을 정의한 구현체 UNKNOWN_EXCEPTION (알 수 없는 에러), INVALID_INPUT_VALUE (잘못된 입력값) 등 구체적인
+ * 에러 상수들을 정의
+ */
 @Getter
 @RequiredArgsConstructor
 public enum InternalServerErrorCode implements ErrorCode {
