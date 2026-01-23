@@ -16,8 +16,12 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+/**
+ * RuntimeException을 상속받으며, 생성자로 ErrorCode를 받아 어떤 종류의 에러인지 명시
+ *
+ */
 @Slf4j
-@RestControllerAdvice
+@RestControllerAdvice // 모든 컨트롤러를 감시
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(GlobalException.class)

@@ -11,5 +11,4 @@ public class MichelinZeroStarApplication {
     public static void main(String[] args) {
         SpringApplication.run(MichelinZeroStarApplication.class, args);
     }
-
 }
