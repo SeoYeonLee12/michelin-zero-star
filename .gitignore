@@ -72,21 +72,19 @@ backend/src/main/resources/application-dev.yml
 # ===============================================
 # 4. Frontend (React / Node.js)
 # ===============================================
-frontend/node_modules/
-frontend/build/
-frontend/dist/
-frontend/.pnp
-frontend/.pnp.js
-frontend/coverage/
+# Frontend (Next.js) - 실제 경로 기준
+michelin-zero-star/frontend/node_modules/
+michelin-zero-star/frontend/.next/
+michelin-zero-star/frontend/out/
+michelin-zero-star/frontend/coverage/
+michelin-zero-star/frontend/.env*.local
 
-# Next.js (혹시 사용할 경우)
-frontend/.next/
 
 # React Environmet Variables
-frontend/.env.local
-frontend/.env.development.local
-frontend/.env.test.local
-frontend/.env.production.local
+michelin-zero-star/frontend/.env.local
+michelin-zero-star/frontend/.env.development.local
+michelin-zero-star/frontend/.env.test.local
+michelin-zero-star/frontend/.env.production.local
 
 
 # ===============================================
@@ -148,3 +146,9 @@ data-pipeline/.env
 *.xlsx
 # 단, 설정 파일용 json은 예외 처리하고 싶다면 아래처럼 추가
 # !data-pipeline/config/*.json
+# frontend json 파일은 전부 허용
+!michelin-zero-star/frontend/**/*.json
+
+# frontend lib 폴더 예외 처리 (lib/ 전역 ignore를 무력화)
+!michelin-zero-star/frontend/lib/
+!michelin-zero-star/frontend/lib/**
