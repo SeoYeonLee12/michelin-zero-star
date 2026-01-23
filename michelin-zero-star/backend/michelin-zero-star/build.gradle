@@ -53,6 +53,15 @@ dependencies {
 
     // 구글 로그인 의존성 설정
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+
+    //QueryDSL
+    // 1. QueryDSL JPA 라이브러리 (반드시 :jakarta 붙이기)
+    implementation 'com.querydsl:querydsl-jpa:5.0.0:jakarta'
+    // 2. QClass 생성을 위한 어노테이션 프로세서 (반드시 :jakarta 붙이기)
+    annotationProcessor "com.querydsl:querydsl-apt:5.0.0:jakarta"
+    // 3. (필수) java.lang.NoClassDefFoundError 방지용 추가 의존성
+    annotationProcessor "jakarta.annotation:jakarta.annotation-api"
+    annotationProcessor "jakarta.persistence:jakarta.persistence-api"
 }
 
 tasks.named('test') {
