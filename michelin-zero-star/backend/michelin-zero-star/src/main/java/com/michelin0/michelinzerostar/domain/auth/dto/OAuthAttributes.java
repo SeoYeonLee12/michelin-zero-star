@@ -35,7 +35,6 @@ public class OAuthAttributes {
     // 소셜 서비스(구글)에 맞는 메소드를 호출하여 OAuthAttributes 객체 생성
     public static OAuthAttributes of(String registrationId, String userNameAttributeName,
             Map<String, Object> attributes) {
-        // ▼▼▼ [추가] 들어오는 데이터를 로그로 찍어봅니다. (범인 색출!) ▼▼▼
         log.info("로그인 시도: registrationId = {}, attributes = {}", registrationId, attributes);
 
         if ("google".equals(registrationId)) {
