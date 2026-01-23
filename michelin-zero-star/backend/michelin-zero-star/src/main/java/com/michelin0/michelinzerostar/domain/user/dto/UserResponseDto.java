@@ -1,5 +1,6 @@
 package com.michelin0.michelinzerostar.domain.user.dto;
 
+import com.michelin0.michelinzerostar.domain.user.entity.SocialProvider;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.domain.user.entity.UserRole;
 import lombok.Getter;
@@ -14,6 +15,8 @@ public class UserResponseDto {
     private String nickname;
     private String profileImageUrl;
     private UserRole role;
+    private Double totalStar;
+    private SocialProvider socialProvider;
 
     public UserResponseDto(User user) {
         this.email = user.getEmail();
@@ -21,5 +24,7 @@ public class UserResponseDto {
         this.nickname = user.getNickname();
         this.profileImageUrl = user.getProfileImageUrl();
         this.role = user.getRole();
+        this.totalStar = user.getTotalStar();
+        this.socialProvider = user.getSocialProvider();
     }
 }

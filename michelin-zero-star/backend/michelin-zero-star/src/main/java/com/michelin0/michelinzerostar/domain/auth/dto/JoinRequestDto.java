@@ -30,7 +30,7 @@ public class JoinRequestDto {
     public User toEntity(PasswordEncoder passwordEncoder) {
         return User.builder()
                 .email(email)
-                .password(passwordEncoder.encode(password)) // 중요: 비밀번호 암호화
+                .password(passwordEncoder.encode(password)) // 비밀번호 암호화
                 .name(name)
                 .nickname(nickname)
                 .role(UserRole.USER) // 가입 시 기본 권한은 USER

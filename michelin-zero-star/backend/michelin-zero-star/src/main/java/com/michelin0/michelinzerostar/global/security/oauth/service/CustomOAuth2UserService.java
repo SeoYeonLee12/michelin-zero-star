@@ -61,7 +61,8 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
                         attributes.getSocialProvider())
                 .map(entity -> {
                     // 업데이트 수행 (void)
-                    entity.updateProfile(attributes.getName(), attributes.getProfileImageUrl());
+                    entity.updateProfile(attributes.getName(), null,
+                            attributes.getProfileImageUrl());
                     // 수행 후 엔티티 자신을 반환
                     return entity;
                 })
