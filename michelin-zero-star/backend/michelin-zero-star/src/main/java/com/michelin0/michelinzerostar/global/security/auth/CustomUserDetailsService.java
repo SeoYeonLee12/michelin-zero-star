@@ -1,5 +1,6 @@
 package com.michelin0.michelinzerostar.global.security.auth;
 
+import com.michelin0.michelinzerostar.domain.user.entity.SocialProvider;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,12 +17,16 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        // 1. 이메일로 User 엔티티 조회
         User user = userRepository.findByEmail(email)
-                .orElseThrow(
-                        () -> new UsernameNotFoundException("해당 유저를 찾을 수 없습니다. email: " + email));
+                .orElseThrow(() -> new UsernameNotFoundException("유저를 찾을 수 없습니다: " + email));
 
-        // 2. UserDetails 구현체(CustomUserDetails)로 변환하여 반환
         return new CustomUserDetails(user);
     }
+
+    public UserDetails loadUserByEmailAndProvider(String email, SocialProvider provider) {
+        User user = userRepository.findByEmailAndSocialProvider(email, provider)
+                .orElseThrow(() -> new UsernameNotFoundException("유저를 찾을 수 없습니다."));
+        return new CustomUserDetails(user);
+    }
+
 }

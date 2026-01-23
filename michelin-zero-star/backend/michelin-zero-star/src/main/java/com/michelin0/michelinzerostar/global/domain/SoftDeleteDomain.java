@@ -16,4 +16,12 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 public class SoftDeleteDomain extends BaseDomain {
 
     private LocalDateTime deletedAt;
+
+    public void recordDeleteTime() {
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    public void undoDelete() {
+        this.deletedAt = null;
+    }
 }
