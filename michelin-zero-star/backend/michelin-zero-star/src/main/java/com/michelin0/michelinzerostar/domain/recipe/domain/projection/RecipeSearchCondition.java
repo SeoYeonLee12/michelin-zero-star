@@ -1,4 +1,4 @@
-package com.michelin0.michelinzerostar.domain.recipe.domain.dto;
+package com.michelin0.michelinzerostar.domain.recipe.domain.projection;
 
 public record RecipeSearchCondition(
         String category,

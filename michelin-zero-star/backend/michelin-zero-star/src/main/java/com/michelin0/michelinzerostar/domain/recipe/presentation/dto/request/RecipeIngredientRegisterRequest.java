@@ -1,6 +1,6 @@
 package com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request;
 
-import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeIngredientRegisterCommand;
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeIngredientCommand;
 import jakarta.validation.constraints.NotBlank;
 
 public record RecipeIngredientRegisterRequest(
@@ -10,8 +10,8 @@ public record RecipeIngredientRegisterRequest(
         String ingredientAmount
 ) {
 
-    public RecipeIngredientRegisterCommand toCommand() {
-        return new RecipeIngredientRegisterCommand(this.ingredientName, this.ingredientAmount);
+    public RecipeIngredientCommand toCommand() {
+        return new RecipeIngredientCommand(this.ingredientName, this.ingredientAmount);
     }
 
 }

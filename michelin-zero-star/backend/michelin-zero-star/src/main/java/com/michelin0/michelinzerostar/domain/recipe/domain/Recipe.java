@@ -91,6 +91,7 @@ public class Recipe extends SoftDeleteDomain {
         this.user = user;
     }
 
+
     public void registerIngredients(List<RecipeIngredient> ingredients) {
         if (ingredients == null || ingredients.isEmpty()) {
             throw new GlobalException(RecipeErrorCode.INVALID_INGREDIENT);

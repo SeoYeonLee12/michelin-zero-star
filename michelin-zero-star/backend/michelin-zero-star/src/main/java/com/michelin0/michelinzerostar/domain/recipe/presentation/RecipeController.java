@@ -1,6 +1,7 @@
 package com.michelin0.michelinzerostar.domain.recipe.presentation;
 
 import com.michelin0.michelinzerostar.domain.recipe.application.RecipeService;
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeDetailCommand;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request.RecipeRegisterRequest;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeDetailResponse;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeRegisterResponse;
@@ -12,10 +13,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 
 @Controller
 @RequestMapping("/api/recipes")
@@ -38,14 +39,12 @@ public class RecipeController {
 
     @GetMapping("/{recipeId}")
     public ResponseEntity<RecipeDetailResponse> getDetailRecipe(
-            @RequestParam Long recipeId,
+            @PathVariable Long recipeId,
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        //TODO 검증로직을 여기에 둬도 되나?
         Long currentUserId = (userDetails != null) ? userDetails.getUser().getId() : null;
-
-//        RecipeDetailResponse response = RecipeService.findRecipeDetail(recipeId, currentUserId);
-//        return ResponseEntity.status(HttpStatus.OK).body(response);
-        return null;
+        RecipeDetailCommand command = recipeService.getDetailRecipe(recipeId, currentUserId);
+        RecipeDetailResponse response = RecipeDetailResponse.from(command);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 }

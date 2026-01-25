@@ -1,5 +1,6 @@
 package com.michelin0.michelinzerostar.domain.recipe.domain;
 
+import static com.michelin0.michelinzerostar.domain.RecipeScrap.domain.QRecipeScrap.recipeScrap;
 import static com.michelin0.michelinzerostar.domain.category.domain.QCategory.category;
 import static com.michelin0.michelinzerostar.domain.category.domain.QRecipeCategory.recipeCategory;
 import static com.michelin0.michelinzerostar.domain.recipe.domain.QRecipe.recipe;
@@ -8,10 +9,10 @@ import static com.michelin0.michelinzerostar.domain.recipe.domain.QRecipeStep.re
 import static com.michelin0.michelinzerostar.domain.recipe.domain.QRecipeTag.recipeTag;
 import static com.michelin0.michelinzerostar.domain.user.entity.QUser.user;
 
-import com.michelin0.michelinzerostar.domain.recipe.domain.dto.RecipeDetailDto;
-import com.michelin0.michelinzerostar.domain.recipe.domain.dto.RecipeIngredientDto;
-import com.michelin0.michelinzerostar.domain.recipe.domain.dto.RecipeStepDto;
-import com.michelin0.michelinzerostar.domain.recipe.domain.dto.RecipeTagDto;
+import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeDetailProjection;
+import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeIngredientProjection;
+import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeStepProjection;
+import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeTagProjection;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -22,11 +23,11 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 @RequiredArgsConstructor
-public class RecipeRepositoryCustom {
+public class RecipeQueryRepository {
 
     private final JPAQueryFactory queryFactory;
 
-    public Optional<RecipeDetailDto> findRecipeById(Long recipeId) {
+    public Optional<RecipeDetailProjection> findRecipeById(Long recipeId, Long loginUserId) {
 
         Recipe foundRecipe = queryFactory
                 .selectFrom(recipe)
@@ -38,6 +39,10 @@ public class RecipeRepositoryCustom {
             return Optional.empty();
         }
 
+        Boolean isMine = (loginUserId != null) && foundRecipe.getUser().getId().equals(loginUserId);
+        Boolean isScrapped = checkIsScrapped(recipeId, loginUserId
+        );
+
         // 카테고리명 태그 재료 단계
         List<String> categoryNames = queryFactory
                 .select(category.categoryName)
@@ -46,52 +51,74 @@ public class RecipeRepositoryCustom {
                 .where(recipeCategory.recipe.recipeId.eq(recipe.recipeId))
                 .fetch();
 
-        List<RecipeTagDto> tags = queryFactory
+        List<RecipeTagProjection> tags = queryFactory
                 .select(Projections.constructor(
-                        RecipeTagDto.class,
+                        RecipeTagProjection.class,
                         recipeTag.tagName)
                 )
                 .from(recipeTag)
                 .where(recipeTag.recipe.recipeId.eq(recipeId))
                 .fetch();
 
-        List<RecipeIngredientDto> ingredients = queryFactory
+        List<RecipeIngredientProjection> ingredients = queryFactory
                 .select(Projections.constructor(
-                        RecipeIngredientDto.class,
+                        RecipeIngredientProjection.class,
                         recipeIngredient.ingredientName, recipeIngredient.amount)
                 )
                 .from(recipeIngredient)
                 .where(recipeIngredient.recipe.recipeId.eq(recipeId))
                 .fetch();
 
-        List<RecipeStepDto> steps = queryFactory
+        List<RecipeStepProjection> steps = queryFactory
                 .select(Projections.constructor(
-                        RecipeStepDto.class,
-                        recipeStep.stepNumber,
-                        recipeStep.stepDescription,
-                        recipeStep.stepImageUrl,
-                        recipeStep.timerSeconds)
+                                RecipeStepProjection.class,
+                                recipeStep.stepNumber,
+                                recipeStep.stepDescription,
+                                recipeStep.timerSeconds,
+                                recipeStep.stepImageUrl,
+                                recipeStep.cookingTip
+                        )
                 )
                 .from(recipeStep)
                 .where(recipeStep.recipe.recipeId.eq(recipeId))
                 .orderBy(recipeStep.stepNumber.asc())
                 .fetch();
 
-        return Optional.of(toDetailDto(foundRecipe, categoryNames, tags, ingredients, steps));
+        return Optional.of(
+                toDetailDto(foundRecipe, categoryNames, tags, ingredients, steps, isScrapped,
+                        isMine));
+    }
+
+    private Boolean checkIsScrapped(Long recipeId, Long userId) {
+        if (userId == null) {
+            return false;
+        }
+        Integer fetchOne = queryFactory
+                .selectOne()
+                .from(recipeScrap)
+                .where(
+                        recipeScrap.recipe.recipeId.eq(recipeId),
+                        recipeScrap.user.id.eq(userId)
+                )
+                .fetchFirst();
+
+        return fetchOne != null;
     }
 
     private BooleanExpression recipeIdEq(Long recipeId) {
         return recipeId != null ? recipe.recipeId.eq(recipeId) : null;
     }
 
-    private RecipeDetailDto toDetailDto(
+    private RecipeDetailProjection toDetailDto(
             Recipe recipe,
             List<String> categoryNames,
-            List<RecipeTagDto> tags,
-            List<RecipeIngredientDto> ingredients,
-            List<RecipeStepDto> steps
+            List<RecipeTagProjection> tags,
+            List<RecipeIngredientProjection> ingredients,
+            List<RecipeStepProjection> steps,
+            Boolean isScrapped,
+            Boolean isMine
     ) {
-        return new RecipeDetailDto(
+        return new RecipeDetailProjection(
                 recipe.getRecipeId(),
                 recipe.getUser().getId(),
                 recipe.getTitle(),
@@ -113,8 +140,8 @@ public class RecipeRepositoryCustom {
                 recipe.getCreatedAt(),
                 recipe.getUpdatedAt(),
                 recipe.getUser().getNickname(),
-                false, // isScrapped
-                false, // isMine
+                isScrapped,
+                isMine,
                 categoryNames,
                 tags,
                 ingredients,

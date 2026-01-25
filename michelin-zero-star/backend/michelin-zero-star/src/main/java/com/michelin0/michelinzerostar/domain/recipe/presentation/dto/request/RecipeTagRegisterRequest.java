@@ -1,6 +1,6 @@
 package com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request;
 
-import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeTagRegisterCommand;
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeTagCommand;
 import jakarta.validation.constraints.NotBlank;
 
 public record RecipeTagRegisterRequest(
@@ -8,7 +8,7 @@ public record RecipeTagRegisterRequest(
         String tagName
 ) {
 
-    public RecipeTagRegisterCommand toCommand() {
-        return new RecipeTagRegisterCommand(tagName);
+    public RecipeTagCommand toCommand() {
+        return new RecipeTagCommand(tagName);
     }
 }
