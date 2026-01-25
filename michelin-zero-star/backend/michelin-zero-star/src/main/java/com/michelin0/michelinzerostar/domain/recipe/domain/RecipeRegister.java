@@ -9,6 +9,7 @@ import com.michelin0.michelinzerostar.global.exception.exception.GlobalException
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -21,6 +22,7 @@ public class RecipeRegister {
     private final RecipeCategoryRepository recipeCategoryRepository;
     private final CategoryRepository categoryRepository;
 
+    @Transactional
     public Long registerRecipe(Recipe recipe,
             List<RecipeStep> steps,
             List<RecipeTag> tags,

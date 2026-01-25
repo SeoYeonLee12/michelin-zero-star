@@ -12,7 +12,6 @@ import com.michelin0.michelinzerostar.domain.user.repository.UserRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -21,7 +20,6 @@ public class RecipeService {
     private final RecipeRegister recipeRegister;
     private final UserRepository userRepository;
 
-    @Transactional
     public Long saveRecipe(RecipeRegisterCommand command) {
         User user = userRepository.getById(command.userId());
         Recipe recipe = command.toRecipe(user);
