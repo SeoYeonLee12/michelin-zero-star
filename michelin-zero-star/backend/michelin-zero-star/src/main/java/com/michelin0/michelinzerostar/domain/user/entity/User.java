@@ -73,14 +73,29 @@ public class User extends SoftDeleteDomain {
         this.password = encodedPassword;
     }
 
-    public User updateProfile(String name, String profileImageUrl) {
+    public void updateProfile(String name, String nickname, String profileImageUrl) {
         if (name != null && !name.isBlank()) {
             this.name = name;
+        }
+
+        if (nickname != null && !nickname.isBlank()) {
+            this.nickname = nickname;
         }
 
         if (profileImageUrl != null && !profileImageUrl.isBlank()) {
             this.profileImageUrl = profileImageUrl;
         }
-        return this;
+    }
+
+    public void withdraw() {
+        // 이메일 마스킹 (중복 가입 방지 및 개인정보 보호)
+        this.email = "withdrawn_" + this.id + "@michelin.com";
+        this.nickname = "탈퇴한사용자";
+        this.profileImageUrl = null;
+        this.password = null;
+        this.socialProvider = null;
+        this.socialId = null;
+
+        recordDeleteTime();
     }
 }

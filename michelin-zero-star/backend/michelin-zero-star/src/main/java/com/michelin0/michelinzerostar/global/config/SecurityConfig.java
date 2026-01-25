@@ -1,11 +1,15 @@
 package com.michelin0.michelinzerostar.global.config;
 
+import com.michelin0.michelinzerostar.global.exception.errorcode.AuthErrorCode;
+import com.michelin0.michelinzerostar.global.exception.response.ErrorResponse;
 import com.michelin0.michelinzerostar.global.security.auth.CustomUserDetailsService;
 import com.michelin0.michelinzerostar.global.security.jwt.JwtAuthenticationFilter;
 import com.michelin0.michelinzerostar.global.security.jwt.JwtTokenProvider;
 import com.michelin0.michelinzerostar.global.security.oauth.handler.OAuth2SuccessHandler;
 import com.michelin0.michelinzerostar.global.security.oauth.service.CustomOAuth2UserService;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -19,7 +23,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import tools.jackson.databind.ObjectMapper;
 
+@Slf4j
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
@@ -50,40 +56,80 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, ObjectMapper objectMapper)
+            throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
                 .sessionManagement(
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // 인증 불필요 경로 (로그인 페이지, 정적 리소스, API 등)
+                        // 로그인 관련 경로 허용
                         .requestMatchers(
                                 "/api/v1/auth/**",
-                                "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html",
-                                "/api-docs/**",
+                                "/login/**",
+                                "/oauth2/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
                                 "/error",
-                                "/favicon.ico",
-                                "/login.html",    // 커스텀 로그인 페이지
-                                "/callback.html",
-                                "/css/**", "/js/**", "/images/**" // 정적 리소스 경로 추가 권장
+                                "/favicon.ico"
                         ).permitAll()
-
-                        // 그 외는 인증 필요
                         .anyRequest().authenticated()
                 )
 
-                // JWT 필터 추가
+                // JWT 필터
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
                         UsernamePasswordAuthenticationFilter.class)
 
                 // 소셜 로그인 설정
                 .oauth2Login(oauth2 -> oauth2
-                        .loginPage("/login.html")
-
                         .userInfoEndpoint(userInfo -> userInfo
-                                .userService(customOAuth2UserService) // 사용자 정보 처리
+                                .userService(customOAuth2UserService)
                         )
-                        .successHandler(oAuth2SuccessHandler) // 로그인 성공 후 JWT 발급
+                        .successHandler(oAuth2SuccessHandler)
+                        .failureHandler((request, response, exception) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json;charset=UTF-8");
+                            String jsonResponse =
+                                    "{\"error\": \"OAuth2 Login Failed\", \"message\": \""
+                                            + exception.getMessage().replace("\"", "'") + "\"}";
+
+                            response.getWriter().write(jsonResponse);
+                        })
+                )
+
+                .exceptionHandling(exception -> exception
+                        // 로그인 실패 (401) 처리
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            log.error("인증 실패 발생 (401): ", authException);
+
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+
+                            ErrorResponse errorResponse = ErrorResponse.from(
+                                    AuthErrorCode.AUTHENTICATION_FAILED);
+
+                            // tools.jackson ObjectMapper로 변환
+                            response.getWriter()
+                                    .write(objectMapper.writeValueAsString(errorResponse));
+                        })
+
+                        // 권한 없음 (403) 처리
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            log.error("권한 없음 발생 (403): ", accessDeniedException);
+
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+
+                            ErrorResponse errorResponse = ErrorResponse.from(
+                                    AuthErrorCode.ACCESS_DENIED);
+
+                            // tools.jackson ObjectMapper로 변환
+                            response.getWriter()
+                                    .write(objectMapper.writeValueAsString(errorResponse));
+                        })
                 );
 
         return http.build();

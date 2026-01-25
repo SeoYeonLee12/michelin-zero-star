@@ -38,6 +38,7 @@ public class UserController {
         SocialProvider provider = SocialProvider.valueOf(
                 jwtTokenProvider.getSocialProvider(resolvedToken));
 
+        // userService.deleteUser 호출 시 provider 인자를 추가
         userService.deleteUser(resolvedToken, userDetails.getUsername(), provider);
 
         return ResponseEntity.ok("회원 탈퇴가 완료되었습니다.");

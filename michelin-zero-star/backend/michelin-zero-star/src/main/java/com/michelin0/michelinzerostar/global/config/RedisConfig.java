@@ -14,8 +14,6 @@ public class RedisConfig {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
 
-        // Key와 Value를 직렬화(Serializer) 설정해야 Redis-cli에서 사람이 읽을 수 있는 텍스트로 저장됩니다.
-
         // Key: String으로 직렬화
         template.setKeySerializer(new StringRedisSerializer());
 

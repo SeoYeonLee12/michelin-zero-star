@@ -1,5 +1,6 @@
 package com.michelin0.michelinzerostar.domain.auth.dto;
 
+import com.michelin0.michelinzerostar.domain.user.entity.SocialProvider;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.domain.user.entity.UserRole;
 import jakarta.validation.constraints.Email;
@@ -29,11 +30,11 @@ public class JoinRequestDto {
     public User toEntity(PasswordEncoder passwordEncoder) {
         return User.builder()
                 .email(email)
-                .password(passwordEncoder.encode(password)) // 중요: 비밀번호 암호화
+                .password(passwordEncoder.encode(password)) // 비밀번호 암호화
                 .name(name)
                 .nickname(nickname)
                 .role(UserRole.USER) // 가입 시 기본 권한은 USER
-                .socialProvider(null) // 일반 회원가입이므로 null
+                .socialProvider(SocialProvider.LOCAL)
                 .build();
     }
 }
