@@ -33,13 +33,9 @@ public class RecipeRegister {
 
         Recipe savedRecipe = recipeRepository.save(recipe);
 
-        // TODO 테스팅 필요 안 쓰게 되면 삭제 예정
         recipe.registerIngredients(ingredients);
         recipe.registerSteps(steps);
         recipe.registerTags(tags);
-//        ingredients.forEach(ingredient -> ingredient.assignToRecipe(savedRecipe));
-//        steps.forEach(step -> step.assignToRecipe(savedRecipe));
-//        tags.forEach(tag -> tag.assignToRecipe(savedRecipe));
 
         List<Category> searchedCategories = categoryRepository.findAllById(categoryIds);
         if (searchedCategories.size() != categoryIds.size()) {
