@@ -1,6 +1,5 @@
-package com.michelin0.michelinzerostar.domain.recipe.domain;
+package com.michelin0.michelinzerostar.domain.category.domain;
 
-import com.michelin0.michelinzerostar.domain.category.domain.Category;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

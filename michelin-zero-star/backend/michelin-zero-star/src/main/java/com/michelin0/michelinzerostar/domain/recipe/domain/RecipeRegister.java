@@ -1,6 +1,7 @@
 package com.michelin0.michelinzerostar.domain.recipe.domain;
 
 import com.michelin0.michelinzerostar.domain.category.domain.Category;
+import com.michelin0.michelinzerostar.domain.category.domain.CategoryRepository;
 import com.michelin0.michelinzerostar.domain.category.domain.RecipeCategory;
 import com.michelin0.michelinzerostar.domain.category.domain.RecipeCategoryRepository;
 import com.michelin0.michelinzerostar.global.exception.errorcode.RecipeErrorCode;
@@ -20,13 +21,12 @@ public class RecipeRegister {
     private final RecipeCategoryRepository recipeCategoryRepository;
     private final CategoryRepository categoryRepository;
 
-    public Long recipeRegist(Recipe recipe,
+    public Long registerRecipe(Recipe recipe,
             List<RecipeStep> steps,
             List<RecipeTag> tags,
             List<RecipeIngredient> ingredients,
             List<Long> categoryIds
     ) {
-
         if (recipeRepository.existsByUserIdAndTitle(recipe.getUser().getId(), recipe.getTitle())) {
             throw new GlobalException(RecipeErrorCode.RECIPE_ALREADY_EXISTS);
         }
