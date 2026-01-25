@@ -49,7 +49,12 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security'
 
     implementation 'org.springframework.boot:spring-boot-starter-validation'
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.3'
+
+    // [변경] Spring Boot 4.x 호환 최신 버전 (2026.01.01 출시)
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.1'
+
+    // [추가] SpringDoc이 내부적으로 찾는 설정 클래스를 위해 추가
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
     // 구글 로그인 의존성 설정
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
