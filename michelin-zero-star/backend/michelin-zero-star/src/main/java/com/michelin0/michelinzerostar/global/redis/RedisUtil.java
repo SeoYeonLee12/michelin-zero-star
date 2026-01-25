@@ -1,6 +1,7 @@
 package com.michelin0.michelinzerostar.global.redis;
 
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
@@ -31,5 +32,17 @@ public class RedisUtil {
 
     public boolean hasKeyBlackList(String accessToken) {
         return Boolean.TRUE.equals(redisTemplate.hasKey("BlackList:" + accessToken));
+    }
+
+    public String getData(String key) {
+        return (String) redisTemplate.opsForValue().get(key);
+    }
+
+    public void deleteData(String key) {
+        redisTemplate.delete(key);
+    }
+
+    public void setDataExpire(String key, String value, long duration) {
+        redisTemplate.opsForValue().set(key, value, duration, TimeUnit.SECONDS);
     }
 }

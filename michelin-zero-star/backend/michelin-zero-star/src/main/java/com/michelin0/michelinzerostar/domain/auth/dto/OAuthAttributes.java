@@ -12,7 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 @Getter
 public class OAuthAttributes {
 
-    private Map<String, Object> attributes; // OAuth2 반환하는 유저 정보 Map
+    private Map<String, Object> attributes;
     private String nameAttributeKey;
     private String name;
     private String email;
@@ -64,10 +64,10 @@ public class OAuthAttributes {
 
     private static OAuthAttributes ofKakao(String userNameAttributeName,
             Map<String, Object> attributes) {
-        // 1. kakao_account 꺼내기
+        // kakao_account 꺼내기
         Map<String, Object> kakaoAccount = (Map<String, Object>) attributes.get("kakao_account");
 
-        // 2. profile 꺼내기
+        // profile 꺼내기
         Map<String, Object> kakaoProfile = (Map<String, Object>) kakaoAccount.get("profile");
 
         return OAuthAttributes.builder()
@@ -90,7 +90,7 @@ public class OAuthAttributes {
                 .profileImageUrl((String) response.get("profile_image"))
                 .socialProvider(SocialProvider.NAVER)
                 .socialId((String) response.get("id"))
-                .attributes(response) // response를 통째로 넘겨줍니다.
+                .attributes(response)
                 .nameAttributeKey("id") // 네이버의 PK는 id
                 .build();
     }
@@ -100,7 +100,7 @@ public class OAuthAttributes {
         return User.builder()
                 .name(name)
                 .email(email)
-                .nickname(name) // 닉네임은 이름과 동일하게 설정 (추후 변경 가능)
+                .nickname(name) // 닉네임은 이름과 동일하게 설정
                 .profileImageUrl(profileImageUrl)
                 .role(UserRole.USER) // 가입 시 기본 권한
                 .socialProvider(socialProvider)
