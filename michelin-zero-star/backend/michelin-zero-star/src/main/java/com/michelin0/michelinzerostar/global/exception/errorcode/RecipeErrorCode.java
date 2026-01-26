@@ -19,7 +19,7 @@ public enum RecipeErrorCode implements ErrorCode {
     ALREADY_ASSIGNED_RECIPE_CATEGORY(HttpStatus.CONFLICT, "RC008", "레시피에 카테고리를 할당할 수 없습니다."),
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "RC009", "카테고리를 찾을 수 없습니다."),
     RECIPE_NOT_FOUND(HttpStatus.NOT_FOUND, "RC010", "레시피를 찾을 수 없습니다."),
-    ;
+    ACCESS_DENIED(HttpStatus.FORBIDDEN, "RC015", "권한이 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;

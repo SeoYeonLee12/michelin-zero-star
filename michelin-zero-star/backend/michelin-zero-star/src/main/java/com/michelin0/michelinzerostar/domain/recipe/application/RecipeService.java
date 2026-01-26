@@ -7,6 +7,7 @@ import com.michelin0.michelinzerostar.domain.recipe.domain.Recipe;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeIngredient;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeQueryRepository;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeRegister;
+import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeRepository;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeStep;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeTag;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeDetailProjection;
@@ -26,6 +27,7 @@ public class RecipeService {
     private final RecipeRegister recipeRegister;
     private final UserRepository userRepository;
     private final RecipeQueryRepository recipeQueryRepository;
+    private final RecipeRepository recipeRepository;
 
     public Long saveRecipe(RecipeRegisterCommand command) {
         User user = userRepository.getById(command.userId());
@@ -39,12 +41,14 @@ public class RecipeService {
 
     @Transactional(readOnly = true)
     public RecipeDetailCommand getDetailRecipe(Long recipeId, Long userId) {
-
         RecipeDetailProjection domainDto = recipeQueryRepository.findRecipeById(recipeId, userId)
                 .orElseThrow(() -> new GlobalException(RecipeErrorCode.RECIPE_NOT_FOUND));
-
         return RecipeDetailCommand.from(domainDto);
     }
 
-
+    public void deleteRecipe(Long recipeId, Long userId) {
+        Recipe searchedRecipe = recipeRepository.getById(recipeId);
+        searchedRecipe.validateRecipeEnrolledUser(userId);
+        recipeRepository.deleteById(recipeId);
+    }
 }
