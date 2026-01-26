@@ -43,7 +43,6 @@ export function CompleteCookDialog({
   const [comment, setComment] = useState("")
   const [reviewSubmitted, setReviewSubmitted] = useState(false)
   const [scrapFeedback, setScrapFeedback] = useState<string | null>(null)
-  const [isCompletedRecipeLiked, setIsCompletedRecipeLiked] = useState(false)
 
   // NOTE: "요리 완료"(completed)와 "리뷰 작성"(reviewed)은 의미가 다르므로 분리합니다.
   // 리뷰 여부는 derived 값으로 계산해 상태 꼬임을 방지합니다.
@@ -58,6 +57,8 @@ export function CompleteCookDialog({
 
 
   if (!completedRecipe) return null
+
+  const isCompletedRecipeLiked = isRecipeLiked(completedRecipe.id)
 
   const handleLikeRecipe = (recipe: Recipe) => {
     if (!isLoggedIn) return
@@ -76,22 +77,24 @@ export function CompleteCookDialog({
   }
 
   const handleLikeCompletedRecipe = () => {
-    if (!isLoggedIn) return
-    setIsCompletedRecipeLiked(!isCompletedRecipeLiked)
-    if (!isCompletedRecipeLiked) {
-      toggleLikeRecipe({
-        id: completedRecipe.id,
-        title: completedRecipe.name,
-        image: completedRecipe.thumbnail || "/placeholder.svg",
-        author: completedRecipe.hashtags?.[0] || "미슐랭 0스타",
-        savedAt: new Date().toISOString(),
-      })
-      setScrapFeedback("스크랩했습니다")
-      setTimeout(() => setScrapFeedback(null), 2000)
-    }
-  }
+  if (!isLoggedIn) return
+  const wasLiked = isRecipeLiked(completedRecipe.id)
 
-  const handleSubmitReview = () => {
+  toggleLikeRecipe({
+    id: completedRecipe.id,
+    title: completedRecipe.name,
+    image: completedRecipe.thumbnail || "/placeholder.svg",
+    author: completedRecipe.hashtags?.[0] || "미슐랭 0스타",
+    savedAt: "",
+  })
+
+  if (!wasLiked) {
+    setScrapFeedback("스크랩했습니다")
+    setTimeout(() => setScrapFeedback(null), 2000)
+  }
+}
+
+const handleSubmitReview = () => {
     if (rating === 0 || !isLoggedIn) return
     console.log("Review submitted as recipe comment:", { rating, comment, recipeId: completedRecipe.id, userId: user?.id })
     // 리뷰는 레시피당 1회만 허용

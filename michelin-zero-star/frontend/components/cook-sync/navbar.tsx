@@ -1,8 +1,7 @@
 "use client"
-import { usePathname, useSearchParams } from "next/navigation"
-import { MichelinIcon } from "@/components/common/MichelinIcon"
+import { usePathname, useSearchParams, useRouter } from "next/navigation"
 import type React from "react"
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   Bell,
   User,
@@ -13,12 +12,10 @@ import {
   Trash2,
   BookOpen,
   FlaskConical,
-  Star,
   Heart,
   MessageCircle,
 } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -31,49 +28,16 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
+import {
+  getNotificationsSnapshot,
+  subscribeNotifications,
+  notificationsActions,
+  type NotificationItem,
+} from "@/lib/notifications-store"
 
 interface NavbarProps {
   onLogoClick?: () => void
 }
-
-const initialNotifications = [
-  {
-    id: 1,
-    type: "rating",
-    title: "미슐랭 평가단이 왔다갔어요",
-    message: "김대전님이 회원님의 레시피에 평점을 남겼습니다.",
-    time: "5분 전",
-    read: false,
-    link: "/recipes/japchae",
-  },
-  {
-    id: 2,
-    type: "like",
-    title: "좋아요 알림",
-    message: "박요리님이 회원님의 레시피를 좋아합니다.",
-    time: "1시간 전",
-    read: false,
-    link: "/recipes/japchae",
-  },
-  {
-    id: 3,
-    type: "comment",
-    title: "미슐랭 평가단이 왔다갔어요",
-    message: "이맛집님이 회원님의 레시피에 댓글을 남겼습니다.",
-    time: "3시간 전",
-    read: true,
-    link: "/recipes/japchae",
-  },
-  {
-    id: 4,
-    type: "message",
-    title: "쪽지 알림",
-    message: "최요리님이 쪽지를 보냈습니다.",
-    time: "어제",
-    read: true,
-    link: "/messages/user4",
-  },
-]
 
 function formatKST(isoString?: string) {
   if (!isoString) return ""
@@ -88,22 +52,6 @@ function formatKST(isoString?: string) {
     minute: "2-digit",
     hour12: false,
   }).format(d)
-}
-
-
-function DynamicStars({ starCount = 0 }: { starCount?: number }) {
-  return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: Math.max(1, starCount || 1) }).map((_, i) => (
-        <img
-          key={i}
-          src="/michelin-star.png"
-          alt="미슐랭"
-          className={cn("h-3 w-3 transition-all", starCount > 0 ? "opacity-100" : "opacity-50")}
-        />
-      ))}
-    </div>
-  )
 }
 
 function getNotificationIcon(type: string) {
@@ -125,8 +73,15 @@ export function Navbar({ onLogoClick }: NavbarProps) {
   const router = useRouter()
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [dmOpen, setDmOpen] = useState(false)
-  const [notifications, setNotifications] = useState(initialNotifications)
-  const [userStarLevel] = useState(0)
+
+  // ✅ Store 기반 알림 상태 (B)
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => getNotificationsSnapshot())
+  useEffect(() => {
+    return subscribeNotifications(() => {
+      setNotifications(getNotificationsSnapshot())
+    })
+  }, [])
+
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const type = searchParams.get("type")
@@ -134,7 +89,6 @@ export function Navbar({ onLogoClick }: NavbarProps) {
   const isLibraryActive = pathname === "/recipes" && type === "cook"
   const isLabActive = pathname === "/recipes" && type === "user"
   const isCommunityActive = pathname.startsWith("/community")
-
 
   const userLocation = user?.location ? user.location.split(" ").slice(-1)[0] : "우리 동네"
 
@@ -146,42 +100,72 @@ export function Navbar({ onLogoClick }: NavbarProps) {
     }
   }
 
-  const unreadCount = notifications.filter((n) => !n.read).length
+  const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications])
   const unreadDmCount = conversations.reduce((acc, c) => acc + c.unreadCount, 0)
 
-  const handleNotificationClick = (notif: (typeof notifications)[0]) => {
-    setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)))
+  const handleNotificationClick = (notif: NotificationItem) => {
+    notificationsActions.markRead(notif.id)
     setNotificationOpen(false)
     router.push(notif.link)
   }
 
   const handleDeleteAllNotifications = () => {
-    setNotifications([])
+    notificationsActions.clearAll()
   }
+
+  // ✅ 로고 애니메이션 토글 (텍스트 ↔ 별) — 흔들림 해결한 버전 유지
+  const [logoMode, setLogoMode] = useState<"text" | "stars">("text")
+  const [logoTick, setLogoTick] = useState(0)
+
+  useEffect(() => {
+    const INTERVAL_MS = 4500
+    const id = window.setInterval(() => {
+      setLogoMode((m) => (m === "text" ? "stars" : "text"))
+      setLogoTick((t) => t + 1)
+    }, INTERVAL_MS)
+    return () => window.clearInterval(id)
+  }, [])
+
+  const logoTextChars = ["미", "슐", "랭", " ", "0", "스", "타"]
+  const starStates = [true, true, true, false, false]
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-        <Link href="/" className="flex items-center gap-2 leading-5 tracking-normal" onClick={handleLogoClick}>
-          <MichelinIcon size={36} />
-          <div className="flex gap-0.5 items-baseline">
-            {["미", "슐", "랭", " ", "0", "스", "타"].map((char, index) => (
-              <span
-                key={index}
-                className="text-xl font-bold tracking-tight text-foreground inline-block"
-                style={{
-                  animation: `slideUpLetters 0.6s ease-out ${index * 0.08}s both`,
-                }}
-              >
-                {char}
-              </span>
-            ))}
+      <div className="mx-auto flex h-16 max-w-6xl items-center px-6">
+        <Link
+          href="/"
+          className="flex items-center gap-2 leading-5 tracking-normal w-56 shrink-0"
+          onClick={handleLogoClick}
+        >
+          <div key={`${logoMode}-${logoTick}`} className="flex gap-0.5 items-baseline" aria-label="미슐랭0스타 로고">
+            {logoMode === "text" ? (
+              logoTextChars.map((char, index) => (
+                <span
+                  key={index}
+                  className="text-xl font-bold tracking-tight text-foreground inline-block"
+                  style={{ animation: `slideUpLetters 0.6s ease-out ${index * 0.08}s both` }}
+                >
+                  {char}
+                </span>
+              ))
+            ) : (
+              <div className="flex items-baseline gap-0.5">
+                {starStates.map((isFull, index) => (
+                  <img
+                    key={index}
+                    src={isFull ? "/michelin-full-star.png" : "/michelin-star.png"}
+                    alt={isFull ? "채워진 미슐랭 마크" : "비어있는 미슐랭 마크"}
+                    className="inline-block h-5 w-5"
+                    style={{ animation: `slideUpLetters 0.6s ease-out ${index * 0.08}s both` }}
+                    draggable={false}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </Link>
 
-        {/* Navigation Menu */}
-        {/* Navigation Menu */}
-        <nav className="hidden lg:flex" aria-label="Primary">
+        <nav className="hidden lg:flex flex-1 justify-center" aria-label="Primary">
           <div className="flex items-center gap-1">
             <Link
               href="/recipes?type=cook"
@@ -209,7 +193,6 @@ export function Navbar({ onLogoClick }: NavbarProps) {
               <span>레시피 연구소</span>
             </Link>
 
-
             <Link
               href="/community"
               className={cn(
@@ -222,12 +205,10 @@ export function Navbar({ onLogoClick }: NavbarProps) {
               <Users className={cn("h-4 w-4 shrink-0", isCommunityActive && "text-[#800020]")} />
               <span>{userLocation} 나눔</span>
             </Link>
-
           </div>
         </nav>
 
-
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 shrink-0">
           {isLoggedIn && (
             <>
               <Popover open={dmOpen} onOpenChange={setDmOpen}>
@@ -270,9 +251,7 @@ export function Navbar({ onLogoClick }: NavbarProps) {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
                               <span className="font-medium text-sm">{conv.recipientName}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {formatKST(conv.lastMessageTime)}
-                              </span>
+                              <span className="text-xs text-muted-foreground">{formatKST(conv.lastMessageTime)}</span>
                             </div>
                             <p className="text-sm text-muted-foreground truncate">{conv.lastMessage}</p>
                           </div>
@@ -308,6 +287,7 @@ export function Navbar({ onLogoClick }: NavbarProps) {
                     )}
                   </Button>
                 </PopoverTrigger>
+
                 <PopoverContent align="end" className="w-80 p-0">
                   <div className="p-3 border-b flex items-center justify-between">
                     <h4 className="font-semibold">알림</h4>
@@ -321,6 +301,7 @@ export function Navbar({ onLogoClick }: NavbarProps) {
                       </button>
                     )}
                   </div>
+
                   <div className="max-h-80 overflow-y-auto">
                     {notifications.length === 0 ? (
                       <div className="p-4 text-center text-muted-foreground text-sm">알림이 없습니다</div>
@@ -346,6 +327,7 @@ export function Navbar({ onLogoClick }: NavbarProps) {
                       ))
                     )}
                   </div>
+
                   <div className="p-2 border-t">
                     <Button variant="ghost" size="sm" className="w-full text-[#800020]" asChild>
                       <Link href="/notifications">모든 알림 보기</Link>

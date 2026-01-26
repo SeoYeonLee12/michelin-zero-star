@@ -205,6 +205,40 @@ React.useEffect(() => {
   if (savedReviewedRecipes.length) setReviewedRecipes(new Set(savedReviewedRecipes))
 }, [])
 
+
+React.useEffect(() => {
+  // Re-load progress whenever the logged-in user changes.
+  // Prevents cases where completed/reviewed sets are read once on mount (user=null),
+  // then never refreshed after login.
+  const userId = user?.id ?? null
+
+  if (!userId) {
+    setCompletedRecipes(new Set())
+    setReviewedRecipes(new Set())
+    return
+  }
+
+  const completedKey = storageKey("cooksync_completed_recipes", userId)
+  const reviewedKey = storageKey("cooksync_reviewed_recipes", userId)
+
+  const legacyCompleted = safeJsonParse<string[]>(localStorage.getItem("cooksync_completed_recipes"), [])
+  const legacyReviewed = safeJsonParse<string[]>(localStorage.getItem("cooksync_reviewed_recipes"), [])
+
+  const completed = safeJsonParse<string[]>(localStorage.getItem(completedKey), legacyCompleted)
+  const reviewed = safeJsonParse<string[]>(localStorage.getItem(reviewedKey), legacyReviewed)
+
+  setCompletedRecipes(new Set(completed))
+  setReviewedRecipes(new Set(reviewed))
+
+  // Light migration: if user-scoped keys were empty but legacy had data, persist to scoped keys.
+  if (!localStorage.getItem(completedKey) && legacyCompleted.length) {
+    localStorage.setItem(completedKey, JSON.stringify(legacyCompleted))
+  }
+  if (!localStorage.getItem(reviewedKey) && legacyReviewed.length) {
+    localStorage.setItem(reviewedKey, JSON.stringify(legacyReviewed))
+  }
+}, [user?.id])
+
   const login = async (email: string, password: string) => {
     await new Promise((resolve) => setTimeout(resolve, 1000))
 
@@ -244,7 +278,10 @@ React.useEffect(() => {
   }
 
   const logout = () => {
+    // Clear user + user-scoped state to avoid cross-user leakage
     setUser(null)
+    setCompletedRecipes(new Set())
+    setReviewedRecipes(new Set())
     localStorage.removeItem("cooksync_user")
   }
 

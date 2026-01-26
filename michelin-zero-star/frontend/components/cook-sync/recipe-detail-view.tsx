@@ -24,13 +24,9 @@ import {
   ChevronLeft,
   ChevronDown,
   Lightbulb,
-  Star,
   Send,
   MessageCircle,
   ThumbsUp,
-  Sparkles,
-  Bot,
-  User,
   Copy,
   Check,
   MoreVertical,
@@ -38,7 +34,7 @@ import {
   Trash2,
   Flame,
   Lock,
-  CheckCircle, // Declare the CheckCircle variable here
+  CheckCircle,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
@@ -130,8 +126,8 @@ const COMMENTS_PER_PAGE = 5
 
 export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking = false }: RecipeDetailViewProps) {
   const router = useRouter()
-  const { user, hasUserReviewedRecipe } = useAuth()
-  const [isLiked, setIsLiked] = React.useState(false)
+  const { user, hasUserReviewedRecipe, toggleLikeRecipe, isRecipeLiked } = useAuth()
+
   const [newComment, setNewComment] = React.useState("")
   const [userRating, setUserRating] = React.useState<number>(0)
   const [likedComments, setLikedComments] = React.useState<Set<number>>(new Set())
@@ -139,11 +135,6 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
   const [prevLikeCounts, setPrevLikeCounts] = React.useState<Record<number, number>>({})
   const [comments, setComments] = React.useState(mockComments)
   const [commentSort, setCommentSort] = React.useState<"latest" | "likes">("latest")
-  const [substituteDialogOpen, setSubstituteDialogOpen] = React.useState(false)
-  const [substituteQuery, setSubstituteQuery] = React.useState("")
-  const [isLoadingSubstitute, setIsLoadingSubstitute] = React.useState(false)
-  const [chatMessages, setChatMessages] = React.useState<Array<{ role: "user" | "ai"; content: string }>>([])
-  const chatEndRef = React.useRef<HTMLDivElement>(null)
   const [shareDialogOpen, setShareDialogOpen] = React.useState(false)
   const [copied, setCopied] = React.useState(false)
   const [editingCommentId, setEditingCommentId] = React.useState<number | null>(null)
@@ -151,7 +142,9 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
   const [currentPage, setCurrentPage] = React.useState(1)
   const [recipeRating, setRecipeRating] = React.useState(4.5)
   const [nutritionOpen, setNutritionOpen] = React.useState(false)
+
   const userAlreadyReviewed = hasUserReviewedRecipe(recipe.id)
+  const isLiked = isRecipeLiked(recipe.id)
 
   const allIngredients = React.useMemo(() => {
     const ingredientMap = new Map<string, string>()
@@ -167,6 +160,7 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
         })
       }
     })
+
     // Also check for recipe-level ingredients (from new recipe form)
     if (ingredientMap.size === 0 && (recipe as any).ingredients) {
       const recipeIngredients = (recipe as any).ingredients
@@ -176,6 +170,7 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
         })
       }
     }
+
     return Array.from(ingredientMap.entries())
   }, [recipe])
 
@@ -218,23 +213,28 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
 
   const handleLikeComment = (commentId: number, currentLikes: number) => {
     const isCurrentlyLiked = likedComments.has(commentId)
-    const newLikeCount = currentLikes + (isCurrentlyLiked ? 1 : 0)
+    const newLikeCount = currentLikes + (isCurrentlyLiked ? -1 : 1)
     setPrevLikeCounts((prev) => ({ ...prev, [commentId]: newLikeCount }))
 
     setLikedComments((prev) => {
       const newSet = new Set(prev)
-      if (newSet.has(commentId)) {
-        newSet.delete(commentId)
-      } else {
-        newSet.add(commentId)
-      }
+      if (newSet.has(commentId)) newSet.delete(commentId)
+      else newSet.add(commentId)
       return newSet
     })
   }
 
   const handleScrap = () => {
-    const wasLiked = isLiked
-    setIsLiked(!isLiked)
+    const wasLiked = isRecipeLiked(recipe.id)
+
+    toggleLikeRecipe({
+      id: recipe.id,
+      title: recipe.name,
+      image: recipe.thumbnail || "/placeholder.svg",
+      author: recipe.author ?? "",
+      savedAt: "",
+    })
+
     if (!wasLiked) {
       setShowScrapFeedback(true)
       setTimeout(() => setShowScrapFeedback(false), 2000)
@@ -243,11 +243,8 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
 
   const handleRatingClick = (star: number) => {
     if (!hasCompletedCooking) return
-    if (userRating === star) {
-      setUserRating(0)
-    } else {
-      setUserRating(star)
-    }
+    if (userRating === star) setUserRating(0)
+    else setUserRating(star)
   }
 
   const handleDeleteComment = (commentId: number) => {
@@ -271,25 +268,6 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleSubstituteSearch = () => {
-    if (!substituteQuery.trim()) return
-
-    const userMessage = substituteQuery
-    setChatMessages((prev) => [...prev, { role: "user", content: userMessage }])
-    setSubstituteQuery("")
-    setIsLoadingSubstitute(true)
-
-    setTimeout(() => {
-      const aiResponse = `"${userMessage}"의 대체 재료를 알려드릴게요!\n\n1. 비슷한 식감: 다른 채소류로 대체 가능해요\n2. 알레르기 대체: 해당 재료 없이도 요리 가능해요\n3. 저칼로리 대체: 두부나 곤약으로 대체 가능해요`
-      setChatMessages((prev) => [...prev, { role: "ai", content: aiResponse }])
-      setIsLoadingSubstitute(false)
-    }, 1500)
-  }
-
-  React.useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [chatMessages])
-
   const filteredTags = React.useMemo(() => {
     const excludeTags = ["명절", "전통", "파티요리", "파티", "명절요리"]
     return (recipe.hashtags || []).filter(
@@ -298,63 +276,41 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
   }, [recipe.hashtags])
 
   // ✅ 레시피 평점 표시 전용(부분 채움: 4.5 -> 4 full + 1 half)
-// 반 아이콘 파일을 쓰지 않고 "같은 꽃 이미지"를 width로 잘라 채움
-const renderRecipeRatingFlowers = (value: number) => {
-  const rating = Number.isFinite(value) ? value : 0
-  const fullCount = Math.floor(rating)
-  const hasHalf = rating % 1 !== 0
+  const renderRecipeRatingFlowers = (value: number) => {
+    const rating = Number.isFinite(value) ? value : 0
+    const fullCount = Math.floor(rating)
+    const hasHalf = rating % 1 !== 0
 
-  return (
-    <div className="flex items-center gap-4">
-      <div className="flex items-center gap-1">
-        {[1, 2, 3, 4, 5].map((idx) => {
-          // ✅ full
-          if (idx <= fullCount) {
+    return (
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((idx) => {
+            if (idx <= fullCount) {
+              return (
+                <img key={idx} src="/michelin-full-star.png" alt="미슐랭" className="h-5 w-5" draggable={false} />
+              )
+            }
+
+            if (idx === fullCount + 1 && hasHalf) {
+              return <img key={idx} src="/michelin-star-half.png" alt="미슐랭 반" className="h-5 w-5" draggable={false} />
+            }
+
             return (
               <img
                 key={idx}
-                src="/michelin-full-star.png"
-                alt="미슐랭"
-                className="h-5 w-5"
+                src="/michelin-star.png"
+                alt="미슐랭 빈"
+                className="h-5 w-5 opacity-30"
                 draggable={false}
               />
             )
-          }
+          })}
+        </div>
 
-          // ✅ half (0.x가 존재하면 무조건 1개)
-          if (idx === fullCount + 1 && hasHalf) {
-            return (
-              <img
-                key={idx}
-                src="/michelin-star-half.png"
-                alt="미슐랭 반"
-                className="h-5 w-5"
-                draggable={false}
-              />
-            )
-          }
-
-          // ✅ empty
-          return (
-            <img
-              key={idx}
-              src="/michelin-star.png"
-              alt="미슐랭 빈"
-              className="h-5 w-5 opacity-30"
-              draggable={false}
-            />
-          )
-        })}
+        <span className="text-sm text-[#800020] font-medium">{rating.toFixed(1)}</span>
       </div>
-
-      <span className="text-sm text-[#800020] font-medium">
-        {rating.toFixed(1)}
-      </span>
-    </div>
-  )
-}
-
-
+    )
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-24">
@@ -502,14 +458,7 @@ const renderRecipeRatingFlowers = (value: number) => {
             </div>
           ))}
         </div>
-        <button
-          onClick={() => setSubstituteDialogOpen(true)}
-          className="w-full flex items-center gap-2 p-2.5 rounded-xl border border-dashed border-[#800020]/30 bg-[#800020]/5 text-left hover:bg-[#800020]/10 transition-colors"
-        >
-          <Lightbulb className="h-4 w-4 text-[#800020] shrink-0" />
-          <span className="flex-1 text-sm text-[#800020]">대체 재료 알아보기</span>
-          <ChevronRight className="h-4 w-4 text-[#800020]" />
-        </button>
+        {/* ✅ 수정사항 반영: '대체 재료 알아보기' 및 AI 챗봇(다이얼로그) 삭제 */}
       </div>
 
       <Separator />
@@ -521,7 +470,12 @@ const renderRecipeRatingFlowers = (value: number) => {
             <div key={step.id}>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start py-4">
                 <div className="relative aspect-[4/3] rounded-lg overflow-hidden bg-muted shadow-sm w-full max-w-[200px]">
-                  <Image src={step.imageUrl || "/placeholder.svg"} alt={`Step ${step.stepNumber}`} fill className="object-cover" />
+                  <Image
+                    src={step.imageUrl || "/placeholder.svg"}
+                    alt={`Step ${step.stepNumber}`}
+                    fill
+                    className="object-cover"
+                  />
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-lg font-bold text-[#800020]">STEP {step.stepNumber}</h3>
@@ -560,7 +514,13 @@ const renderRecipeRatingFlowers = (value: number) => {
           </Select>
         </div>
 
-        <div className={cn("p-3 bg-muted/50 rounded-xl space-y-2", !hasCompletedCooking && "opacity-60", userAlreadyReviewed && "bg-amber-50/50 border border-amber-100")}>
+        <div
+          className={cn(
+            "p-3 bg-muted/50 rounded-xl space-y-2",
+            !hasCompletedCooking && "opacity-60",
+            userAlreadyReviewed && "bg-amber-50/50 border border-amber-100",
+          )}
+        >
           {!hasCompletedCooking && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2 p-2 bg-amber-50 rounded-lg border border-amber-200">
               <Lock className="h-4 w-4 text-amber-600" />
@@ -573,16 +533,11 @@ const renderRecipeRatingFlowers = (value: number) => {
               <span>이미 이 레시피에 평점과 댓글을 남기셨습니다</span>
             </div>
           )}
-          
+
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium">별점:</span>
 
-            <div
-              className={cn(
-                "flex items-center gap-1",
-                (!hasCompletedCooking || userAlreadyReviewed) && "opacity-60",
-              )}
-            >
+            <div className={cn("flex items-center gap-1", (!hasCompletedCooking || userAlreadyReviewed) && "opacity-60")}>
               {Array.from({ length: 5 }).map((_, i) => {
                 const star = i + 1
                 const filled = userRating >= star
@@ -614,7 +569,13 @@ const renderRecipeRatingFlowers = (value: number) => {
 
           <div className="flex gap-2">
             <Textarea
-              placeholder={userAlreadyReviewed ? "이미 평점과 댓글을 남기셨습니다" : hasCompletedCooking ? "댓글을 남겨주세요..." : "요리 완료 후 댓글을 남길 수 있습니다"}
+              placeholder={
+                userAlreadyReviewed
+                  ? "이미 평점과 댓글을 남기셨습니다"
+                  : hasCompletedCooking
+                    ? "댓글을 남겨주세요..."
+                    : "요리 완료 후 댓글을 남길 수 있습니다"
+              }
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               rows={2}
@@ -655,13 +616,9 @@ const renderRecipeRatingFlowers = (value: number) => {
                           key={i}
                           src={i < comment.rating ? "/michelin-full-star.png" : "/michelin-star.png"}
                           alt="미슐랭"
-                          className={cn(
-                            "h-2.5 w-2.5",
-                            i < comment.rating ? "opacity-100" : "opacity-30"
-                          )}
+                          className={cn("h-2.5 w-2.5", i < comment.rating ? "opacity-100" : "opacity-30")}
                         />
                       ))}
-
                     </div>
                     <span className="text-xs text-muted-foreground">{comment.time}</span>
 
@@ -677,7 +634,10 @@ const renderRecipeRatingFlowers = (value: number) => {
                             <Pencil className="h-3 w-3 mr-2" />
                             수정
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteComment(comment.id)} className="text-destructive">
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteComment(comment.id)}
+                            className="text-destructive"
+                          >
                             <Trash2 className="h-3 w-3 mr-2" />
                             삭제
                           </DropdownMenuItem>
@@ -685,19 +645,30 @@ const renderRecipeRatingFlowers = (value: number) => {
                       </DropdownMenu>
                     )}
                   </div>
+
                   {isEditing ? (
                     <div className="flex gap-2">
-                      <Input value={editingText} onChange={(e) => setEditingText(e.target.value)} className="flex-1 h-8 text-sm" />
+                      <Input
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        className="flex-1 h-8 text-sm"
+                      />
                       <Button size="sm" onClick={() => handleSaveEdit(comment.id)} className="h-8 px-2">
                         저장
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => setEditingCommentId(null)} className="h-8 px-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditingCommentId(null)}
+                        className="h-8 px-2"
+                      >
                         취소
                       </Button>
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">{comment.text}</p>
                   )}
+
                   <button
                     className={cn(
                       "flex items-center gap-1 text-xs mt-1 transition-colors",
@@ -745,14 +716,24 @@ const renderRecipeRatingFlowers = (value: number) => {
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted shrink-0">
-              <Image src={recipe.thumbnail || "/placeholder.svg"} alt={recipe.name} width={40} height={40} className="object-cover w-full h-full" />
+              <Image
+                src={recipe.thumbnail || "/placeholder.svg"}
+                alt={recipe.name}
+                width={40}
+                height={40}
+                className="object-cover w-full h-full"
+              />
             </div>
             <div className="hidden sm:block">
               <p className="font-medium text-sm line-clamp-1">{recipe.name}</p>
               <p className="text-xs text-muted-foreground">{recipe.duration}분</p>
             </div>
           </div>
-          <Button onClick={onStartCooking} size="lg" className="bg-[#800020] hover:bg-[#800020]/90 text-white shadow-lg shadow-[#800020]/25 px-8">
+          <Button
+            onClick={onStartCooking}
+            size="lg"
+            className="bg-[#800020] hover:bg-[#800020]/90 text-white shadow-lg shadow-[#800020]/25 px-8"
+          >
             <ChefHat className="h-5 w-5 mr-2" />
             요리 시작하기
           </Button>
@@ -771,86 +752,6 @@ const renderRecipeRatingFlowers = (value: number) => {
               </Button>
             </div>
             {copied && <p className="text-sm text-green-600">URL이 복사되었습니다!</p>}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Substitute Dialog */}
-      <Dialog
-        open={substituteDialogOpen}
-        onOpenChange={(open) => {
-          setSubstituteDialogOpen(open)
-          if (!open) {
-            setChatMessages([])
-            setSubstituteQuery("")
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden">
-          <div className="flex items-center gap-3 p-4 border-b bg-[#800020]/5">
-            <div className="w-10 h-10 rounded-full bg-[#800020] flex items-center justify-center">
-              <Bot className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-sm">대체 재료 AI</h3>
-              <p className="text-xs text-muted-foreground">없는 재료의 대체품을 찾아드려요</p>
-            </div>
-          </div>
-          <div className="h-[300px] overflow-y-auto p-4 space-y-4 bg-muted/30">
-            {chatMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
-                <Sparkles className="h-10 w-10 mb-3 text-[#800020]/50" />
-                <p className="text-sm font-medium">대체 재료가 필요하신가요?</p>
-                <p className="text-xs mt-1">없는 재료를 입력해보세요!</p>
-              </div>
-            ) : (
-              chatMessages.map((msg, idx) => (
-                <div key={idx} className={cn("flex gap-2", msg.role === "user" ? "justify-end" : "justify-start")}>
-                  {msg.role === "ai" && (
-                    <div className="w-8 h-8 rounded-full bg-[#800020] flex items-center justify-center shrink-0">
-                      <Bot className="h-4 w-4 text-white" />
-                    </div>
-                  )}
-                  <div className={cn("max-w-[80%] rounded-2xl px-4 py-2.5 text-sm", msg.role === "user" ? "bg-[#800020] text-white rounded-br-md" : "bg-white border shadow-sm rounded-bl-md")}>
-                    <p className="whitespace-pre-line">{msg.content}</p>
-                  </div>
-                  {msg.role === "user" && (
-                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
-                      <User className="h-4 w-4 text-gray-600" />
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-            {isLoadingSubstitute && (
-              <div className="flex gap-2 justify-start">
-                <div className="w-8 h-8 rounded-full bg-[#800020] flex items-center justify-center shrink-0">
-                  <Bot className="h-4 w-4 text-white" />
-                </div>
-                <div className="bg-white border shadow-sm rounded-2xl rounded-bl-md px-4 py-3">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-[#800020]/60 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-2 h-2 bg-[#800020]/60 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <span className="w-2 h-2 bg-[#800020]/60 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                  </div>
-                </div>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-          <div className="p-3 border-t bg-white">
-            <div className="flex gap-2">
-              <Input
-                placeholder="대체하고 싶은 재료를 입력하세요..."
-                value={substituteQuery}
-                onChange={(e) => setSubstituteQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSubstituteSearch()}
-                className="flex-1 rounded-full border-gray-200 focus-visible:ring-[#800020]"
-              />
-              <Button onClick={handleSubstituteSearch} disabled={isLoadingSubstitute || !substituteQuery.trim()} size="icon" className="rounded-full bg-[#800020] hover:bg-[#800020]/90 shrink-0">
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
           </div>
         </DialogContent>
       </Dialog>

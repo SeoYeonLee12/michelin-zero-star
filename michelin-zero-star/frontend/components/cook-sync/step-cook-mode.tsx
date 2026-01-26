@@ -14,12 +14,16 @@ import {
   SkipForward,
   Mic,
   MicOff,
+  X,
+  Send,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import type { RecipeStep } from "@/lib/types"
+import { createPortal } from "react-dom"
 
 type SkillLevel = "beginner" | "intermediate" | "expert"
 
@@ -61,6 +65,9 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
   const [completedSteps, setCompletedSteps] = React.useState<Set<number>>(new Set())
   const [autoAdvance, setAutoAdvance] = React.useState(true)
   const [isListening, setIsListening] = React.useState(false)
+  const [micPermission, setMicPermission] = React.useState<
+    "unknown" | "granted" | "denied"
+  >("unknown")
   const pendingAdvanceRef = React.useRef(false)
   const prevStepRef = React.useRef(currentStepIndex)
   const prevSkillLevelRef = React.useRef(skillLevel)
@@ -69,16 +76,82 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
   const totalProgress = ((currentStepIndex + (completedSteps.has(currentStepIndex) ? 1 : 0)) / steps.length) * 100
   const adjustedDuration = getAdjustedDuration(currentStep.duration, skillLevel)
 
+  // ===== Floating AI Chat (Popover above floating button) =====
+  const [aiOpen, setAiOpen] = React.useState(false)
+  React.useEffect(() => {
+    const requestMicPermission = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        stream.getTracks().forEach((t) => t.stop()) // 바로 종료
+        setMicPermission("granted")
+      } catch (e) {
+        setMicPermission("denied")
+      }
+    }
+
+    requestMicPermission()
+  }, [])
+  const [aiInput, setAiInput] = React.useState("")
+  const [aiMessages, setAiMessages] = React.useState<Array<{ role: "user" | "ai"; content: string }>>([
+    { role: "ai", content: "요리 중 궁금한 걸 말씀해 주세요. (예: '다음 단계 요약해줘')" },
+  ])
+  const aiEndRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    // STT(외부)에서 키워드 감지 시 아래 이벤트만 쏴주면 열림/닫힘/토글
+    // window.dispatchEvent(new CustomEvent("cooksync:ai-open"))
+    // window.dispatchEvent(new CustomEvent("cooksync:ai-close"))
+    // window.dispatchEvent(new CustomEvent("cooksync:ai-toggle"))
+    const onOpen = () => setAiOpen(true)
+    const onClose = () => setAiOpen(false)
+    const onToggle = () => setAiOpen((v) => !v)
+
+    window.addEventListener("cooksync:ai-open", onOpen)
+    window.addEventListener("cooksync:ai-close", onClose)
+    window.addEventListener("cooksync:ai-toggle", onToggle)
+
+    return () => {
+      window.removeEventListener("cooksync:ai-open", onOpen)
+      window.removeEventListener("cooksync:ai-close", onClose)
+      window.removeEventListener("cooksync:ai-toggle", onToggle)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (!aiOpen) return
+    aiEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [aiMessages, aiOpen])
+
+  const handleAiSend = () => {
+    if (!aiInput.trim()) return
+    const userText = aiInput.trim()
+
+    setAiMessages((prev) => [...prev, { role: "user", content: userText }])
+    setAiInput("")
+
+    // TODO: 실제 AI 연동 시 여기만 교체
+    setTimeout(() => {
+      setAiMessages((prev) => [
+        ...prev,
+        {
+          role: "ai",
+          content: `(${userText}) 관련해서 도와드릴게요.\n현재 STEP ${currentStep.stepNumber}: ${currentStep.action}\n필요하면 '핵심만', '주의점만' 같이 요청해 주세요.`,
+        },
+      ])
+    }, 400)
+  }
+
   React.useEffect(() => {
     if (prevStepRef.current !== currentStepIndex) {
       setTimerSeconds(getAdjustedDuration(currentStep.duration, skillLevel))
       if (currentStepIndex > 0) {
         setIsTimerRunning(true)
-        setIsListening(true)
+        if (micPermission === "granted") setIsListening(true) // ✅ 권한 있을 때만
+        else setIsListening(false) // ✅ denied/unknown이면 확실히 끔
       }
     }
     prevStepRef.current = currentStepIndex
-  }, [currentStepIndex, currentStep.duration, skillLevel])
+  }, [currentStepIndex, currentStep.duration, skillLevel, micPermission])
 
   React.useEffect(() => {
     if (prevSkillLevelRef.current !== skillLevel) {
@@ -136,7 +209,9 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
       setTimerSeconds(adjustedDuration)
     }
     setIsTimerRunning(true)
-    setIsListening(true)
+
+    if (micPermission === "granted") setIsListening(true)
+    else setIsListening(false)
   }
 
   const handlePauseTimer = () => {
@@ -179,7 +254,8 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
   }
 
   const handleVoiceToggle = () => {
-    setIsListening(!isListening)
+  if (micPermission !== "granted") return
+  setIsListening((v) => !v)
   }
 
   const handleAddTime = () => {
@@ -220,15 +296,9 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
         <div className="flex gap-4 h-[360px]">
           {/* Step Image */}
           <div className="relative rounded-xl overflow-hidden bg-muted shadow-lg w-1/2 h-full">
-            <img
-              src={currentStep.imageUrl || "/placeholder.svg"}
-              alt={currentStep.action}
-              className="w-full h-full object-cover"
-            />
+            <img src={currentStep.imageUrl || "/placeholder.svg"} alt={currentStep.action} className="w-full h-full object-cover" />
             <div className="absolute top-3 left-3">
-              <Badge className="bg-[#800020] text-white text-sm px-3 py-1 shadow-lg">
-                STEP {currentStep.stepNumber}
-              </Badge>
+              <Badge className="bg-[#800020] text-white text-sm px-3 py-1 shadow-lg">STEP {currentStep.stepNumber}</Badge>
             </div>
           </div>
 
@@ -250,7 +320,7 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
           </div>
         </div>
 
-        {/* 하단: 타이머와 숙련도/음성제어 (높이 반으로, 밑면 일직선) */}
+        {/* 하단: 타이머와 숙련도/음성제어 */}
         <div className="flex gap-4 h-[260px] items-end">
           {/* Timer */}
           <div className="w-1/2 h-full p-4 bg-gradient-to-br from-[#800020] to-[#800020]/80 rounded-xl text-white shadow-lg flex flex-col">
@@ -325,7 +395,7 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
             </div>
           </div>
 
-          {/* 숙련도 + 음성제어 (가로 배치, 높이 절반으로 줄이고 타이머 밑면과 정렬) */}
+          {/* 숙련도 + 음성제어 */}
           <div className="flex-1 flex gap-3 h-[50%]">
             {/* Skill Level Card */}
             <div className="flex-1 p-4 bg-card rounded-lg border shadow-sm flex flex-col min-h-[140px]">
@@ -381,32 +451,44 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
               </h4>
 
               <div className="flex-1 flex flex-col gap-2 justify-center">
-                <Button
-                  variant={isListening ? "default" : "outline"}
-                  size="sm"
-                  onClick={handleVoiceToggle}
-                  className={cn(
-                    "gap-2 w-full h-8 text-xs font-semibold",
-                    isListening && "bg-[#800020] hover:bg-[#800020]/90",
-                  )}
-                >
-                  {isListening ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-                  {isListening ? "듣는 중" : "음성 명령"}
-                </Button>
-
-                {isListening ? (
-                  <div className="flex-1 flex items-center justify-center p-2 bg-[#800020]/10 rounded-md min-h-[44px]">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">🎤</span>
-                      <span className="text-[#800020] font-bold text-sm">
-                        <WaveText text="말씀하세요..." />
-                      </span>
-                    </div>
+                {micPermission !== "granted" ? (
+                  // ✅ 권한 없을 때: 버튼 자체 없음
+                  <div className="rounded-md border border-[#800020]/20 bg-[#800020]/5 px-3 py-2 text-xs text-muted-foreground leading-relaxed">
+                    마이크 권한이 없어 <span className="font-semibold text-foreground">음성 인식 기능</span>을 사용할 수 없습니다.
+                    <br />
+                    (주소창 옆 ⓘ  → 마이크 허용)
                   </div>
                 ) : (
-                  <div className="flex-1 flex items-center text-xs text-muted-foreground px-1 min-h-[44px]">
-                    <p>&apos;이전&apos; / &apos;다음&apos;</p>
-                  </div>
+                  // ✅ 권한 있을 때만 음성 버튼 + 상태 UI
+                  <>
+                    <Button
+                      variant={isListening ? "default" : "outline"}
+                      size="sm"
+                      onClick={handleVoiceToggle}
+                      className={cn(
+                        "gap-2 w-full h-8 text-xs font-semibold",
+                        isListening && "bg-[#800020] hover:bg-[#800020]/90",
+                      )}
+                    >
+                      <Mic className="h-4 w-4" />
+                      {isListening ? "듣는 중" : "음성 명령"}
+                    </Button>
+
+                    {isListening ? (
+                      <div className="flex-1 flex items-center justify-center p-2 bg-[#800020]/10 rounded-md min-h-[44px]">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">🎤</span>
+                          <span className="text-[#800020] font-bold text-sm">
+                            <WaveText text="말씀하세요..." />
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex items-center text-xs text-muted-foreground px-1 min-h-[44px]">
+                        <p>&apos;이전&apos; / &apos;다음&apos;</p>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -445,11 +527,7 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
             ))}
           </div>
 
-          <Button
-            size="sm"
-            onClick={handleNextStep}
-            className="gap-1.5 bg-[#800020] hover:bg-[#800020]/90 h-11 px-10 text-sm font-medium flex-shrink-0"
-          >
+          <Button size="sm" onClick={handleNextStep} className="gap-1.5 bg-[#800020] hover:bg-[#800020]/90 h-11 px-10 text-sm font-medium flex-shrink-0">
             {currentStepIndex === steps.length - 1 ? (
               <>
                 <span>완료</span>
@@ -463,6 +541,98 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
             )}
           </Button>
         </div>
+      </div>
+
+      {/* ===== Floating AI (Button + Floating Chat Popover) ===== */}
+      {/* ✅ 최소 수정(점프 제거): fixed를 Tailwind 클래스가 아니라 "인라인 스타일"로 고정 */}
+      <div style={{ position: "fixed", right: 24, bottom: 24, zIndex: 70 }}>
+        {/* Chat Popover (opens above the button) */}
+        {aiOpen && (
+          <div className="absolute bottom-[72px] right-0 w-[320px] max-w-[92vw] rounded-2xl border bg-background shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="h-12 px-4 border-b flex items-center justify-between bg-[#800020]/5">
+              <div className="flex items-center gap-2">
+                <div className="h-7 w-7 rounded-full bg-[#800020] flex items-center justify-center overflow-hidden">
+                  <img src="/chef_cursor.png" alt="AI" className="h-5 w-5 object-contain" draggable={false} />
+                </div>
+                <div className="leading-tight">
+                  <p className="text-sm font-semibold">AI 도우미</p>
+                  <p className="text-[11px] text-muted-foreground">요리 중 질문을 바로 해결</p>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setAiOpen(false)}
+                aria-label="AI 닫기"
+                className="h-8 w-8"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Body */}
+            <div className="h-[360px] overflow-y-auto px-4 py-3 space-y-3 bg-muted/20">
+              {aiMessages.map((m, idx) => (
+                <div key={idx} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
+                  <div
+                    className={cn(
+                      "max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-line",
+                      m.role === "user"
+                        ? "bg-[#800020] text-white rounded-br-md"
+                        : "bg-white border shadow-sm rounded-bl-md",
+                    )}
+                  >
+                    {m.content}
+                  </div>
+                </div>
+              ))}
+              <div ref={aiEndRef} />
+            </div>
+
+            {/* Footer */}
+            <div className="h-14 border-t bg-white px-3 flex items-center gap-2">
+              <Input
+                value={aiInput}
+                onChange={(e) => setAiInput(e.target.value)}
+                placeholder="예: 다음 단계 핵심만 요약해줘"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault()
+                    handleAiSend()
+                  }
+                }}
+                className="rounded-full"
+              />
+              <Button
+                type="button"
+                onClick={handleAiSend}
+                disabled={!aiInput.trim()}
+                size="icon"
+                className="rounded-full bg-[#800020] hover:bg-[#800020]/90"
+                aria-label="전송"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Floating Button */}
+        <button
+          type="button"
+          onClick={() => setAiOpen((v) => !v)}
+          aria-label="AI 열기"
+          className={cn(
+            "h-14 w-14 rounded-full shadow-2xl shadow-[#800020]/25 grid place-items-center",
+            "bg-[#F2E5E8] hover:bg-[#F2E5E8]/90 transition-colors",
+            "border border-[#800020]/30 hover:border-[#800020]/45",
+          )}
+        >
+          <img src="/chef_cursor.png" alt="AI" className="h-10 w-10 object-contain" draggable={false} />
+        </button>
       </div>
     </div>
   )

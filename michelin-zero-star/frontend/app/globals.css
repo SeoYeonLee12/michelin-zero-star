@@ -342,3 +342,13 @@
     @apply bg-background text-foreground;
   }
 }
+
+html {
+scrollbar-gutter: stable;
+}
+
+
+/* scrollbar-gutter 지원이 애매한 환경까지 커버하려면 */
+body {
+overflow-y: scroll;
+}

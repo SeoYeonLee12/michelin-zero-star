@@ -9,16 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/auth-context"
 import { Camera, ArrowLeft, Eye, EyeOff, Check, X, MapPin, Loader2 } from "lucide-react"
 import Link from "next/link"
@@ -39,6 +31,7 @@ const mockNicknames = ["민지", "요리왕", "쉐프김", "맛집탐방"]
 export default function ProfileEditPage() {
   const router = useRouter()
   const { user, isLoggedIn, updateProfile } = useAuth()
+
   const [isLoading, setIsLoading] = React.useState(false)
   const [isGettingLocation, setIsGettingLocation] = React.useState(false)
   const [showCurrentPassword, setShowCurrentPassword] = React.useState(false)
@@ -55,8 +48,6 @@ export default function ProfileEditPage() {
     email: user?.email || "",
     bio: user?.bio || "",
     location: user?.location || "",
-    preferredTime: "30분 이내",
-    dietary: "일반식",
     categories: [] as string[],
   })
 
@@ -160,7 +151,7 @@ export default function ProfileEditPage() {
         enableHighAccuracy: true,
         timeout: 10000,
         maximumAge: 0,
-      },
+      }
     )
   }
 
@@ -186,13 +177,15 @@ export default function ProfileEditPage() {
     }
     setIsLoading(true)
     await new Promise((resolve) => setTimeout(resolve, 500))
+
     updateProfile({
-      name: formData.name,
+      // name(실명)은 변경 불가: payload에서 제외
       nickname: formData.nickname,
       bio: formData.bio,
       location: formData.location,
       profileImage: profileImagePreview || undefined,
     })
+
     setIsLoading(false)
     router.push("/mypage")
   }
@@ -276,7 +269,7 @@ export default function ProfileEditPage() {
             </CardContent>
           </Card>
 
-          {/* Basic Info - 이름, 닉네임 분리 및 이메일 수정 불가 */}
+          {/* Basic Info */}
           <Card>
             <CardHeader>
               <CardTitle>기본 정보</CardTitle>
@@ -286,13 +279,10 @@ export default function ProfileEditPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="name">이름 (실명)</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="이름을 입력하세요"
-                  />
+                  <Input id="name" value={formData.name} disabled readOnly className="bg-muted cursor-not-allowed" />
+                  <p className="text-xs text-muted-foreground">이름(실명)은 변경할 수 없습니다</p>
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="nickname">닉네임 (표시 이름)</Label>
                   <Input
@@ -308,17 +298,13 @@ export default function ProfileEditPage() {
                   )}
                 </div>
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="email">이메일</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  disabled
-                  className="bg-muted cursor-not-allowed"
-                />
+                <Input id="email" type="email" value={formData.email} disabled className="bg-muted cursor-not-allowed" />
                 <p className="text-xs text-muted-foreground">이메일은 변경할 수 없습니다</p>
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="bio">자기소개</Label>
                 <Textarea
@@ -329,14 +315,37 @@ export default function ProfileEditPage() {
                   rows={3}
                 />
               </div>
+
+              {/* Preferred Categories moved here (bottom of Basic Info) */}
+              <div className="space-y-2">
+                <Label>선호 카테고리 (복수 선택 가능)</Label>
+                <div className="flex flex-wrap gap-2">
+                  {categoryOptions.map((cat) => (
+                    <div key={cat.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`cat-${cat.value}`}
+                        checked={formData.categories.includes(cat.value)}
+                        onCheckedChange={() => handleCategoryToggle(cat.value)}
+                      />
+                      <label
+                        htmlFor={`cat-${cat.value}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        {cat.label}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          {/* Location - 현재 위치 버튼 클릭 후 확인 다이얼로그 */}
+          {/* Location */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-[#800020]" />내 위치
+                <MapPin className="h-5 w-5 text-[#800020]" />
+                내 위치
               </CardTitle>
               <CardDescription>재료 나눔을 위한 위치 정보를 등록하세요</CardDescription>
             </CardHeader>
@@ -362,72 +371,6 @@ export default function ProfileEditPage() {
                 위치 정보는 주변 재료 나눔 게시글을 찾는 데 사용됩니다.
                 {isGettingLocation && " GPS로 위치를 탐색 중입니다..."}
               </p>
-            </CardContent>
-          </Card>
-
-          {/* Cooking Profile - 주방환경, 요리 실력 제거 / 카테고리 추가 */}
-          <Card>
-            <CardHeader>
-              <CardTitle>요리 프로필</CardTitle>
-              <CardDescription>AI가 더 정확한 레시피를 추천할 수 있도록 설정하세요</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>선호 조리시간</Label>
-                  <Select
-                    value={formData.preferredTime}
-                    onValueChange={(value) => setFormData({ ...formData, preferredTime: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="15분 이내">15분 이내</SelectItem>
-                      <SelectItem value="30분 이내">30분 이내</SelectItem>
-                      <SelectItem value="1시간 이내">1시간 이내</SelectItem>
-                      <SelectItem value="상관없음">상관없음</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>식단 유형</Label>
-                  <Select
-                    value={formData.dietary}
-                    onValueChange={(value) => setFormData({ ...formData, dietary: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="일반식">일반식</SelectItem>
-                      <SelectItem value="다이어트">다이어트</SelectItem>
-                      <SelectItem value="채식">채식</SelectItem>
-                      <SelectItem value="비건">비건</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>선호 카테고리 (복수 선택 가능)</Label>
-                <div className="flex flex-wrap gap-2">
-                  {categoryOptions.map((cat) => (
-                    <div key={cat.value} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={cat.value}
-                        checked={formData.categories.includes(cat.value)}
-                        onCheckedChange={() => handleCategoryToggle(cat.value)}
-                      />
-                      <label
-                        htmlFor={cat.value}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        {cat.label}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </CardContent>
           </Card>
 
@@ -457,6 +400,7 @@ export default function ProfileEditPage() {
                   </button>
                 </div>
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="newPassword">새 비밀번호</Label>
                 <div className="relative">
@@ -475,6 +419,7 @@ export default function ProfileEditPage() {
                     {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+
                 {passwordData.newPassword && (
                   <div className="flex gap-3 mt-2">
                     {passwordRequirements.map((req) => (
@@ -483,7 +428,9 @@ export default function ProfileEditPage() {
                         className={`flex items-center gap-1 text-xs ${req.met ? "text-[#800020]" : "text-muted-foreground"}`}
                       >
                         <div
-                          className={`w-4 h-4 rounded-full flex items-center justify-center ${req.met ? "bg-[#800020]/20" : "bg-muted"}`}
+                          className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                            req.met ? "bg-[#800020]/20" : "bg-muted"
+                          }`}
                         >
                           {req.met ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
                         </div>
@@ -493,6 +440,7 @@ export default function ProfileEditPage() {
                   </div>
                 )}
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">새 비밀번호 확인</Label>
                 <Input
@@ -506,6 +454,7 @@ export default function ProfileEditPage() {
                   <p className="text-xs text-destructive">비밀번호가 일치하지 않습니다</p>
                 )}
               </div>
+
               <Button
                 onClick={handleChangePassword}
                 variant="outline"
