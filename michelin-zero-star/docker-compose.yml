@@ -18,11 +18,13 @@ services:
       - DB_NAME=${PROD_DB_NAME}
       - DB_USER=${PROD_DB_USER}
       - DB_PW=${PROD_DB_PASSWORD}
+      # 백엔드가 AI서버를 부를 때 사용할 주소 (같은 네트워라 이렇게 부름)
+      - AI_SERVER_URL=http://ai-serving:8000
     networks:
       - mzs-network
-    depends_on:
       - db
       - elasticsearch
+      - ai-serving # AI 서버가 켜져야 백엔드도 의미 있음
 
   #===============================================#
   # 2. Database (MySQL)
@@ -35,7 +37,6 @@ services:
       - "${PROD_DB_PORT}:3306"
     volumes:
       - db_data:/var/lib/mysql
-      - ./infra/mysql:/docker-entrypoint-initdb.d
     environment:
       MYSQL_TCP_PORT: ${PROD_DB_PORT}
       MYSQL_ROOT_PASSWORD: ${PROD_DB_ROOT_PASSWORD}
@@ -72,40 +73,24 @@ services:
 
   
   #===============================================#
-  # 3-1. Elasticsearch Data Loader
+  # 3-1. Elasticsearch Data Loader (일회성 컨테이너)
   #===============================================#
-  es-data-loader:
-    build:
-      context: ./infra/elasticsearch
-      dockerfile: Dockerfile.loader
-    container_name: mzs-es-loader
-    networks:
-      - mzs-network
-    environment:
-      - ELASTICSEARCH_HOST=elasticsearch
-      - ELASTICSEARCH_PORT=9200
-      - GMS_KEY=${GMS_KEY}
-    depends_on:
-      - elasticsearch
-    restart: "no"
+  # es-data-loader:
+  #   build:
+  #     context: ./infra/elasticsearch
+  #     dockerfile: Dockerfile.loader
+  #   container_name: mzs-es-loader
+  #   networks:
+  #     - mzs-network
+  #   environment:
+  #     - ELASTICSEARCH_HOST=elasticsearch
+  #     - ELASTICSEARCH_PORT=9200
+  #     - GMS_KEY=${GMS_KEY}
+  #   depends_on:
+  #     - elasticsearch
+  #   restart: "no"
   
-
-  #===============================================#
-  # 3-2. MySQL Data Loader
-  #===============================================#
-  mysql-data-loader:
-    build:
-      context: .
-      dockerfile: data-pipeline/Dockerfile.mysql-loader
-    container_name: mzs-mysql-loader
-    networks:
-      - mzs-network
-    env_file:
-      - ./.env
-    depends_on:
-      - db
-    restart: "no"
-
+  
   
   #===============================================#
   # 4. Monitoring (Kibana)
@@ -122,6 +107,63 @@ services:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     depends_on:
       - elasticsearch
+
+  #===============================================#
+  # 5. AI Serving Server (FastAPI)
+  #===============================================#
+  ai-serving:
+    container_name: mzs-ai
+    build:
+      context: ./ai-serving # Dockerfile이 있는 폴더 경로
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "8000:8000" # 호스트:컨테이너
+    environment:
+      # Docker 내부에서는 'localhost'가 아니라 '서비스명'
+      - ES_URL=http://elasticsearch:9200
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PYTHONUNBUFFERED=1
+      - PROJECT_NAME="Michelin Zero Star AI"
+    volumes:
+      # [개발 편의] 로컬 코드를 컨테이너에 연결 (코드 수정 시 즉시 반영)
+      - ./ai-serving:/app
+    networks:
+      - mzs-network
+    depends_on:
+      - elasticsearch # ES가 켜진 뒤에 실행
+
+  #===============================================#
+  # 6. Frontend Application (Next.js)
+  #===============================================#
+  frontend:
+    container_name: michelin-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
+      # 프론트가 백엔드를 부를 때 사용할 주소 (같은 네트워크라 이렇게 부름)
+      # ※ 현재 zip 코드에는 env를 읽는 코드가 없어서 "향후 연동용"으로만 둡니다.
+      - NEXT_PUBLIC_API_BASE_URL=http://backend:8080
+    volumes:
+      # [개발 편의] 로컬 코드를 컨테이너에 연결 (코드 수정 시 즉시 반영)
+      - ./frontend:/app
+      # [주의] node_modules / .next 는 컨테이너 내부 것을 사용 (호스트 덮어쓰기 방지)
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - mzs-network
+    depends_on:
+      - backend
+    command: npm run dev -- -H 0.0.0.0 -p 3000
+
+
+
 
 #===============================================#
 # Network & Volume Definition
