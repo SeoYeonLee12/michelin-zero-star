@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
@@ -47,6 +48,18 @@ public class RecipeController {
         RecipeDetailCommand command = recipeService.getDetailRecipe(recipeId, currentUserId);
         RecipeDetailResponse response = RecipeDetailResponse.from(command);
         return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
+    @PutMapping("/{recipeId}")
+    public ResponseEntity<RecipeRegisterResponse> modifyRecipe(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long recipeId,
+            @RequestBody @Valid RecipeRegisterRequest recipeRegisterRequest
+    ) {
+        Long currentUserId = (userDetails != null) ? userDetails.getUser().getId() : null;
+        recipeService.updateRecipe(
+                recipeRegisterRequest.toCommand(currentUserId, recipeId));
+        return ResponseEntity.status(HttpStatus.OK).body(new RecipeRegisterResponse(recipeId));
     }
 
     @DeleteMapping("/{recipeId}")

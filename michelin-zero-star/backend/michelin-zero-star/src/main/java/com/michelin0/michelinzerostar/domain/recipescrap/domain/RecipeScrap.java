@@ -1,4 +1,4 @@
-package com.michelin0.michelinzerostar.domain.RecipeScrap.domain;
+package com.michelin0.michelinzerostar.domain.recipescrap.domain;
 
 import com.michelin0.michelinzerostar.domain.recipe.domain.Recipe;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
@@ -28,11 +28,11 @@ public class RecipeScrap extends BaseDomain {
     private Long scrapId;
 
     @ManyToOne
-    @JoinColumn(name = "users_id")
+    @JoinColumn(name = "users_id", nullable = false)
     private User user;
 
     @ManyToOne
-    @JoinColumn(name = "recipes_id")
+    @JoinColumn(name = "recipes_id", nullable = false)
     private Recipe recipe;
 
     public RecipeScrap(User user, Recipe recipe) {

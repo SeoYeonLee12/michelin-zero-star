@@ -3,6 +3,7 @@ package com.michelin0.michelinzerostar.domain.recipe.application;
 
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeDetailCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeRegisterCommand;
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeUpdateCommand;
 import com.michelin0.michelinzerostar.domain.recipe.domain.Recipe;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeIngredient;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeQueryRepository;
@@ -10,6 +11,7 @@ import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeRegister;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeRepository;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeStep;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeTag;
+import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeUpdate;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeDetailProjection;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.domain.user.repository.UserRepository;
@@ -28,6 +30,7 @@ public class RecipeService {
     private final UserRepository userRepository;
     private final RecipeQueryRepository recipeQueryRepository;
     private final RecipeRepository recipeRepository;
+    private final RecipeUpdate recipeUpdate;
 
     public Long saveRecipe(RecipeRegisterCommand command) {
         User user = userRepository.getById(command.userId());
@@ -45,6 +48,18 @@ public class RecipeService {
                 .orElseThrow(() -> new GlobalException(RecipeErrorCode.RECIPE_NOT_FOUND));
         return RecipeDetailCommand.from(domainDto);
     }
+
+    public Long updateRecipe(RecipeUpdateCommand command) {
+        User user = userRepository.getById(command.userId());
+        Recipe recipe = command.toRecipe(user);
+        List<RecipeIngredient> ingredient = command.toIngredients();
+        List<RecipeStep> steps = command.toSteps();
+        List<RecipeTag> tags = command.toTags();
+        List<Long> categoryIds = command.categoryIds();
+        recipeUpdate.updateRecipe(command.recipeId(), recipe, ingredient, steps, tags, categoryIds);
+        return command.recipeId();
+    }
+
 
     public void deleteRecipe(Long recipeId, Long userId) {
         Recipe searchedRecipe = recipeRepository.getById(recipeId);

@@ -46,4 +46,14 @@ public class Nutrition {
         this.sodium = Objects.requireNonNullElse(sodium, 0.0);
         this.calcium = Objects.requireNonNullElse(calcium, 0.0);
     }
+
+    public void updateNutrition(Nutrition updateNutrition) {
+        this.calorie = updateNutrition.calorie;
+        this.carbohydrate = updateNutrition.carbohydrate;
+        this.protein = updateNutrition.protein;
+        this.saturatedFat = updateNutrition.getSaturatedFat();
+        this.cholesterol = updateNutrition.getCholesterol();
+        this.sodium = updateNutrition.getSodium();
+        this.calcium = updateNutrition.getCalcium();
+    }
 }
