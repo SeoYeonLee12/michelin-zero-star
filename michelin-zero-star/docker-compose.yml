@@ -22,6 +22,7 @@ services:
       - AI_SERVER_URL=http://ai-serving:8000
     networks:
       - mzs-network
+    depends_on:
       - db
       - elasticsearch
       - ai-serving # AI 서버가 켜져야 백엔드도 의미 있음
@@ -73,7 +74,7 @@ services:
 
   
   #===============================================#
-  # 3-1. Elasticsearch Data Loader (일회성 컨테이너)
+  # 3-1. Elasticsearch Data Loader
   #===============================================#
   # es-data-loader:
   #   build:
@@ -147,9 +148,6 @@ services:
     environment:
       - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
-      # 프론트가 백엔드를 부를 때 사용할 주소 (같은 네트워크라 이렇게 부름)
-      # ※ 현재 zip 코드에는 env를 읽는 코드가 없어서 "향후 연동용"으로만 둡니다.
-      - NEXT_PUBLIC_API_BASE_URL=http://backend:8080
     volumes:
       # [개발 편의] 로컬 코드를 컨테이너에 연결 (코드 수정 시 즉시 반영)
       - ./frontend:/app

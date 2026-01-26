@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { join } from "@/lib/api/auth"
 
 function safeJsonParse<T>(value: string | null, fallback: T): T {
   if (!value) return fallback
@@ -259,22 +260,28 @@ React.useEffect(() => {
   }
 
   const signup = async (data: { name: string; nickname: string; email: string; password: string }) => {
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    const newUser: User = {
-      id: Date.now().toString(),
+    // 1) API 호출
+    const result = await join({
       name: data.name,
       nickname: data.nickname,
       email: data.email,
-      level: "미슐랭 0스타",
-      bio: "CookSync와 함께 요리를 시작해요!",
-      location: "",
-      stars: 0,
-      todayStars: 0,
-      lastStarDate: new Date().toISOString().split("T")[0],
-    }
-    setUser(newUser)
-    localStorage.setItem("cooksync_user", JSON.stringify(newUser))
+      password: data.password,
+    })
+
+    // 2) 백엔드 응답이 "string"이라서 유저 정보가 없음.
+    //    지금 단계(회원가입만 연동)에서는 "가입 성공"만 확인하고,
+    //    로그인은 별도 API 연동 때 처리하는 게 정상입니다.
+    //    따라서 여기서는 user를 강제로 만들지 않는 것을 권장합니다.
+    //
+    //    하지만 현재 UX가 "가입 후 바로 홈 이동"이고, 홈이 로그인 필요 없으면 OK.
+    //    만약 UI상 '로그인 상태'가 필요하면 임시 user를 만드는 방식으로 유지할 수도 있음(아래 옵션).
+
+    // 옵션 1) 권장: 회원가입 성공만 처리(로그인 상태 만들지 않음)
+    localStorage.removeItem("cooksync_user")
+    setUser(null)
+
+    // 필요하면 result를 사용(토스트/로깅)
+    // console.log("join result:", result)
   }
 
   const logout = () => {
