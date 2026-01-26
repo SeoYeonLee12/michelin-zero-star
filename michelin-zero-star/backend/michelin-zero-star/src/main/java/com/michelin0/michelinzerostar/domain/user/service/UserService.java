@@ -5,11 +5,14 @@ import com.michelin0.michelinzerostar.domain.user.dto.UserResponseDto;
 import com.michelin0.michelinzerostar.domain.user.dto.UserUpdateRequestDto;
 import com.michelin0.michelinzerostar.domain.user.entity.SocialProvider;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
+import com.michelin0.michelinzerostar.domain.user.entity.UserProfile;
+import com.michelin0.michelinzerostar.domain.user.repository.UserProfileRepository;
 import com.michelin0.michelinzerostar.domain.user.repository.UserRepository;
 import com.michelin0.michelinzerostar.global.exception.errorcode.AuthErrorCode;
 import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
 import com.michelin0.michelinzerostar.global.redis.RedisUtil;
 import com.michelin0.michelinzerostar.global.security.jwt.JwtTokenProvider;
+import com.michelin0.michelinzerostar.global.util.KakaoMapService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,41 +26,63 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final UserProfileRepository userProfileRepository; // 필드 추가
     private final JwtTokenProvider jwtTokenProvider;
     private final RedisUtil redisUtil;
     private final PasswordEncoder passwordEncoder;
     private final AuthService authService;
+    private final KakaoMapService kakaoMapService;
+
+    @Transactional
+    public String updateUserLocation(String email, double latitude, double longitude) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("유저를 찾을 수 없습니다."));
+
+        // 카카오 API로 좌표 -> 주소 변환
+        KakaoMapService.AddressInfo addressInfo = kakaoMapService.getAddressFromCoords(latitude,
+                longitude);
+
+        // 프로필 찾기 (없으면 생성)
+        UserProfile profile = userProfileRepository.findById(user.getId())
+                .orElseGet(() -> UserProfile.builder()
+                        .user(user)
+                        .locationAddress(addressInfo.fullAddress())
+                        .locationCode(addressInfo.code())
+                        .latitude(latitude)   // [중요] 생성 시 위도 저장
+                        .longitude(longitude) // [중요] 생성 시 경도 저장
+                        .isVerified(true)     // 생성 즉시 인증됨
+                        .build());
+
+        // 정보 업데이트 (Dirty Checking)
+        profile.updateLocation(addressInfo.fullAddress(), addressInfo.code(), latitude, longitude);
+        userProfileRepository.save(profile);
+
+        return addressInfo.dongName(); // "둔산동" 반환
+    }
 
     @Transactional
     public void deleteUser(String accessToken, String email, SocialProvider provider) {
 
-        // 이메일 + 소셜 타입으로 정확한 유저 찾기
         User user = userRepository.findByEmailAndSocialProvider(email, provider)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
 
-        // 소셜 로그인 유저라면 Redis에서 소셜 전용 토큰을 가져와 연동 해제
         if (!provider.equals(SocialProvider.LOCAL)) {
-            // Redis에 저장해둔 진짜 카카오/네이버 토큰 조회
             String socialToken = redisUtil.getData("SocialToken:" + email);
 
             if (socialToken != null) {
-                // JWT가 아닌 진짜 소셜 토큰을 넘겨줌
                 authService.unlinkSocialAccount(provider.name(), socialToken);
-                redisUtil.deleteData("SocialToken:" + email); // 사용 후 삭제
+                redisUtil.deleteData("SocialToken:" + email);
             } else {
                 log.warn("소셜 연동 해제를 시도했으나 Redis에 토큰이 없습니다. (이메일: {})", email);
             }
         }
 
-        // DB Soft Delete 처리 (이메일 마스킹 + recordDeleteTime 포함)
         user.withdraw();
 
-        // Redis에서 Refresh Token 삭제
         if (redisUtil.getRefreshToken(email) != null) {
             redisUtil.deleteRefreshToken(email);
         }
 
-        // 5. 현재 사용 중인 JWT Access Token 블랙리스트 등록
         Long expiration = jwtTokenProvider.getExpiration(accessToken);
         redisUtil.setBlackList(accessToken, expiration);
     }
@@ -65,7 +90,6 @@ public class UserService {
     @Transactional
     public void updateUser(String email, SocialProvider provider, UserUpdateRequestDto requestDto) {
 
-        // 이메일 + 소셜 타입으로 정확한 유저 찾기
         User user = userRepository.findByEmailAndSocialProvider(email, provider)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
 
@@ -80,10 +104,8 @@ public class UserService {
             }
         }
 
-        // 프로필 정보 수정 (Null 체크 필수)
         user.updateProfile(null, requestDto.getNickname(), null);
 
-        // 비밀번호 변경 로직
         if (provider == SocialProvider.LOCAL
                 && requestDto.getNewPassword() != null
                 && !requestDto.getNewPassword().isBlank()) {
@@ -106,7 +128,6 @@ public class UserService {
                 throw new RuntimeException("새 비밀번호가 일치하지 않습니다.");
             }
 
-            // 기존 비밀번호와 중복
             if (user.getPassword() != null && passwordEncoder.matches(
                     requestDto.getNewPassword(), user.getPassword())) {
                 throw new GlobalException(AuthErrorCode.SAME_AS_OLD_PASSWORD);

@@ -71,3 +71,6 @@ springdoc:
   default-produces-media-type: application/json
   paths-to-match:
     - /api/v1/**
+
+kakao:
+  rest-api-key: "a1f418f12dfefbde9916ccaa1897631a"
