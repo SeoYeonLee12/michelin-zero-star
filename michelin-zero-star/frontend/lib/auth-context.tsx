@@ -5,8 +5,8 @@ import { verifyUserLocation } from "./api"
 import { mockVerifyUserLocation } from "./mock-api"
 import type { LocationRequestDto } from "./types"
 
-// 개발 환경에서 mock 사용 여부 (필요시 true로 변경)
-const USE_MOCK_API = true  // ← 백엔드 준비 전까지 true 유지
+// 개발 환경에서 mock 사용 여부
+const USE_MOCK_API = true
 
 function safeJsonParse<T>(value: string | null, fallback: T): T {
   if (!value) return fallback
@@ -269,22 +269,22 @@ React.useEffect(() => {
   }
 
   const signup = async (data: { name: string; nickname: string; email: string; password: string }) => {
+    // 1) 회원가입 API 호출
+    //    실제 백엔드 연동 시: const result = await join({ ... })
+    //    현재는 Mock으로 처리
     await new Promise((resolve) => setTimeout(resolve, 1000))
 
-    const newUser: User = {
-      id: Date.now().toString(),
-      name: data.name,
-      nickname: data.nickname,
-      email: data.email,
-      level: "미슐랭 0스타",
-      bio: "CookSync와 함께 요리를 시작해요!",
-      location: "",
-      stars: 0,
-      todayStars: 0,
-      lastStarDate: new Date().toISOString().split("T")[0],
-    }
-    setUser(newUser)
-    localStorage.setItem("cooksync_user", JSON.stringify(newUser))
+    // 2) 백엔드 응답이 "string"이라서 유저 정보가 없음.
+    //    지금 단계(회원가입만 연동)에서는 "가입 성공"만 확인하고,
+    //    로그인은 별도 API 연동 때 처리하는 게 정상입니다.
+    //    따라서 여기서는 user를 강제로 만들지 않는 것을 권장합니다.
+
+    // 옵션 1) 권장: 회원가입 성공만 처리(로그인 상태 만들지 않음)
+    localStorage.removeItem("cooksync_user")
+    setUser(null)
+
+    // 필요하면 result를 사용(토스트/로깅)
+    // console.log("join result:", result)
   }
 
   const logout = () => {

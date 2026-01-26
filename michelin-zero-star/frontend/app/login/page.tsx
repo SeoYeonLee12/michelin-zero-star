@@ -30,11 +30,25 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = React.useState(false)
   const [mounted, setMounted] = React.useState(false)
   const [funMessage, setFunMessage] = React.useState("")
+  const [showSignupSuccess, setShowSignupSuccess] = React.useState(false)
 
   // 클라이언트에서만 랜덤 문구 설정 (Hydration 에러 방지)
   React.useEffect(() => {
     setMounted(true)
     setFunMessage(funMessages[Math.floor(Math.random() * funMessages.length)])
+  }, [])
+
+  // 회원가입 성공 메시지
+  React.useEffect(() => {
+    const flag = sessionStorage.getItem("signup_success")
+    if (flag === "1") {
+      sessionStorage.removeItem("signup_success") // ✅ 1회만 뜨게
+      setShowSignupSuccess(true)
+
+      // ✅ 자동으로 사라지게(원하면 삭제 가능)
+      const t = setTimeout(() => setShowSignupSuccess(false), 3500)
+      return () => clearTimeout(t)
+    }
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -134,9 +148,8 @@ export default function LoginPage() {
 
           <div className="space-y-2 text-center lg:text-left">
             <h2 className="text-2xl font-bold tracking-tight">로그인</h2>
-            <p className="text-muted-foreground">계정에 로그인하여 요리를 시작하세요</p>
+            <p className="text-muted-foreground">로그인하여 요리를 시작하세요</p>
           </div>
-
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
               <div className="space-y-2">
