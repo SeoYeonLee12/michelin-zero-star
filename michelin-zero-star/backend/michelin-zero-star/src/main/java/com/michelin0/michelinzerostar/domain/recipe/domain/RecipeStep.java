@@ -26,7 +26,7 @@ public class RecipeStep {
     private Long recipeStepId;
 
     @ManyToOne
-    @JoinColumn(name = "recipe_id", nullable = false)
+    @JoinColumn(name = "recipes_id", nullable = false)
     private Recipe recipe;
 
     @Column(name = "step_number", nullable = false)
