@@ -1,6 +1,12 @@
 "use client"
 
 import * as React from "react"
+import { verifyUserLocation } from "./api"
+import { mockVerifyUserLocation } from "./mock-api"
+import type { LocationRequestDto } from "./types"
+
+// 개발 환경에서 mock 사용 여부 (필요시 true로 변경)
+const USE_MOCK_API = true  // ← 백엔드 준비 전까지 true 유지
 
 function safeJsonParse<T>(value: string | null, fallback: T): T {
   if (!value) return fallback
@@ -26,6 +32,9 @@ interface User {
   level: string
   bio: string
   location?: string
+  latitude?: number
+  longitude?: number
+  locationCode?: string
   stars: number
   todayStars: number
   lastStarDate: string
@@ -105,6 +114,7 @@ interface AuthContextType {
   signup: (data: { name: string; nickname: string; email: string; password: string }) => Promise<void>
   logout: () => void
   updateProfile: (data: Partial<User>) => void
+  updateLocation: (latitude: number, longitude: number) => Promise<string>
   likedRecipes: LikedRecipe[]
   toggleLikeRecipe: (recipe: LikedRecipe) => void
   isRecipeLiked: (recipeId: string) => boolean
@@ -290,6 +300,62 @@ React.useEffect(() => {
       const updatedUser = { ...user, ...data }
       setUser(updatedUser)
       localStorage.setItem("cooksync_user", JSON.stringify(updatedUser))
+    }
+  }
+
+  const updateLocation = async (latitude: number, longitude: number): Promise<string> => {
+    if (!user) {
+      throw new Error("사용자 정보가 없습니다.")
+    }
+
+    try {
+      // 📍 디버깅: 전달받은 좌표 출력
+      // console.log("📡 updateLocation 호출:")
+      // console.log(`   전달받은 Latitude:  ${latitude}`)
+      // console.log(`   전달받은 Longitude: ${longitude}`)
+
+      const locationData: LocationRequestDto = {
+        latitude,
+        longitude,
+      }
+
+      let response
+      if (USE_MOCK_API) {
+        // Mock API 사용 (백엔드 없이 테스트)
+        // console.log("🎭 Mock API 사용 중...")
+        response = await mockVerifyUserLocation(locationData)
+      } else {
+        // 실제 백엔드 API 호출
+        // console.log("🔌 실제 백엔드 API 호출...")
+        const token = localStorage.getItem("cooksync_access_token") || ""
+        response = await verifyUserLocation(locationData, token)
+      }
+
+      // 📍 디버깅: API 응답 출력
+      // console.log("📬 API 응답 받음:")
+      // console.log(`   주소: ${response.locationAddress}`)
+      // console.log(`   코드: ${response.locationCode}`)
+      // console.log(`   메시지: ${response.message}`)
+
+      // 응답에서 주소 정보 추출
+      const locationAddress = response.locationAddress || "위치 인증 완료"
+      const locationCode = response.locationCode || ""
+      
+      // 사용자 정보 업데이트 (좌표, 주소, 코드 모두 저장)
+      const updatedUser = {
+        ...user,
+        location: locationAddress,
+        latitude,
+        longitude,
+        locationCode,
+      }
+      setUser(updatedUser)
+      localStorage.setItem("cooksync_user", JSON.stringify(updatedUser))
+
+      return locationAddress
+    } catch (error) {
+      console.error("위치 인증 중 오류 발생:", error)
+      throw error
     }
   }
 
@@ -540,6 +606,7 @@ React.useEffect(() => {
         signup,
         logout,
         updateProfile,
+        updateLocation,
         likedRecipes,
         toggleLikeRecipe,
         isRecipeLiked,

@@ -44,3 +44,24 @@ export interface ChatMessage {
   recipes?: Recipe[]
   selectedRecipe?: Recipe
 }
+
+// 위치 인증 관련 타입
+export interface LocationRequestDto {
+  latitude: number
+  longitude: number
+}
+
+export interface LocationResponseDto {
+  message: string
+  locationAddress?: string
+  locationCode?: string
+}
+
+export interface UserLocation {
+  latitude: number
+  longitude: number
+  locationAddress: string
+  locationCode: string
+  isVerified: boolean
+  updatedAt: string
+}

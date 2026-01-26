@@ -28,7 +28,14 @@ export default function LoginPage() {
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [isLoading, setIsLoading] = React.useState(false)
-  const [funMessage] = React.useState(() => funMessages[Math.floor(Math.random() * funMessages.length)])
+  const [mounted, setMounted] = React.useState(false)
+  const [funMessage, setFunMessage] = React.useState("")
+
+  // 클라이언트에서만 랜덤 문구 설정 (Hydration 에러 방지)
+  React.useEffect(() => {
+    setMounted(true)
+    setFunMessage(funMessages[Math.floor(Math.random() * funMessages.length)])
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

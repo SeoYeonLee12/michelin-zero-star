@@ -22,9 +22,10 @@ services:
       - AI_SERVER_URL=http://ai-serving:8000
     networks:
       - mzs-network
-      - db
-      - elasticsearch
-      - ai-serving # AI 서버가 켜져야 백엔드도 의미 있음
+      # - mzs-network
+      # - db
+      # - elasticsearch
+      # - ai-serving # AI 서버가 켜져야 백엔드도 의미 있음
 
   #===============================================#
   # 2. Database (MySQL)
