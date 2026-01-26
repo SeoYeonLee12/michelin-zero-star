@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import type { RecipeStep } from "@/lib/types"
 import { createPortal } from "react-dom"
+import Image from "next/image"
 
 type SkillLevel = "beginner" | "intermediate" | "expert"
 
