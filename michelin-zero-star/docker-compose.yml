@@ -22,7 +22,6 @@ services:
       - AI_SERVER_URL=http://ai-serving:8000
     networks:
       - mzs-network
-    depends_on:
       - db
       - elasticsearch
       - ai-serving # AI 서버가 켜져야 백엔드도 의미 있음
@@ -74,7 +73,7 @@ services:
 
   
   #===============================================#
-  # 3-1. Elasticsearch Data Loader
+  # 3-1. Elasticsearch Data Loader (일회성 컨테이너)
   #===============================================#
   # es-data-loader:
   #   build:
