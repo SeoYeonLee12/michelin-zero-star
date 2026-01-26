@@ -31,17 +31,47 @@ const foodCategories = [
   { id: "etc", name: "기타", icon: "🍽️" },
 ]
 
-const recipes = allRecipesForBrowse.map((recipe, index) => ({
-  ...recipe,
-  author: recipe.hashtags?.[0] || "미슐랭 0스타",
-  image: recipe.thumbnail,
-  time: `${recipe.duration}분`,
-  likes: Math.floor(Math.random() * 3000) + 1000,
-  saves: Math.floor(Math.random() * 2000) + 500,
-  rating: (4.5 + Math.random() * 0.5).toFixed(1),
-  category: index % 2 === 0 ? "korean" : "western",
-  foodCategory: foodCategories[index % foodCategories.length].id,
-}))
+// ✅ SSR/CSR 동일 결과를 위한 "결정적 난수" 유틸
+function stable01FromString(seed: string) {
+  // FNV-1a hash (간단/빠름)
+  let h = 2166136261
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return (h >>> 0) / 4294967295 // 0~1
+}
+
+function stableInt(seed: string, min: number, max: number) {
+  const v = stable01FromString(seed)
+  return Math.floor(min + v * (max - min + 1))
+}
+
+function stableFloat(seed: string, min: number, max: number, digits = 1) {
+  const v = stable01FromString(seed)
+  const num = min + v * (max - min)
+  return Number(num.toFixed(digits))
+}
+
+const recipes = allRecipesForBrowse.map((recipe, index) => {
+  const id = recipe.id ?? `browse-${index + 1}`
+
+  return {
+    ...recipe,
+    id, // ✅ id 확정
+    author: recipe.hashtags?.[0] || "미슐랭 0스타",
+    image: recipe.thumbnail,
+    time: `${recipe.duration}분`,
+
+    // ✅ Math.random 제거 → id 기반 고정값
+    likes: stableInt(`${id}-likes`, 1000, 3999),
+    saves: stableInt(`${id}-saves`, 500, 2499),
+    rating: stableFloat(`${id}-rating`, 4.5, 5.0, 1).toFixed(1),
+
+    category: index % 2 === 0 ? "korean" : "western",
+    foodCategory: foodCategories[index % foodCategories.length].id,
+  }
+})
 
 const ITEMS_PER_PAGE = 20
 

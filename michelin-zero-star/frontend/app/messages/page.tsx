@@ -143,9 +143,18 @@ export default function MessagesPage() {
           ) : (
             <div className="flex-1 overflow-y-auto">
               {paginatedConversations.map((conv) => (
-                <button
+                // NOTE: shadcn <Button> is a <button>. Avoid nesting <button> inside <button> to prevent hydration errors.
+                <div
                   key={conv.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedConversationId(conv.recipientId)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      setSelectedConversationId(conv.recipientId)
+                    }
+                  }}
                   className={cn(
                     "w-full px-4 py-3 border-b flex items-center gap-3 hover:bg-gray-50 transition-colors text-left group",
                     selectedConversationId === conv.recipientId && "bg-[#800020]/5 border-l-4 border-l-[#800020]"
@@ -201,7 +210,7 @@ export default function MessagesPage() {
                       {conv.unreadCount}
                     </span>
                   )}
-                </button>
+                </div>
               ))}
             </div>
           )}
@@ -241,7 +250,11 @@ export default function MessagesPage() {
               ) : (
                 localMessages.map((msg) => (
                   <div key={msg.id} className={`flex ${msg.isSentByMe ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-xs lg:max-w-md flex items-end gap-2 ${msg.isSentByMe ? "flex-row-reverse" : "flex-row"}`}>
+                    <div
+                      className={`max-w-xs lg:max-w-md flex items-end gap-2 ${
+                        msg.isSentByMe ? "flex-row-reverse" : "flex-row"
+                      }`}
+                    >
                       {!msg.isSentByMe && (
                         <Avatar className="h-8 w-8 shrink-0">
                           <AvatarImage src={selectedConversation.recipientAvatar || "/placeholder.svg"} />
@@ -303,7 +316,13 @@ export default function MessagesPage() {
                 >
                   <Plus className="h-5 w-5" />
                 </Button>
-                <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
                 <div className="flex-1 relative">
                   <Input
                     placeholder="동네 이웃과 채팅을 나눠보세요!"
@@ -350,7 +369,9 @@ export default function MessagesPage() {
             onClick={() => setCurrentPage(page)}
             className={cn(
               "min-w-[40px] h-10 rounded-lg text-base font-medium transition-all",
-              currentPage === page ? "border-2 border-[#800020] text-[#800020] bg-white" : "text-gray-500 hover:bg-gray-100"
+              currentPage === page
+                ? "border-2 border-[#800020] text-[#800020] bg-white"
+                : "text-gray-500 hover:bg-gray-100"
             )}
           >
             {page}

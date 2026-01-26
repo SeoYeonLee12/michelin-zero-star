@@ -193,7 +193,7 @@ export default function CommunityPage() {
           <div className="justify-self-end">
             <Button className="gap-2 bg-[#800020] hover:bg-[#800020]/90" onClick={handleCreatePost}>
               <Plus className="h-4 w-4" />
-              N빵 팟 구함
+              나눔 팟 구함
             </Button>
           </div>
         </div>
