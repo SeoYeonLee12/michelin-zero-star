@@ -33,7 +33,7 @@ public class RecipeIngredient extends BaseDomain {
     private String amount;
 
     @ManyToOne
-    @JoinColumn(name = "recipe_id", nullable = false)
+    @JoinColumn(name = "recipes_id", nullable = false)
     private Recipe recipe;
 
     public RecipeIngredient(String ingredientName, String amount) {

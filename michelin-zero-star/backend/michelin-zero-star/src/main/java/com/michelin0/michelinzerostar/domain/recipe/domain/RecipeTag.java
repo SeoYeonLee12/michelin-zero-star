@@ -27,7 +27,7 @@ public class RecipeTag extends BaseDomain {
     private Long tagId;
 
     @ManyToOne
-    @JoinColumn(name = "recipe_id", nullable = false)
+    @JoinColumn(name = "recipes_id", nullable = false)
     private Recipe recipe;
 
     @Column(name = "tag_name", nullable = false)
