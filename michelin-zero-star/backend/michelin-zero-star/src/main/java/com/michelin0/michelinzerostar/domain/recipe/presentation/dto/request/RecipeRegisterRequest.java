@@ -4,6 +4,7 @@ import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeIn
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeRegisterCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeStepCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeTagCommand;
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeUpdateCommand;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -23,7 +24,7 @@ public record RecipeRegisterRequest(
         @NotNull(message = "전체 요리 시간을 입력하세요.")
         Integer cookTime,
         @Min(value = 1)
-        @NotNull(message = "인분 수를 입력하1세요.")
+        @NotNull(message = "인분 수를 입력하세요.")
         Integer servings,
         Double calorie,
         Double carbohydrate,
@@ -57,6 +58,24 @@ public record RecipeRegisterRequest(
                 .map(RecipeTagRegisterRequest::toCommand).toList();
 
         return new RecipeRegisterCommand(title, mainImageUrl, recipeDescription, cookTime, servings,
+                userId, calorie, carbohydrate, protein, saturatedFat, cholesterol, sodium, calcium,
+                stepCommands, tagCommands, ingredientCommands, categoryIds);
+    }
+
+
+    public RecipeUpdateCommand toCommand(Long userId, Long recipeId) {
+
+        List<RecipeIngredientCommand> ingredientCommands = ingredients.stream()
+                .map(RecipeIngredientRegisterRequest::toCommand).toList();
+
+        List<RecipeStepCommand> stepCommands = steps.stream()
+                .map(RecipeStepRegisterRequest::toCommand).toList();
+
+        List<RecipeTagCommand> tagCommands = tags.stream()
+                .map(RecipeTagRegisterRequest::toCommand).toList();
+
+        return new RecipeUpdateCommand(recipeId, title, mainImageUrl, recipeDescription, cookTime,
+                servings,
                 userId, calorie, carbohydrate, protein, saturatedFat, cholesterol, sodium, calcium,
                 stepCommands, tagCommands, ingredientCommands, categoryIds);
     }

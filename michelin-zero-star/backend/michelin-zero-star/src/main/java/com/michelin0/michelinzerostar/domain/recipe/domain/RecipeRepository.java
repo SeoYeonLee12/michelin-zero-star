@@ -10,11 +10,11 @@ import org.springframework.stereotype.Repository;
 public interface RecipeRepository extends JpaRepository<Recipe, Long> {
 
     default Recipe getById(Long recipeId) {
-        return findById(recipeId).orElseThrow(
-                () -> new GlobalException(RecipeErrorCode.RECIPE_NOT_FOUND));
+        return findById(recipeId)
+                .orElseThrow(() -> new GlobalException(RecipeErrorCode.RECIPE_NOT_FOUND));
     }
 
-    Optional<Recipe> findByRecipeId(Long recipeId);
+    Optional<Recipe> findById(Long recipeId);
 
     boolean existsByUserIdAndTitle(Long userId, String title);
 }
