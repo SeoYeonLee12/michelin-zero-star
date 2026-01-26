@@ -1,0 +1,17 @@
+package com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request;
+
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeIngredientCommand;
+import jakarta.validation.constraints.NotBlank;
+
+public record RecipeIngredientRegisterRequest(
+        @NotBlank(message = "재료 양을 입력하세요.")
+        String ingredientName,
+        @NotBlank(message = "재료 명을 입력하세요.")
+        String ingredientAmount
+) {
+
+    public RecipeIngredientCommand toCommand() {
+        return new RecipeIngredientCommand(this.ingredientName, this.ingredientAmount);
+    }
+
+}

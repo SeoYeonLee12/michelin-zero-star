@@ -1,6 +1,6 @@
-package com.michelin0.michelinzerostar.domain.recipe.presentation.dto;
+package com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request;
 
-import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeStepRegisterCommand;
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeStepCommand;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -17,8 +17,8 @@ public record RecipeStepRegisterRequest(
 
 ) {
 
-    public RecipeStepRegisterCommand toCommand() {
-        return new RecipeStepRegisterCommand(
+    public RecipeStepCommand toCommand() {
+        return new RecipeStepCommand(
                 stepNumber,
                 stepDescription,
                 timerSeconds,

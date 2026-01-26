@@ -1,9 +1,9 @@
-package com.michelin0.michelinzerostar.domain.recipe.presentation.dto;
+package com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request;
 
-import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeIngredientRegisterCommand;
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeIngredientCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeRegisterCommand;
-import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeStepRegisterCommand;
-import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeTagRegisterCommand;
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeStepCommand;
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeTagCommand;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -47,13 +47,13 @@ public record RecipeRegisterRequest(
 
     public RecipeRegisterCommand toCommand(Long userId) {
 
-        List<RecipeIngredientRegisterCommand> ingredientCommands = ingredients.stream()
+        List<RecipeIngredientCommand> ingredientCommands = ingredients.stream()
                 .map(RecipeIngredientRegisterRequest::toCommand).toList();
 
-        List<RecipeStepRegisterCommand> stepCommands = steps.stream()
+        List<RecipeStepCommand> stepCommands = steps.stream()
                 .map(RecipeStepRegisterRequest::toCommand).toList();
 
-        List<RecipeTagRegisterCommand> tagCommands = tags.stream()
+        List<RecipeTagCommand> tagCommands = tags.stream()
                 .map(RecipeTagRegisterRequest::toCommand).toList();
 
         return new RecipeRegisterCommand(title, mainImageUrl, recipeDescription, cookTime, servings,

@@ -1,6 +1,7 @@
 package com.michelin0.michelinzerostar.domain.recipe.domain;
 
 import com.michelin0.michelinzerostar.domain.category.domain.Category;
+import com.michelin0.michelinzerostar.domain.category.domain.CategoryRepository;
 import com.michelin0.michelinzerostar.domain.category.domain.RecipeCategory;
 import com.michelin0.michelinzerostar.domain.category.domain.RecipeCategoryRepository;
 import com.michelin0.michelinzerostar.global.exception.errorcode.RecipeErrorCode;
@@ -8,6 +9,7 @@ import com.michelin0.michelinzerostar.global.exception.exception.GlobalException
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -20,22 +22,22 @@ public class RecipeRegister {
     private final RecipeCategoryRepository recipeCategoryRepository;
     private final CategoryRepository categoryRepository;
 
-    public Long recipeRegist(Recipe recipe,
+    @Transactional
+    public Long registerRecipe(Recipe recipe,
             List<RecipeStep> steps,
             List<RecipeTag> tags,
             List<RecipeIngredient> ingredients,
             List<Long> categoryIds
     ) {
-        
         if (recipeRepository.existsByUserIdAndTitle(recipe.getUser().getId(), recipe.getTitle())) {
             throw new GlobalException(RecipeErrorCode.RECIPE_ALREADY_EXISTS);
         }
 
         Recipe savedRecipe = recipeRepository.save(recipe);
 
-        ingredients.forEach(ingredient -> ingredient.assignToRecipe(savedRecipe));
-        steps.forEach(step -> step.assignToRecipe(savedRecipe));
-        tags.forEach(tag -> tag.assignToRecipe(savedRecipe));
+        recipe.registerIngredients(ingredients);
+        recipe.registerSteps(steps);
+        recipe.registerTags(tags);
 
         List<Category> searchedCategories = categoryRepository.findAllById(categoryIds);
         if (searchedCategories.size() != categoryIds.size()) {
