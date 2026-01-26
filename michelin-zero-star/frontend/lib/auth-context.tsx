@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { verifyUserLocation } from "./api"
+import { verifyUserLocation, signup as signupAPI } from "./api"
 import { mockVerifyUserLocation } from "./mock-api"
 import type { LocationRequestDto } from "./types"
 
@@ -269,22 +269,26 @@ React.useEffect(() => {
   }
 
   const signup = async (data: { name: string; nickname: string; email: string; password: string }) => {
-    // 1) 회원가입 API 호출
-    //    실제 백엔드 연동 시: const result = await join({ ... })
-    //    현재는 Mock으로 처리
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    // 백엔드 회원가입 API 호출
+    try {
+      const result = await signupAPI({
+        name: data.name,
+        nickname: data.nickname,
+        email: data.email,
+        password: data.password,
+      })
 
-    // 2) 백엔드 응답이 "string"이라서 유저 정보가 없음.
-    //    지금 단계(회원가입만 연동)에서는 "가입 성공"만 확인하고,
-    //    로그인은 별도 API 연동 때 처리하는 게 정상입니다.
-    //    따라서 여기서는 user를 강제로 만들지 않는 것을 권장합니다.
+      // 회원가입 성공 후 로그인 상태 초기화
+      // (회원가입 성공 → 로그인 페이지로 리다이렉트)
+      localStorage.removeItem("cooksync_user")
+      setUser(null)
 
-    // 옵션 1) 권장: 회원가입 성공만 처리(로그인 상태 만들지 않음)
-    localStorage.removeItem("cooksync_user")
-    setUser(null)
-
-    // 필요하면 result를 사용(토스트/로깅)
-    // console.log("join result:", result)
+      console.log("✅ 회원가입 성공:", result)
+      return result
+    } catch (error) {
+      console.error("❌ 회원가입 실패:", error)
+      throw error
+    }
   }
 
   const logout = () => {
