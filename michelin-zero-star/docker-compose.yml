@@ -76,20 +76,20 @@ services:
   #===============================================#
   # 3-1. Elasticsearch Data Loader
   #===============================================#
-  es-data-loader:
-    build:
-      context: ./infra/elasticsearch
-      dockerfile: Dockerfile.loader
-    container_name: mzs-es-loader
-    networks:
-      - mzs-network
-    environment:
-      - ELASTICSEARCH_HOST=elasticsearch
-      - ELASTICSEARCH_PORT=9200
-      - GMS_KEY=${GMS_KEY}
-    depends_on:
-      - elasticsearch
-    restart: "no"
+  # es-data-loader:
+  #   build:
+  #     context: ./infra/elasticsearch
+  #     dockerfile: Dockerfile.loader
+  #   container_name: mzs-es-loader
+  #   networks:
+  #     - mzs-network
+  #   environment:
+  #     - ELASTICSEARCH_HOST=elasticsearch
+  #     - ELASTICSEARCH_PORT=9200
+  #     - GMS_KEY=${GMS_KEY}
+  #   depends_on:
+  #     - elasticsearch
+  #   restart: "no"
   
   
   
@@ -133,6 +133,38 @@ services:
       - mzs-network
     depends_on:
       - elasticsearch # ES가 켜진 뒤에 실행
+
+  #===============================================#
+  # 6. Frontend Application (Next.js)
+  #===============================================#
+  frontend:
+    container_name: michelin-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
+      # 프론트가 백엔드를 부를 때 사용할 주소 (같은 네트워크라 이렇게 부름)
+      # ※ 현재 zip 코드에는 env를 읽는 코드가 없어서 "향후 연동용"으로만 둡니다.
+      - NEXT_PUBLIC_API_BASE_URL=http://backend:8080
+    volumes:
+      # [개발 편의] 로컬 코드를 컨테이너에 연결 (코드 수정 시 즉시 반영)
+      - ./frontend:/app
+      # [주의] node_modules / .next 는 컨테이너 내부 것을 사용 (호스트 덮어쓰기 방지)
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - mzs-network
+    depends_on:
+      - backend
+    command: npm run dev -- -H 0.0.0.0 -p 3000
+
+
+
 
 #===============================================#
 # Network & Volume Definition
