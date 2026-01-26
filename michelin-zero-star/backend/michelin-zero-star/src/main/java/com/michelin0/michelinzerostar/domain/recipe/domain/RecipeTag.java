@@ -27,7 +27,7 @@ public class RecipeTag extends BaseDomain {
     private Long tagId;
 
     @ManyToOne
-    @JoinColumn(name = "recipe_id", nullable = false)
+    @JoinColumn(name = "recipes_id", nullable = false)
     private Recipe recipe;
 
     @Column(name = "tag_name", nullable = false)
@@ -42,5 +42,12 @@ public class RecipeTag extends BaseDomain {
             throw new GlobalException(RecipeErrorCode.ALREADY_ASSIGNED_TAG);
         }
         this.recipe = recipe;
+    }
+
+    public void unassignToRecipe() {
+        if (this.recipe == null) {
+            throw new GlobalException(RecipeErrorCode.RECIPE_NOT_FOUND_FOR_TAG);
+        }
+        this.recipe = null;
     }
 }

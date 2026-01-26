@@ -5,6 +5,7 @@ import static com.michelin0.michelinzerostar.global.SqlRestrictionClause.DELETED
 import com.michelin0.michelinzerostar.domain.recipe.enums.RecipeType;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.global.domain.SoftDeleteDomain;
+import com.michelin0.michelinzerostar.global.exception.errorcode.ErrorCode;
 import com.michelin0.michelinzerostar.global.exception.errorcode.RecipeErrorCode;
 import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
 import jakarta.persistence.Column;
@@ -20,6 +21,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -91,27 +93,79 @@ public class Recipe extends SoftDeleteDomain {
         this.user = user;
     }
 
+    public void updateRecipe(Recipe updatedRecipe) {
+        this.title = updatedRecipe.getTitle();
+        this.mainImageUrl = updatedRecipe.getMainImageUrl();
+        this.description = updatedRecipe.getDescription();
+        this.cookTime = updatedRecipe.getCookTime();
+        this.servings = updatedRecipe.getServings();
+        this.scrapCount = updatedRecipe.getScrapCount();
+        this.reviewCount = updatedRecipe.getReviewCount();
+        this.averageRating = updatedRecipe.getAverageRating();
+        this.recipeType = updatedRecipe.getRecipeType();
+        this.nutrition = updatedRecipe.getNutrition();
+    }
+
+    public void deleteIngredients(List<RecipeIngredient> recipeIngredients) {
+        checkedBlank(recipeIngredients, RecipeErrorCode.INVALID_INGREDIENT);
+        isMatchedRecipeId(recipeIngredients,
+                RecipeIngredient::getRecipe,
+                RecipeErrorCode.RECIPE_ID_NOT_MATCH
+        );
+        recipeIngredients.forEach(RecipeIngredient::unassignToRecipe);
+    }
+
+    public void deleteTags(List<RecipeTag> recipeTags) {
+        checkedBlank(recipeTags, RecipeErrorCode.INVALID_TAG);
+        isMatchedRecipeId(recipeTags,
+                RecipeTag::getRecipe,
+                RecipeErrorCode.RECIPE_ID_NOT_MATCH
+        );
+        recipeTags.forEach(RecipeTag::unassignToRecipe);
+    }
+
+    public void deleteSteps(List<RecipeStep> recipeSteps) {
+        checkedBlank(recipeSteps, RecipeErrorCode.INVALID_STEP);
+        isMatchedRecipeId(recipeSteps,
+                RecipeStep::getRecipe,
+                RecipeErrorCode.RECIPE_ID_NOT_MATCH
+        );
+        recipeSteps.forEach(RecipeStep::unassignToRecipe);
+    }
 
     public void registerIngredients(List<RecipeIngredient> ingredients) {
-        if (ingredients == null || ingredients.isEmpty()) {
-            throw new GlobalException(RecipeErrorCode.INVALID_INGREDIENT);
-        }
+        checkedBlank(ingredients, RecipeErrorCode.INVALID_INGREDIENT);
         ingredients.forEach(ing -> ing.assignToRecipe(this));
     }
 
     public void registerSteps(List<RecipeStep> steps) {
-        if (steps == null || steps.isEmpty()) {
-            throw new GlobalException(RecipeErrorCode.INVALID_STEP);
-        }
+        checkedBlank(steps, RecipeErrorCode.INVALID_STEP);
         steps.forEach(step -> step.assignToRecipe(this));
     }
 
     public void registerTags(List<RecipeTag> tags) {
-        if (tags == null || tags.isEmpty()) {
-            throw new GlobalException(RecipeErrorCode.INVALID_TAG);
-        }
+        checkedBlank(tags, RecipeErrorCode.INVALID_TAG);
         tags.forEach(tag -> tag.assignToRecipe(this));
     }
 
+    private <T> void isMatchedRecipeId(
+            List<T> list,
+            Function<T, Recipe> recipeExtractor,
+            ErrorCode matchError
+    ) {
+        boolean isMatched = list.stream()
+                .map(recipeExtractor)
+                .anyMatch(recipe -> !(recipe.getRecipeId().equals(this.recipeId))
+                );
+        if (isMatched) {
+            throw new GlobalException(matchError);
+        }
+    }
+
+    private <T> void checkedBlank(List<T> list, ErrorCode emptyError) {
+        if (list == null || list.isEmpty()) {
+            throw new GlobalException(emptyError);
+        }
+    }
 }
 

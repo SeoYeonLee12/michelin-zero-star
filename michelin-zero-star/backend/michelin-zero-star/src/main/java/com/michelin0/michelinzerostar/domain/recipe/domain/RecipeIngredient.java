@@ -33,7 +33,7 @@ public class RecipeIngredient extends BaseDomain {
     private String amount;
 
     @ManyToOne
-    @JoinColumn(name = "recipe_id", nullable = false)
+    @JoinColumn(name = "recipes_id", nullable = false)
     private Recipe recipe;
 
     public RecipeIngredient(String ingredientName, String amount) {
@@ -48,5 +48,12 @@ public class RecipeIngredient extends BaseDomain {
         }
         this.recipe = recipe;
 
+    }
+
+    public void unassignToRecipe() {
+        if (this.recipe == null) {
+            throw new GlobalException(RecipeErrorCode.RECIPE_NOT_FOUND_FOR_INGREDIENT);
+        }
+        this.recipe = null;
     }
 }
