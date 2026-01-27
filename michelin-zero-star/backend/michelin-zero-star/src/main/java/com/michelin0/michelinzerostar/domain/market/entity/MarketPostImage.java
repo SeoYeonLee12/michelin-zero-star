@@ -22,7 +22,7 @@ public class MarketPostImage {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "market_post_image_id")
+    @Column(name = "market_post_images_id")
     private Long id;
 
     @Column(nullable = false)
@@ -31,7 +31,7 @@ public class MarketPostImage {
     private int orderIndex; // 이미지 순서
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "market_post_id")
+    @JoinColumn(name = "post_id")
     private MarketPost marketPost;
 
     @Builder
