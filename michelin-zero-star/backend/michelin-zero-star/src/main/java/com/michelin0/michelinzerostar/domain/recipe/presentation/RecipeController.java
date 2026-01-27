@@ -1,11 +1,11 @@
 package com.michelin0.michelinzerostar.domain.recipe.presentation;
 
+import com.michelin0.michelinzerostar.domain.auth.UserPrincipal;
 import com.michelin0.michelinzerostar.domain.recipe.application.RecipeService;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeDetailCommand;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request.RecipeRegisterRequest;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeDetailResponse;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeRegisterResponse;
-import com.michelin0.michelinzerostar.global.security.auth.CustomUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,12 +27,11 @@ public class RecipeController {
 
     @PostMapping
     public ResponseEntity<RecipeRegisterResponse> enrolledRecipes(
-            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestBody @Valid RecipeRegisterRequest recipeRegisterRequest
     ) {
         Long recipeId = recipeService.saveRecipe(
-                recipeRegisterRequest.toCommand(userDetails.getUser()
-                        .getId()));
+                recipeRegisterRequest.toCommand(userPrincipal.getId()));
         return ResponseEntity.status(HttpStatus.CREATED).body(new RecipeRegisterResponse(recipeId));
 
     }
@@ -40,9 +39,9 @@ public class RecipeController {
     @GetMapping("/{recipeId}")
     public ResponseEntity<RecipeDetailResponse> getDetailRecipe(
             @PathVariable Long recipeId,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        Long currentUserId = (userDetails != null) ? userDetails.getUser().getId() : null;
+        Long currentUserId = (userPrincipal != null) ? userPrincipal.getId() : null;
         RecipeDetailCommand command = recipeService.getDetailRecipe(recipeId, currentUserId);
         RecipeDetailResponse response = RecipeDetailResponse.from(command);
         return ResponseEntity.status(HttpStatus.OK).body(response);
