@@ -28,21 +28,25 @@ export default function LoginPage() {
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [isLoading, setIsLoading] = React.useState(false)
-  const [funMessage, setFunMessage] = React.useState(funMessages[0])
-
-  React.useEffect(() => {
-    setFunMessage(funMessages[Math.floor(Math.random() * funMessages.length)])
-  }, [])
   
+  // ✅ Hydration 에러 및 초기 로직 통합
+  const [mounted, setMounted] = React.useState(false)
+  const [funMessage, setFunMessage] = React.useState("")
   const [showSignupSuccess, setShowSignupSuccess] = React.useState(false)
 
   React.useEffect(() => {
+    // 1. 컴포넌트 마운트 표시
+    setMounted(true)
+    
+    // 2. 클라이언트에서만 랜덤 문구 설정 (서버와 불일치 방지)
+    const randomMsg = funMessages[Math.floor(Math.random() * funMessages.length)]
+    setFunMessage(randomMsg)
+
+    // 3. 회원가입 성공 메시지 체크
     const flag = sessionStorage.getItem("signup_success")
     if (flag === "1") {
-      sessionStorage.removeItem("signup_success") // ✅ 1회만 뜨게
+      sessionStorage.removeItem("signup_success")
       setShowSignupSuccess(true)
-
-      // ✅ 자동으로 사라지게(원하면 삭제 가능)
       const t = setTimeout(() => setShowSignupSuccess(false), 3500)
       return () => clearTimeout(t)
     }
@@ -62,7 +66,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex relative">
+      {/* 회원가입 성공 토스트 알림 (선택 사항) */}
+      {showSignupSuccess && (
+        <div className="absolute top-5 right-5 z-50 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg animate-in fade-in slide-in-from-top-4">
+          회원가입이 완료되었습니다! 로그인해 주세요.
+        </div>
+      )}
+
       {/* Left Panel */}
       <DotPatternBackground
         containerClassName="hidden lg:flex lg:w-1/2 min-h-screen bg-background"
@@ -75,7 +86,6 @@ export default function LoginPage() {
               className="bg-[#FEF2F2] shadow-none rounded-2xl"
               imgClassName="h-10 w-10"
             />
-
           </div>
           <span className="text-3xl font-bold tracking-tight">미슐랭 0스타</span>
         </div>
@@ -89,13 +99,14 @@ export default function LoginPage() {
           <Highlight className="text-foreground">셰프님</Highlight> 오셨습니까?
         </motion.h1>
 
+        {/* ✅ mounted 상태일 때만 텍스트를 렌더링하여 Hydration Error 완전 차단 */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3, duration: 0.5 }}
-          className="mt-6 text-muted-foreground text-center max-w-md text-lg"
+          className="mt-6 text-muted-foreground text-center max-w-md text-lg h-7"
         >
-          {funMessage}
+          {mounted ? funMessage : ""}
         </motion.p>
 
         <motion.div
@@ -105,19 +116,19 @@ export default function LoginPage() {
           className="mt-10 flex gap-2"
         >
           {[1, 2, 3, 4, 5].map((_, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 + i * 0.1 }}
-          >
-            <img
-              src={i < 3 ? "/michelin-full-star.png" : "/michelin-star.png"}
-              alt="미슐랭"
-              className={`h-8 w-8 ${i < 3 ? "opacity-100" : "opacity-30"}`}
-            />
-          </motion.div>
-        ))}
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 + i * 0.1 }}
+            >
+              <img
+                src={i < 3 ? "/michelin-full-star.png" : "/michelin-star.png"}
+                alt="미슐랭"
+                className={`h-8 w-8 ${i < 3 ? "opacity-100" : "opacity-30"}`}
+              />
+            </motion.div>
+          ))}
         </motion.div>
 
         <motion.p
