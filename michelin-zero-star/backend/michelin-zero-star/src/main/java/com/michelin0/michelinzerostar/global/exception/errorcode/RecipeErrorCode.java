@@ -25,7 +25,8 @@ public enum RecipeErrorCode implements ErrorCode {
             "요청하신 태그의 레시피 정보가 현재 레시피와 일치하지 않습니다."),
     RECIPE_NOT_FOUND_FOR_STEP(HttpStatus.BAD_REQUEST, "RC014",
             "요청하신 단계의 레시피 정보가 현재 레시피 정보와 일치하지 않습니다."),
-    ACCESS_DENIED(HttpStatus.FORBIDDEN, "RC015", "권한이 없습니다.");
+    ACCESS_DENIED(HttpStatus.FORBIDDEN, "RC015", "권한이 없습니다."),
+    ;
 
     private final HttpStatus httpStatus;
     private final String code;
