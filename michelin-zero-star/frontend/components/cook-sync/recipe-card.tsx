@@ -148,7 +148,7 @@ export function RecipeCard({ recipe, isLiked, onHeartClick, onEdit, onDelete, on
           <h3 className="font-semibold text-base leading-tight line-clamp-2 flex-1">{recipe.name}</h3>
           <div className="flex items-center gap-1 shrink-0">
             <img
-              src="/michelin-full-star.png"
+              src="/michelin-star.png"
               alt="미슐랭"
               className="h-4 w-4"
             />
