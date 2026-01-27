@@ -1,12 +1,12 @@
 package com.michelin0.michelinzerostar.domain.recipe.domain;
 
-import static com.michelin0.michelinzerostar.domain.RecipeScrap.domain.QRecipeScrap.recipeScrap;
 import static com.michelin0.michelinzerostar.domain.category.domain.QCategory.category;
 import static com.michelin0.michelinzerostar.domain.category.domain.QRecipeCategory.recipeCategory;
 import static com.michelin0.michelinzerostar.domain.recipe.domain.QRecipe.recipe;
 import static com.michelin0.michelinzerostar.domain.recipe.domain.QRecipeIngredient.recipeIngredient;
 import static com.michelin0.michelinzerostar.domain.recipe.domain.QRecipeStep.recipeStep;
 import static com.michelin0.michelinzerostar.domain.recipe.domain.QRecipeTag.recipeTag;
+import static com.michelin0.michelinzerostar.domain.recipescrap.domain.QRecipeScrap.recipeScrap;
 import static com.michelin0.michelinzerostar.domain.user.entity.QUser.user;
 
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeDetailProjection;
@@ -39,7 +39,7 @@ public class RecipeQueryRepository {
             return Optional.empty();
         }
 
-        Boolean isMine = (loginUserId != null) && foundRecipe.getUser().getId().equals(loginUserId);
+        Boolean isMine = foundRecipe.getUser().getId().equals(loginUserId);
         Boolean isScrapped = checkIsScrapped(recipeId, loginUserId
         );
 

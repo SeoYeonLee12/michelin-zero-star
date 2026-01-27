@@ -59,4 +59,11 @@ public class RecipeStep {
         }
         this.recipe = recipe;
     }
+
+    public void unassignToRecipe() {
+        if (this.recipe == null) {
+            throw new GlobalException(RecipeErrorCode.RECIPE_NOT_FOUND_FOR_STEP);
+        }
+        this.recipe = null;
+    }
 }
