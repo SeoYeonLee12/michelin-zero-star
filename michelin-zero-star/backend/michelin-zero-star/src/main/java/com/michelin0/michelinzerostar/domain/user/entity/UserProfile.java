@@ -8,6 +8,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -40,16 +41,16 @@ public class UserProfile {
     @Column(name = "is_verified", nullable = false)
     private boolean isVerified; // 동네 인증 여부
 
-    @Column(name = "latitude")
-    private Double latitude;
+    @Column(precision = 10, scale = 8)
+    private BigDecimal latitude;
 
-    @Column(name = "longitude")
-    private Double longitude;
+    @Column(precision = 11, scale = 8)
+    private BigDecimal longitude;
 
 
     @Builder
-    public void updateLocation(String locationAddress, String locationCode, Double latitude,
-            Double longitude) {
+    public void updateLocation(String locationAddress, String locationCode, BigDecimal latitude,
+            BigDecimal longitude) {
         this.locationAddress = locationAddress;
         this.locationCode = locationCode;
         this.latitude = latitude;

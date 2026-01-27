@@ -35,7 +35,7 @@ public class MarketComment extends BaseTimeEntity {
     private MarketPost marketPost;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "writer_id", nullable = false)
+    @JoinColumn(name = "users_id", nullable = false)
     private User writer;
 
     @Column(nullable = false, columnDefinition = "TEXT")

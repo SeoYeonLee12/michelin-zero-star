@@ -13,6 +13,7 @@ import com.michelin0.michelinzerostar.global.exception.exception.GlobalException
 import com.michelin0.michelinzerostar.global.redis.RedisUtil;
 import com.michelin0.michelinzerostar.global.security.jwt.JwtTokenProvider;
 import com.michelin0.michelinzerostar.global.util.KakaoMapService;
+import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -34,7 +35,7 @@ public class UserService {
     private final KakaoMapService kakaoMapService;
 
     @Transactional
-    public String updateUserLocation(String email, double latitude, double longitude) {
+    public String updateUserLocation(String email, BigDecimal latitude, BigDecimal longitude) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("유저를 찾을 수 없습니다."));
 
