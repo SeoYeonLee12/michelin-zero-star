@@ -1,6 +1,6 @@
 package com.michelin0.michelinzerostar.domain.starhistory.domain;
 
-import com.michelin0.michelinzerostar.domain.starhistory.domain.enums.GainType;
+import com.michelin0.michelinzerostar.domain.starhistory.domain.enums.StarHistoryType;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.global.domain.BaseDomain;
 import jakarta.persistence.Column;
@@ -33,12 +33,12 @@ public class StarHistory extends BaseDomain {
     private User user;
 
     @Enumerated(EnumType.STRING)
-    GainType type;
+    StarHistoryType type;
 
     @Column(name = "amount", nullable = false)
     Double starAmount;
 
-    public StarHistory(User user, GainType type, Double starAmount) {
+    public StarHistory(User user, StarHistoryType type, Double starAmount) {
         this.user = user;
         this.type = type;
         this.starAmount = starAmount;
