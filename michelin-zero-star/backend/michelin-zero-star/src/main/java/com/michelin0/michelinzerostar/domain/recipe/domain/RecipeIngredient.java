@@ -49,4 +49,11 @@ public class RecipeIngredient extends BaseDomain {
         this.recipe = recipe;
 
     }
+
+    public void unassignToRecipe() {
+        if (this.recipe == null) {
+            throw new GlobalException(RecipeErrorCode.RECIPE_NOT_FOUND_FOR_INGREDIENT);
+        }
+        this.recipe = null;
+    }
 }

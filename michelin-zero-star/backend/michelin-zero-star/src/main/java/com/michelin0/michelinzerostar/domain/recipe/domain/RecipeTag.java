@@ -43,4 +43,11 @@ public class RecipeTag extends BaseDomain {
         }
         this.recipe = recipe;
     }
+
+    public void unassignToRecipe() {
+        if (this.recipe == null) {
+            throw new GlobalException(RecipeErrorCode.RECIPE_NOT_FOUND_FOR_TAG);
+        }
+        this.recipe = null;
+    }
 }
