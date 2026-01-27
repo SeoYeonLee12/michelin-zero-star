@@ -43,8 +43,8 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         log.info("[ACCESS TOKEN]: {}", tokenDto.getAccessToken());
 
-        String targetUrl = UriComponentsBuilder.fromUriString("https://www.google.com/search")
-                .queryParam("q", tokenDto.getAccessToken())
+        String targetUrl = UriComponentsBuilder.fromUriString("http://localhost:3000/auth/callback")
+                .queryParam("accessToken", tokenDto.getAccessToken())
                 .build().encode(StandardCharsets.UTF_8).toUriString();
 
         getRedirectStrategy().sendRedirect(request, response, targetUrl);

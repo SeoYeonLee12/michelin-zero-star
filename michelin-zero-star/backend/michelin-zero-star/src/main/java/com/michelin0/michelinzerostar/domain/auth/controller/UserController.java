@@ -6,6 +6,7 @@ import com.michelin0.michelinzerostar.domain.user.entity.SocialProvider;
 import com.michelin0.michelinzerostar.domain.user.service.UserService;
 import com.michelin0.michelinzerostar.global.security.jwt.JwtTokenProvider;
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
@@ -98,7 +99,7 @@ public class UserController {
     @NoArgsConstructor
     public static class LocationRequestDto {
 
-        private Double latitude;
-        private Double longitude;
+        private BigDecimal latitude;
+        private BigDecimal longitude;
     }
 }

@@ -1,6 +1,7 @@
 package com.michelin0.michelinzerostar.domain.market.repository;
 
 import com.michelin0.michelinzerostar.domain.market.entity.MarketPost;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -24,7 +25,7 @@ public interface MarketPostRepository extends JpaRepository<MarketPost, Long> {
             "AND deleted_at IS NULL " + // 삭제된 글은 제외
             "ORDER BY created_at DESC",
             nativeQuery = true)
-    List<MarketPost> findNearbyPosts(@Param("myLat") Double myLat,
-            @Param("myLon") Double myLon,
+    List<MarketPost> findNearbyPosts(@Param("myLat") BigDecimal myLat,
+            @Param("myLon") BigDecimal myLon,
             @Param("radius") Double radius);
 }

@@ -1,6 +1,7 @@
 package com.michelin0.michelinzerostar.domain.recipe.application;
 
 
+import com.michelin0.michelinzerostar.domain.recipe.application.command.CookModeCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeDetailCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeRegisterCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeUpdateCommand;
@@ -12,6 +13,7 @@ import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeRepository;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeStep;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeTag;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeUpdate;
+import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModeProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeDetailProjection;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.domain.user.repository.UserRepository;
@@ -44,9 +46,9 @@ public class RecipeService {
 
     @Transactional(readOnly = true)
     public RecipeDetailCommand getDetailRecipe(Long recipeId, Long userId) {
-        RecipeDetailProjection domainDto = recipeQueryRepository.findRecipeById(recipeId, userId)
+        RecipeDetailProjection projection = recipeQueryRepository.findRecipeById(recipeId, userId)
                 .orElseThrow(() -> new GlobalException(RecipeErrorCode.RECIPE_NOT_FOUND));
-        return RecipeDetailCommand.from(domainDto);
+        return RecipeDetailCommand.from(projection);
     }
 
     public Long updateRecipe(RecipeUpdateCommand command) {
@@ -65,5 +67,12 @@ public class RecipeService {
         Recipe searchedRecipe = recipeRepository.getById(recipeId);
         searchedRecipe.validateRecipeEnrolledUser(userId);
         recipeRepository.deleteById(recipeId);
+    }
+
+    public CookModeCommand getCookModeDetail(Long recipeId, Long userId) {
+        User user = userRepository.getById(userId);
+        CookModeProjection projection = recipeQueryRepository.findRecipeStepByRecipeId(recipeId)
+                .orElseThrow(() -> new GlobalException(RecipeErrorCode.RECIPE_NOT_FOUND));
+        return CookModeCommand.from(projection);
     }
 }
