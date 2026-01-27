@@ -2,7 +2,9 @@ package com.michelin0.michelinzerostar.domain.recipe.presentation;
 
 import com.michelin0.michelinzerostar.domain.auth.UserPrincipal;
 import com.michelin0.michelinzerostar.domain.recipe.application.RecipeService;
+import com.michelin0.michelinzerostar.domain.recipe.application.command.CookModeCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeDetailCommand;
+import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.CookModeDetailResponse;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request.RecipeRegisterRequest;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeDetailResponse;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeRegisterResponse;
@@ -56,9 +58,9 @@ public class RecipeController {
             @RequestBody @Valid RecipeRegisterRequest recipeRegisterRequest
     ) {
         Long currentUserId = (principle != null) ? principle.getId() : null;
-        recipeService.updateRecipe(
+        Long response = recipeService.updateRecipe(
                 recipeRegisterRequest.toCommand(currentUserId, recipeId));
-        return ResponseEntity.status(HttpStatus.OK).body(new RecipeRegisterResponse(recipeId));
+        return ResponseEntity.status(HttpStatus.OK).body(new RecipeRegisterResponse(response));
     }
 
     @DeleteMapping("/{recipeId}")
@@ -69,5 +71,16 @@ public class RecipeController {
         Long currentUserId = (principal != null) ? principal.getId() : null;
         recipeService.deleteRecipe(recipeId, currentUserId);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
+    @GetMapping("/{recipeId}/cooking")
+    public ResponseEntity<CookModeDetailResponse> getCookModeDetails(
+            @PathVariable Long recipeId,
+            @AuthenticationPrincipal UserPrincipal principle
+    ) {
+        Long currentUserId = (principle != null) ? principle.getId() : null;
+        CookModeCommand command = recipeService.getCookModeDetail(recipeId, currentUserId);
+        CookModeDetailResponse response = CookModeDetailResponse.from(command);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 }

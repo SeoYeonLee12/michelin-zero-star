@@ -9,12 +9,16 @@ import static com.michelin0.michelinzerostar.domain.recipe.domain.QRecipeTag.rec
 import static com.michelin0.michelinzerostar.domain.recipescrap.domain.QRecipeScrap.recipeScrap;
 import static com.michelin0.michelinzerostar.domain.user.entity.QUser.user;
 
+import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModeProjection;
+import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModeRecipeStepProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeDetailProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeIngredientProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeStepProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeTagProjection;
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.util.List;
 import java.util.Optional;
@@ -87,6 +91,53 @@ public class RecipeQueryRepository {
         return Optional.of(
                 toDetailDto(foundRecipe, categoryNames, tags, ingredients, steps, isScrapped,
                         isMine));
+    }
+
+    public Optional<CookModeProjection> findRecipeStepByRecipeId(Long recipeId) {
+        Tuple searchedRecipe = queryFactory
+                .select(
+                        recipe.recipeId,
+                        recipe.title,
+                        JPAExpressions
+                                .select(recipeStep.count())
+                                .from(recipeStep)
+                                .where(recipeStep.recipe.recipeId.eq(recipeId))
+                )
+                .from(recipe)
+                .where(recipe.recipeId.eq(recipeId))
+                .fetchOne();
+
+        if (searchedRecipe == null) {
+            return Optional.empty();
+        }
+
+        List<CookModeRecipeStepProjection> steps = queryFactory
+                .select(Projections.constructor(
+                        CookModeRecipeStepProjection.class,
+                        recipeStep.recipeStepId,
+                        recipeStep.stepNumber,
+                        recipeStep.stepDescription,
+                        recipeStep.stepImageUrl,
+                        recipeStep.timerSeconds,
+                        recipeStep.cookingTip
+                ))
+                .from(recipeStep)
+                .where(recipeStep.recipe.recipeId.eq(recipeId))
+                .orderBy(recipeStep.stepNumber.asc())
+                .fetch();
+
+        Long searchedRecipeId = searchedRecipe.get(recipe.recipeId);
+        String searchedTitle = searchedRecipe.get(recipe.title);
+
+        Long totalStepCount = searchedRecipe.get(2, Long.class);
+        Integer totalStep = (totalStepCount != null) ? totalStepCount.intValue() : 0;
+
+        return Optional.of(new CookModeProjection(
+                searchedRecipeId,
+                searchedTitle,
+                totalStep,
+                steps
+        ));
     }
 
     private Boolean checkIsScrapped(Long recipeId, Long userId) {
