@@ -12,10 +12,10 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.AccessLevel;
@@ -39,13 +39,13 @@ public class MarketPost extends SoftDeleteDomain {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "writer_id", nullable = false)
+    @JoinColumn(name = "users_id", nullable = false)
     private User writer;
 
     @Column(nullable = false)
     private String title;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String content;
 
     private int price;
@@ -58,11 +58,11 @@ public class MarketPost extends SoftDeleteDomain {
     private String locationText; // 동 이름
     private String locationCode; // 행정동 코드
 
-    @Column
-    private Double latitude;
+    @Column(precision = 10, scale = 8)
+    private BigDecimal latitude;
 
-    @Column
-    private Double longitude;
+    @Column(precision = 11, scale = 8)
+    private BigDecimal longitude;
 
     private String category;
 
@@ -73,7 +73,7 @@ public class MarketPost extends SoftDeleteDomain {
 
     @Builder
     public MarketPost(User writer, String title, String content, int price, String meetingPlace,
-            String locationText, String locationCode, Double latitude, Double longitude,
+            String locationText, String locationCode, BigDecimal latitude, BigDecimal longitude,
             String category) {
         this.writer = writer;
         this.title = title;

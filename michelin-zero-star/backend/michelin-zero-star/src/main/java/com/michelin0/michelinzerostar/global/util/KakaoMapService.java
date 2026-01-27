@@ -2,6 +2,7 @@ package com.michelin0.michelinzerostar.global.util;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,7 +25,7 @@ public class KakaoMapService {
 
     private static final String KAKAO_API_URL = "https://dapi.kakao.com/v2/local/geo/coord2regioncode.json";
 
-    public AddressInfo getAddressFromCoords(double latitude, double longitude) {
+    public AddressInfo getAddressFromCoords(BigDecimal latitude, BigDecimal longitude) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "KakaoAK " + kakaoRestApiKey);
         HttpEntity<String> entity = new HttpEntity<>(headers);
