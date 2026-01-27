@@ -5,7 +5,7 @@
 
 import type { LocationRequestDto, LocationResponseDto } from "./types"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1"
 
 interface ApiRequestOptions extends RequestInit {
   headers?: Record<string, string>
@@ -149,16 +149,15 @@ export async function signup(data: {
   nickname: string
   email: string
   password: string
-}): Promise<{ accessToken: string }> {
+}): Promise<string> {
   try {
-    const response = await apiRequest<{ accessToken: string }>(
-      "/auth/signup",
+    return await apiRequest<string>(
+      "/auth/join",
       {
         method: "POST",
         body: JSON.stringify(data),
       },
     )
-    return response
   } catch (error) {
     console.error("회원가입 실패:", error)
     throw error

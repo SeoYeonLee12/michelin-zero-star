@@ -251,22 +251,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signup = async (data: { name: string; nickname: string; email: string; password: string }) => {
-    try {
-      // ✅ 실제 백엔드 API 호출로 변경됨
-      const result = await signupAPI({
-        name: data.name,
-        nickname: data.nickname,
-        email: data.email,
-        password: data.password,
-      })
-      localStorage.removeItem("cooksync_user")
-      setUser(null)
-      console.log("✅ 회원가입 성공:", result)
-    } catch (error) {
-      console.error("❌ 회원가입 실패:", error)
-      throw error
-    }
+  try {
+    const accessToken = await signupAPI({
+      name: data.name,
+      nickname: data.nickname,
+      email: data.email,
+      password: data.password,
+    })
+
+    // ✅ 토큰 저장 (이후 위치 인증 등에서 사용)
+    localStorage.setItem("cooksync_access_token", accessToken)
+
+    // ✅ (선택) 회원가입 직후 로그인 상태로 만들고 싶으면 user 세팅 필요
+    // 백엔드에서 유저 정보 안 내려주면 임시로 최소 정보만 넣거나,
+    // 가입 후 login API를 다시 호출해서 유저 정보를 가져오는 방식이 더 안전.
+    // 일단은 “가입 성공 + 토큰 저장”까지만 처리해도 위치 인증은 가능해짐.
+
+    console.log("✅ 회원가입 성공, accessToken 저장 완료")
+  } catch (error) {
+    console.error("❌ 회원가입 실패:", error)
+    throw error
   }
+}
 
   const logout = () => {
     setUser(null)
