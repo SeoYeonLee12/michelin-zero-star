@@ -1,5 +1,6 @@
 package com.michelin0.michelinzerostar.global.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.michelin0.michelinzerostar.global.exception.errorcode.AuthErrorCode;
 import com.michelin0.michelinzerostar.global.exception.response.ErrorResponse;
 import com.michelin0.michelinzerostar.global.security.auth.CustomUserDetailsService;
@@ -18,12 +19,12 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Configuration
@@ -38,6 +39,7 @@ public class SecurityConfig {
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
+        // [핵심 수정] 생성자에 customUserDetailsService 주입
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(
                 customUserDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());
@@ -56,77 +58,65 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, ObjectMapper objectMapper)
-            throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+
+        ObjectMapper objectMapper = new ObjectMapper();
+
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
+                .headers(headers -> headers.frameOptions(
+                        HeadersConfigurer.FrameOptionsConfig::sameOrigin))
                 .sessionManagement(
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // 로그인 관련 경로 허용
+                        // 정적 리소스 허용
+                        .requestMatchers("/css/**", "/images/**", "/js/**", "/favicon.*",
+                                "/*/icon-*").permitAll()
+
+                        // [핵심 수정] 인증 없이 접근 가능한 URL 목록
                         .requestMatchers(
-                                "/api/v1/auth/**",
-                                "/login/**",
-                                "/oauth2/**",
-                                "/v3/api-docs/**",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html",
+                                "/",
                                 "/error",
-                                "/favicon.ico"
+                                "/api/v1/auth/**", // 회원가입, 로그인 등 auth 하위 경로 모두 허용
+                                "/api/users/login", // 혹시 몰라 기존 경로도 유지
+                                "/api/users/signup",
+                                "/api-docs/**",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/h2-console/**"
                         ).permitAll()
+
                         .anyRequest().authenticated()
                 )
-
-                // JWT 필터
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
                         UsernamePasswordAuthenticationFilter.class)
-
-                // 소셜 로그인 설정
                 .oauth2Login(oauth2 -> oauth2
-                        .userInfoEndpoint(userInfo -> userInfo
-                                .userService(customOAuth2UserService)
-                        )
+                        .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                         .successHandler(oAuth2SuccessHandler)
                         .failureHandler((request, response, exception) -> {
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType("application/json;charset=UTF-8");
-                            String jsonResponse =
-                                    "{\"error\": \"OAuth2 Login Failed\", \"message\": \""
-                                            + exception.getMessage().replace("\"", "'") + "\"}";
-
-                            response.getWriter().write(jsonResponse);
+                            response.getWriter().write("{\"error\": \"OAuth2 Login Failed\"}");
                         })
                 )
-
                 .exceptionHandling(exception -> exception
-                        // 로그인 실패 (401) 처리
                         .authenticationEntryPoint((request, response, authException) -> {
-                            log.error("인증 실패 발생 (401): ", authException);
-
+                            log.error("인증 실패 (401) - URL: {}", request.getRequestURI());
                             response.setContentType("application/json;charset=UTF-8");
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-
                             ErrorResponse errorResponse = ErrorResponse.from(
                                     AuthErrorCode.AUTHENTICATION_FAILED);
-
-                            // tools.jackson ObjectMapper로 변환
                             response.getWriter()
                                     .write(objectMapper.writeValueAsString(errorResponse));
                         })
-
-                        // 권한 없음 (403) 처리
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
-                            log.error("권한 없음 발생 (403): ", accessDeniedException);
-
+                            log.error("권한 없음 (403) - URL: {}", request.getRequestURI());
                             response.setContentType("application/json;charset=UTF-8");
                             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-
                             ErrorResponse errorResponse = ErrorResponse.from(
                                     AuthErrorCode.ACCESS_DENIED);
-
-                            // tools.jackson ObjectMapper로 변환
                             response.getWriter()
                                     .write(objectMapper.writeValueAsString(errorResponse));
                         })
