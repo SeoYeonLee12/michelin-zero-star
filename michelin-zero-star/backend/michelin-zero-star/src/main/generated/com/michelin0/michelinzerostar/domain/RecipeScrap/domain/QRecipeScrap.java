@@ -1,4 +1,4 @@
-package com.michelin0.michelinzerostar.domain.RecipeScrap.domain;
+package com.michelin0.michelinzerostar.domain.recipescrap.domain;
 
 import static com.querydsl.core.types.PathMetadataFactory.*;
 
@@ -19,7 +19,7 @@ import com.querydsl.core.types.dsl.PathInits;
 @Generated("com.querydsl.codegen.DefaultEntitySerializer")
 public class QRecipeScrap extends EntityPathBase<RecipeScrap> {
 
-    private static final long serialVersionUID = -1814335553L;
+    private static final long serialVersionUID = 698531711L;
 
     private static final PathInits INITS = PathInits.DIRECT2;
 
@@ -58,7 +58,7 @@ public class QRecipeScrap extends EntityPathBase<RecipeScrap> {
     public QRecipeScrap(Class<? extends RecipeScrap> type, PathMetadata metadata, PathInits inits) {
         super(type, metadata, inits);
         this.recipe = inits.isInitialized("recipe") ? new com.michelin0.michelinzerostar.domain.recipe.domain.QRecipe(forProperty("recipe"), inits.get("recipe")) : null;
-        this.user = inits.isInitialized("user") ? new com.michelin0.michelinzerostar.domain.user.entity.QUser(forProperty("user")) : null;
+        this.user = inits.isInitialized("user") ? new com.michelin0.michelinzerostar.domain.user.entity.QUser(forProperty("user"), inits.get("user")) : null;
     }
 
 }
