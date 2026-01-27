@@ -276,38 +276,16 @@ export default function RecipesPage() {
               </Button>
             )}
           </p>
-          <Select
-              value={sortBy}
-              onValueChange={(v) => setSortBy(v as typeof sortBy)}
-              onOpenChange={(open) => {
-                if (open) {
-                  const y = window.scrollY
-                  document.body.dataset.scrollY = String(y)
-                  document.body.style.position = "fixed"
-                  document.body.style.top = `-${y}px`
-                  document.body.style.width = "100%"
-                } else {
-                  const y = Number(document.body.dataset.scrollY || 0)
-                  document.body.style.position = ""
-                  document.body.style.top = ""
-                  document.body.style.width = ""
-                  window.scrollTo(0, y)
-                }
-              }}
-            >
-              <SelectTrigger className="w-32 h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent
-                position="popper"
-                sideOffset={4}
-                avoidCollisions={false}
-              >
-                <SelectItem value="latest">최신순</SelectItem>
-                <SelectItem value="rating">스타순</SelectItem>
-                <SelectItem value="time">조리시간순</SelectItem>
-              </SelectContent>
-            </Select>
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+            <SelectTrigger className="w-32 h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="latest">최신순</SelectItem>
+              <SelectItem value="rating">스타순</SelectItem>
+              <SelectItem value="time">조리시간순</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Recipe Grid - 4 columns, 5 rows */}

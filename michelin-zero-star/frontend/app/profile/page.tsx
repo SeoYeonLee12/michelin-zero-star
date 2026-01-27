@@ -30,7 +30,7 @@ const mockNicknames = ["민지", "요리왕", "쉐프김", "맛집탐방"]
 
 export default function ProfileEditPage() {
   const router = useRouter()
-  const { user, isLoggedIn, updateProfile, updateLocation } = useAuth()
+  const { user, isLoggedIn, updateProfile } = useAuth()
 
   const [isLoading, setIsLoading] = React.useState(false)
   const [isGettingLocation, setIsGettingLocation] = React.useState(false)
@@ -38,7 +38,6 @@ export default function ProfileEditPage() {
   const [showNewPassword, setShowNewPassword] = React.useState(false)
   const [locationDialogOpen, setLocationDialogOpen] = React.useState(false)
   const [pendingLocation, setPendingLocation] = React.useState("")
-  const [pendingCoordinates, setPendingCoordinates] = React.useState<{ latitude: number; longitude: number } | null>(null)
   const [nicknameError, setNicknameError] = React.useState("")
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [profileImagePreview, setProfileImagePreview] = React.useState<string | null>(null)
@@ -48,7 +47,7 @@ export default function ProfileEditPage() {
     nickname: user?.nickname || "",
     email: user?.email || "",
     bio: user?.bio || "",
-    location: "",
+    location: user?.location || "",
     categories: [] as string[],
   })
 
@@ -72,7 +71,7 @@ export default function ProfileEditPage() {
         nickname: user.nickname || "",
         email: user.email,
         bio: user.bio || "",
-        // location: user.location || "",
+        location: user.location || "",
       }))
       if (user.profileImage) {
         setProfileImagePreview(user.profileImage)
@@ -124,26 +123,22 @@ export default function ProfileEditPage() {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords
+          let mockAddress = "서울 강남구"
 
-          // 📍 디버깅: 받은 좌표 출력
-          // console.log("🌍 GPS 좌표 획득:")
-          // console.log(`   Latitude:  ${latitude}`)
-          // console.log(`   Longitude: ${longitude}`)
+          if (latitude >= 36.2 && latitude <= 36.5 && longitude >= 127.3 && longitude <= 127.5) {
+            mockAddress = "대전 서구 둔산동"
+          } else if (latitude >= 37.4 && latitude <= 37.7 && longitude >= 126.8 && longitude <= 127.2) {
+            mockAddress = "서울 강남구"
+          } else if (latitude >= 35.1 && latitude <= 35.3 && longitude >= 128.9 && longitude <= 129.2) {
+            mockAddress = "부산 해운대구"
+          }
 
-          // 백엔드 API 호출하여 위치 인증
-          const locationAddress = await updateLocation(latitude, longitude)
-
-          // 📍 디버깅: 반환된 주소 출력
-          // console.log(`✅ 위치 인증 완료: ${locationAddress}`)
-
-          // 응답 받은 주소와 좌표를 저장 (확인 버튼에서 사용)
-          setPendingLocation(locationAddress)
-          setPendingCoordinates({ latitude, longitude })
+          setPendingLocation(mockAddress)
           setLocationDialogOpen(true)
-        } catch (error) {
-          console.error("위치 인증 오류:", error)
-          const errorMessage = error instanceof Error ? error.message : "위치를 가져올 수 없습니다"
-          alert(`위치 인증 실패: ${errorMessage}`)
+        } catch {
+          setPendingLocation("위치를 가져올 수 없습니다")
+          setLocationDialogOpen(true)
+        } finally {
           setIsGettingLocation(false)
         }
       },
@@ -160,36 +155,10 @@ export default function ProfileEditPage() {
     )
   }
 
-  const handleConfirmLocation = async () => {
-    if (!pendingCoordinates) {
-      alert("위치 정보가 없습니다.")
-      return
-    }
-
-    try {
-      setIsGettingLocation(true)
-
-      // 📍 백엔드에 위치 저장
-      // console.log("💾 백엔드에 위치 저장 중...")
-      // console.log(`   주소: ${pendingLocation}`)
-      // console.log(`   좌표: (${pendingCoordinates.latitude}, ${pendingCoordinates.longitude})`)
-
-      // 폼 데이터 업데이트
-      setFormData((prev) => ({ ...prev, location: pendingLocation }))
-
-      // 다이얼로그 닫기
-      setLocationDialogOpen(false)
-      setPendingLocation("")
-      setPendingCoordinates(null)
-
-      // ✅ 저장 완료
-      console.log("✅ 위치 저장 완료")
-    } catch (error) {
-      console.error("위치 저장 오류:", error)
-      alert("위치 저장에 실패했습니다.")
-    } finally {
-      setIsGettingLocation(false)
-    }
+  const handleConfirmLocation = () => {
+    setFormData((prev) => ({ ...prev, location: pendingLocation }))
+    setLocationDialogOpen(false)
+    setPendingLocation("")
   }
 
   const handleCategoryToggle = (category: string) => {
@@ -382,26 +351,11 @@ export default function ProfileEditPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-2">
-                {/* <Input
+                <Input
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   placeholder="예: 대전 서구 둔산동"
                   className="flex-1"
-                /> */}
-
-                {/* <Input
-                  value={formData.location}
-                  readOnly
-                  disabled
-                  placeholder="현재 위치 버튼을 눌러 위치를 인증해주세요"
-                  className="flex-1 bg-muted cursor-not-allowed"
-                /> */}
-                <Input
-                  value={isGettingLocation ? "" : formData.location}
-                  readOnly
-                  disabled={!formData.location}
-                  placeholder={isGettingLocation ? "위치 탐색 중입니다..." : "현재 위치 버튼을 눌러 위치를 인증해주세요"}
-                  className={`flex-1 ${!formData.location ? "bg-muted cursor-not-allowed" : ""}`}
                 />
                 <Button
                   variant="outline"
@@ -413,15 +367,10 @@ export default function ProfileEditPage() {
                   현재 위치
                 </Button>
               </div>
-
-              {/* <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 위치 정보는 주변 재료 나눔 게시글을 찾는 데 사용됩니다.
                 {isGettingLocation && " GPS로 위치를 탐색 중입니다..."}
-              </p> */}
-              {/* <p className="text-xs text-muted-foreground">
-                현재 위치 버튼을 눌러 동네 인증을 해주세요. 위치 정보는 주변 재료 나눔 게시글을 찾는 데 사용됩니다. */}
-                {/* {isGettingLocation && " 위치를 탐색 중입니다..."} */}
-              {/* </p> */}
+              </p>
             </CardContent>
           </Card>
 

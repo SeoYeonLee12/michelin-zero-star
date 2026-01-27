@@ -6,7 +6,6 @@ import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Navbar } from "@/components/cook-sync/navbar"
 import { ScrollToTop } from "@/components/cook-sync/scroll-to-top"
-import { AccessDenied } from "@/components/cook-sync/access-denied"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -30,7 +29,7 @@ import Image from "next/image"
 
 export default function CommunityNewPage() {
   const router = useRouter()
-  const { isLoggedIn, user, addUserPost } = useAuth()
+  const { isLoggedIn, addUserPost } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
@@ -43,26 +42,6 @@ export default function CommunityNewPage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showExitDialog, setShowExitDialog] = useState(false)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
-
-  // 로그인 체크
-  if (!isLoggedIn) {
-    return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <Navbar />
-        <AccessDenied type="login" />
-      </div>
-    )
-  }
-
-  // 동네 인증 체크
-  if (!user?.location) {
-    return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <Navbar />
-        <AccessDenied type="location" />
-      </div>
-    )
-  }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -127,7 +106,7 @@ export default function CommunityNewPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">나눔 팟 구함</h1>
+            <h1 className="text-2xl font-bold tracking-tight">N빵 팟 구함</h1>
             <p className="text-muted-foreground">이웃과 재료를 나눠보세요</p>
           </div>
         </div>
@@ -210,12 +189,7 @@ export default function CommunityNewPage() {
               </Label>
               <Textarea
                 id="description"
-                placeholder={`구매한 재료, 상태, 나눔 방법 등을 자세히 적어주세요.
-    
-    예시:
-    - 오늘 마트에서 구매한 신선한 양배추예요
-    - 반 통씩 나눠서 가져가시면 됩니다
-    - 둔산동 롯데마트 앞에서 직거래 원해요`}
+                placeholder="구매한 재료, 상태, 나눔 방법 등을 자세히 적어주세요.&#10;&#10;예시:&#10;- 오늘 마트에서 구매한 신선한 양배추예요&#10;- 반 통씩 나눠서 가져가시면 됩니다&#10;- 둔산동 롯데마트 앞에서 직거래 원해요"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={6}

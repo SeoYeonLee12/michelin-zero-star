@@ -24,7 +24,10 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import type { RecipeStep } from "@/lib/types"
 import { createPortal } from "react-dom"
-import Image from "next/image"
+import { fetchSpeechToken, postChat } from "@/lib/voice-api"
+import { startSttOnce } from "@/lib/stt"
+import { createPorcupineController } from "@/lib/kws/porcupine"
+
 
 type SkillLevel = "beginner" | "intermediate" | "expert"
 
@@ -77,8 +80,96 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
   const totalProgress = ((currentStepIndex + (completedSteps.has(currentStepIndex) ? 1 : 0)) / steps.length) * 100
   const adjustedDuration = getAdjustedDuration(currentStep.duration, skillLevel)
 
+  const sttStopRef = React.useRef<null | (() => void)>(null)
+  const porcupineRef = React.useRef<ReturnType<typeof createPorcupineController> | null>(null)
+
+  const isListeningRef = React.useRef(isListening)
+
+  const stepIndexRef = React.useRef(currentStepIndex)
+  const timerSecondsRef = React.useRef(timerSeconds)
+  const isTimerRunningRef = React.useRef(isTimerRunning)
+
+  React.useEffect(() => { isListeningRef.current = isListening }, [isListening])
+
+  React.useEffect(() => { stepIndexRef.current = currentStepIndex }, [currentStepIndex])
+  React.useEffect(() => { timerSecondsRef.current = timerSeconds }, [timerSeconds])
+  React.useEffect(() => { isTimerRunningRef.current = isTimerRunning }, [isTimerRunning])
+
+
+
   // ===== Floating AI Chat (Popover above floating button) =====
   const [aiOpen, setAiOpen] = React.useState(false)
+  const aiOpenRef = React.useRef(aiOpen)
+  React.useEffect(() => { aiOpenRef.current = aiOpen }, [aiOpen])
+
+  const safeStopStt = () => {
+    try { sttStopRef.current?.() } catch {}
+    sttStopRef.current = null
+  }
+
+  const runSttOnce = React.useCallback(async () => {
+    safeStopStt()
+    await porcupineRef.current?.stop()
+    if (micPermission !== "granted") return
+    if (!isListening) return
+
+    await porcupineRef.current?.stop()
+
+    try {
+      const { token, region } = await fetchSpeechToken()
+
+      const ctrl = await startSttOnce({
+        token,
+        region,
+        onFinal: async (text) => {
+          const raw = (text || "").trim()
+          if (!raw) return
+
+          // Show message
+          setAiMessages((prev) => [...prev, { role: "user", content: raw }])
+
+          const norm = raw
+            .replace(/[^\p{L}\p{N}\s]/gu, "")
+            .trim()
+
+          const isCloseIntent =
+            /(채팅|셰프|챗봇)?\s*(닫아|닫기|종료|끝|그만|나가|꺼)/.test(norm)
+
+          if (isCloseIntent) {
+            sttStopRef.current?.()
+            sttStopRef.current = null
+
+            setAiOpen(false)
+
+            if (isListening) {
+              await porcupineRef.current?.start()
+            }
+            return
+          }
+
+          try {
+            const res = await postChat({ text: raw })
+            setAiMessages((prev) => [...prev, { role: "ai", content: res.answer }])
+          } catch {
+            setAiMessages((prev) => [...prev, { role: "ai", content: "서버 응답을 받지 못했어요." }])
+          }
+
+          if (isListeningRef.current && aiOpenRef.current) {
+            setTimeout(() => { if (isListeningRef.current && aiOpenRef.current) runSttOnce()}, 250)
+          }
+        },
+        onError: () => {
+          if (isListening && aiOpen) setTimeout(() => runSttOnce(), 400)
+        },
+      })
+
+      sttStopRef.current = ctrl.stop
+    } catch {
+      if (isListening && aiOpen) setTimeout(() => runSttOnce(), 400)
+    }
+  }, [micPermission, isListening, aiOpen])
+
+
   React.useEffect(() => {
     const requestMicPermission = async () => {
       try {
@@ -97,6 +188,51 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
     { role: "ai", content: "요리 중 궁금한 걸 말씀해 주세요. (예: '다음 단계 요약해줘')" },
   ])
   const aiEndRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    if (micPermission !== "granted") return
+
+    // OFF면 KWS 끄기
+    if (!isListening || aiOpen) {
+      porcupineRef.current?.stop()
+      return
+    }
+
+    // ON이면 KWS 켜기 (처음 1번만 생성)
+    if (!porcupineRef.current) {
+      porcupineRef.current = createPorcupineController({
+        accessKey: "YOUR_PRIVATE_KEY",
+        modelPublicPath: "/porcupine/ko.pv",
+        keywords: [
+          { label: "WAKE", publicPath: "/porcupine/wake.ppn" },
+          { label: "NEXT", publicPath: "/porcupine/next.ppn" },
+          { label: "PREV", publicPath: "/porcupine/prev.ppn" },
+          { label: "PLAY", publicPath: "/porcupine/play.ppn" },
+          { label: "PAUSE", publicPath: "/porcupine/pause.ppn" },
+        ],
+        onCommand: async (cmd) => {
+          console.log("[KWS] detected:", cmd)
+          if (cmd === "WAKE") {
+            await porcupineRef.current?.stop()
+            setAiOpen(true)
+            setTimeout(() => runSttOnce(), 50)
+            return
+          }
+
+          if (cmd === "NEXT") goNextStep()
+          if (cmd === "PREV") goPrevStep()
+          if (cmd === "PLAY") handleStartTimer()
+          if (cmd === "PAUSE") handlePauseTimer()
+        },
+      })
+    }
+
+    porcupineRef.current.start()
+
+    return () => {
+      porcupineRef.current?.stop()
+    }
+  }, [isListening, micPermission, runSttOnce])
 
   React.useEffect(() => {
     // STT(외부)에서 키워드 감지 시 아래 이벤트만 쏴주면 열림/닫힘/토글
@@ -123,7 +259,7 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
     aiEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [aiMessages, aiOpen])
 
-  const handleAiSend = () => {
+  const handleAiSend = async() => {
     if (!aiInput.trim()) return
     const userText = aiInput.trim()
 
@@ -131,22 +267,22 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
     setAiInput("")
 
     // TODO: 실제 AI 연동 시 여기만 교체
-    setTimeout(() => {
+  try {
+      const res = await postChat({ text: userText })
+      setAiMessages((prev) => [...prev, { role: "ai", content: res.answer }])
+    } catch (e) {
       setAiMessages((prev) => [
         ...prev,
-        {
-          role: "ai",
-          content: `(${userText}) 관련해서 도와드릴게요.\n현재 STEP ${currentStep.stepNumber}: ${currentStep.action}\n필요하면 '핵심만', '주의점만' 같이 요청해 주세요.`,
-        },
+        { role: "ai", content: "서버 연결에 실패했어요. 잠시 후 다시 시도해 주세요." },
       ])
-    }, 400)
+    }
   }
 
   React.useEffect(() => {
     if (prevStepRef.current !== currentStepIndex) {
       setTimerSeconds(getAdjustedDuration(currentStep.duration, skillLevel))
       if (currentStepIndex > 0) {
-        setIsTimerRunning(true)
+//        setIsTimerRunning(true)
         if (micPermission === "granted") setIsListening(true) // ✅ 권한 있을 때만
         else setIsListening(false) // ✅ denied/unknown이면 확실히 끔
       }
@@ -206,18 +342,19 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
   }, [isTimerRunning, timerSeconds, autoAdvance])
 
   const handleStartTimer = () => {
-    if (timerSeconds === 0) {
-      setTimerSeconds(adjustedDuration)
-    }
-    setIsTimerRunning(true)
+    if (isTimerRunningRef.current) return
 
-    if (micPermission === "granted") setIsListening(true)
-    else setIsListening(false)
+    if (timerSecondsRef.current > 0){
+      setIsTimerRunning(true)
+      return
+    }
+
+    setTimerSeconds(adjustedDuration)
+    setIsTimerRunning(true)
   }
 
   const handlePauseTimer = () => {
     setIsTimerRunning(false)
-    setIsListening(false)
   }
 
   const formatTime = (seconds: number) => {
@@ -226,20 +363,17 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
   }
 
-  const handlePrevStep = () => {
-    if (currentStepIndex > 0) {
-      onStepChange(currentStepIndex - 1)
-    }
-  }
+  const goNextStep = React.useCallback(() => {
+    setCompletedSteps(prev => new Set([...prev, stepIndexRef.current]))
+    const idx = stepIndexRef.current
+    if (idx < steps.length - 1) onStepChange(idx + 1)
+    else onComplete()
+  }, [steps.length, onStepChange, onComplete])
 
-  const handleNextStep = () => {
-    setCompletedSteps((prev) => new Set([...prev, currentStepIndex]))
-    if (currentStepIndex < steps.length - 1) {
-      onStepChange(currentStepIndex + 1)
-    } else {
-      onComplete()
-    }
-  }
+  const goPrevStep = React.useCallback(() => {
+    const idx = stepIndexRef.current
+    if (idx > 0) onStepChange(idx - 1)
+  }, [onStepChange])
 
   const handleStepClick = (index: number) => {
     if (index < currentStepIndex) {
@@ -255,8 +389,8 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
   }
 
   const handleVoiceToggle = () => {
-  if (micPermission !== "granted") return
-  setIsListening((v) => !v)
+    if (micPermission !== "granted") return
+    setIsListening((v) => !v)
   }
 
   const handleAddTime = () => {
@@ -503,7 +637,7 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
           <Button
             variant="outline"
             size="sm"
-            onClick={handlePrevStep}
+            onClick={goPrevStep}
             disabled={currentStepIndex === 0}
             className="gap-1.5 bg-transparent h-11 px-10 text-sm font-medium flex-shrink-0"
           >
@@ -528,7 +662,7 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
             ))}
           </div>
 
-          <Button size="sm" onClick={handleNextStep} className="gap-1.5 bg-[#800020] hover:bg-[#800020]/90 h-11 px-10 text-sm font-medium flex-shrink-0">
+          <Button size="sm" onClick={goNextStep} className="gap-1.5 bg-[#800020] hover:bg-[#800020]/90 h-11 px-10 text-sm font-medium flex-shrink-0">
             {currentStepIndex === steps.length - 1 ? (
               <>
                 <span>완료</span>
@@ -566,7 +700,12 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
                 type="button"
                 variant="ghost"
                 size="icon"
-                onClick={() => setAiOpen(false)}
+                onClick={async () => {
+                  setAiOpen(false)
+                  sttStopRef.current?.()
+                  sttStopRef.current = null
+                  if (isListening) await porcupineRef.current?.start()
+                }}
                 aria-label="AI 닫기"
                 className="h-8 w-8"
               >
