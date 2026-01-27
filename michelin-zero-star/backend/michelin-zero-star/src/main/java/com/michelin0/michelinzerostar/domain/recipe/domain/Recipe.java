@@ -29,7 +29,7 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
 @SQLRestriction(DELETED_AT_IS_NULL)
-@SQLDelete(sql = "UPDATE recipes SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?")
+@SQLDelete(sql = "UPDATE recipes SET deleted_at = CURRENT_TIMESTAMP WHERE recipes_id = ?")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "recipes")
@@ -148,6 +148,11 @@ public class Recipe extends SoftDeleteDomain {
         tags.forEach(tag -> tag.assignToRecipe(this));
     }
 
+    public void validateRecipeEnrolledUser(Long userId) {
+        if (!this.user.getId().equals(userId)) {
+            throw new GlobalException(RecipeErrorCode.ACCESS_DENIED);
+        }
+    }
     private <T> void isMatchedRecipeId(
             List<T> list,
             Function<T, Recipe> recipeExtractor,

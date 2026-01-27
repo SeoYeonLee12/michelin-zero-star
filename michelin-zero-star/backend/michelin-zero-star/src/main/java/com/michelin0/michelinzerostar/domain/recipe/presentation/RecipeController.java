@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,5 +60,15 @@ public class RecipeController {
         recipeService.updateRecipe(
                 recipeRegisterRequest.toCommand(currentUserId, recipeId));
         return ResponseEntity.status(HttpStatus.OK).body(new RecipeRegisterResponse(recipeId));
+    }
+
+    @DeleteMapping("/{recipeId}")
+    public ResponseEntity<Void> deleteRecipe(
+            @PathVariable Long recipeId,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        Long currentUserId = (userDetails != null) ? userDetails.getUser().getId() : null;
+        recipeService.deleteRecipe(recipeId, currentUserId);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }
