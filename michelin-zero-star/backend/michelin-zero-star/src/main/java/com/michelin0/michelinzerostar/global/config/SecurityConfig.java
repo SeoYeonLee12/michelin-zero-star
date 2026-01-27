@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod; // ★ 추가된 Import
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -39,7 +40,6 @@ public class SecurityConfig {
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
-        // [핵심 수정] 생성자에 customUserDetailsService 주입
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(
                 customUserDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());
@@ -75,12 +75,15 @@ public class SecurityConfig {
                         .requestMatchers("/css/**", "/images/**", "/js/**", "/favicon.*",
                                 "/*/icon-*").permitAll()
 
-                        // [핵심 수정] 인증 없이 접근 가능한 URL 목록
+                        .requestMatchers(HttpMethod.GET, "/api/v1/market/posts/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/recipes/**").permitAll()
+
+                        // 인증 없이 접근 가능한 URL 목록 (로그인, 회원가입, Swagger 등)
                         .requestMatchers(
                                 "/",
                                 "/error",
-                                "/api/v1/auth/**", // 회원가입, 로그인 등 auth 하위 경로 모두 허용
-                                "/api/users/login", // 혹시 몰라 기존 경로도 유지
+                                "/api/v1/auth/**",
+                                "/api/users/login",
                                 "/api/users/signup",
                                 "/api-docs/**",
                                 "/swagger-ui/**",
@@ -88,6 +91,7 @@ public class SecurityConfig {
                                 "/h2-console/**"
                         ).permitAll()
 
+                        // 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
