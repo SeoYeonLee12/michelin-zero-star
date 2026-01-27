@@ -12,20 +12,26 @@ services:
       - "${PROD_APP_PORT}:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      # [DB 연결 정보]
-      - DB_HOST=${PROD_DB_HOST}
-      - DB_PORT=${PROD_DB_PORT}
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - DB_HOST=db
+      - DB_PORT=3306
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
       - DB_NAME=${PROD_DB_NAME}
       - DB_USER=${PROD_DB_USER}
       - DB_PW=${PROD_DB_PASSWORD}
-      # 백엔드가 AI서버를 부를 때 사용할 주소 (같은 네트워라 이렇게 부름)
       - AI_SERVER_URL=http://ai-serving:8000
     networks:
       - mzs-network
     depends_on:
-      - db
-      - elasticsearch
-      - ai-serving # AI 서버가 켜져야 백엔드도 의미 있음
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      elasticsearch:
+        condition: service_started
+      ai-serving:
+        condition: service_started
 
   #===============================================#
   # 2. Database (MySQL)
@@ -38,18 +44,36 @@ services:
       - "${PROD_DB_PORT}:3306"
     volumes:
       - db_data:/var/lib/mysql
+      # ▼ [새로 추가된 초기화 스크립트 연결]
+      - ./infra/mysql:/docker-entrypoint-initdb.d
     environment:
-      MYSQL_TCP_PORT: ${PROD_DB_PORT}
       MYSQL_ROOT_PASSWORD: ${PROD_DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${PROD_DB_NAME}
       MYSQL_USER: ${PROD_DB_USER}
       MYSQL_PASSWORD: ${PROD_DB_PASSWORD}
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - mzs-network
 
   #===============================================#
-  # 3. AI / Search Engine (Elasticsearch)
+  # 3. Redis
+  #===============================================#
+  redis:
+    image: redis:latest
+    container_name: michelin-redis-local
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - mzs-network
+
+  #===============================================#
+  # 4. AI / Search Engine (Elasticsearch)
   #===============================================#
   elasticsearch:
     build:
@@ -72,7 +96,6 @@ services:
     volumes:
       - es_data:/usr/share/elasticsearch/data
 
-  
   #===============================================#
   # 3-1. Elasticsearch Data Loader
   #===============================================#
@@ -110,32 +133,30 @@ services:
       - elasticsearch
 
   #===============================================#
-  # 5. AI Serving Server (FastAPI)
+  # 6. AI Serving Server (FastAPI)
   #===============================================#
   ai-serving:
     container_name: mzs-ai
     build:
-      context: ./ai-serving # Dockerfile이 있는 폴더 경로
+      context: ./ai-serving
       dockerfile: Dockerfile
     restart: always
     ports:
-      - "8000:8000" # 호스트:컨테이너
+      - "8000:8000"
     environment:
-      # Docker 내부에서는 'localhost'가 아니라 '서비스명'
       - ES_URL=http://elasticsearch:9200
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - PYTHONUNBUFFERED=1
       - PROJECT_NAME="Michelin Zero Star AI"
     volumes:
-      # [개발 편의] 로컬 코드를 컨테이너에 연결 (코드 수정 시 즉시 반영)
       - ./ai-serving:/app
     networks:
       - mzs-network
     depends_on:
-      - elasticsearch # ES가 켜진 뒤에 실행
+      - elasticsearch
 
   #===============================================#
-  # 6. Frontend Application (Next.js)
+  # 7. Frontend Application (Next.js)
   #===============================================#
   frontend:
     container_name: michelin-frontend
@@ -148,10 +169,9 @@ services:
     environment:
       - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
+      - NEXT_PUBLIC_API_BASE_URL=http://backend:8080
     volumes:
-      # [개발 편의] 로컬 코드를 컨테이너에 연결 (코드 수정 시 즉시 반영)
       - ./frontend:/app
-      # [주의] node_modules / .next 는 컨테이너 내부 것을 사용 (호스트 덮어쓰기 방지)
       - /app/node_modules
       - /app/.next
     networks:
@@ -159,9 +179,6 @@ services:
     depends_on:
       - backend
     command: npm run dev -- -H 0.0.0.0 -p 3000
-
-
-
 
 #===============================================#
 # Network & Volume Definition
