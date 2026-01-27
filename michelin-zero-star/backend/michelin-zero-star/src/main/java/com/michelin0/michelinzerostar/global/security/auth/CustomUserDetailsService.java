@@ -1,5 +1,6 @@
 package com.michelin0.michelinzerostar.global.security.auth;
 
+import com.michelin0.michelinzerostar.domain.auth.UserPrincipal;
 import com.michelin0.michelinzerostar.domain.user.entity.SocialProvider;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.domain.user.repository.UserRepository;
@@ -20,12 +21,13 @@ public class CustomUserDetailsService implements UserDetailsService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("유저를 찾을 수 없습니다: " + email));
 
-        return new CustomUserDetails(user);
+        return new UserPrincipal(user);
     }
 
     public UserDetails loadUserByEmailAndProvider(String email, SocialProvider provider) {
         User user = userRepository.findByEmailAndSocialProvider(email, provider)
                 .orElseThrow(() -> new UsernameNotFoundException("유저를 찾을 수 없습니다."));
-        return new CustomUserDetails(user);
+
+        return new UserPrincipal(user);
     }
 }

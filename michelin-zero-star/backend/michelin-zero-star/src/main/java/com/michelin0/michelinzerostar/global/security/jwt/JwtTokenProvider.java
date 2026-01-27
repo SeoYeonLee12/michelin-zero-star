@@ -44,12 +44,12 @@ public class JwtTokenProvider {
         this.customUserDetailsService = customUserDetailsService;
     }
 
-    // 소셜 로그인용 (SuccessHandler에서 사용)
+    // 소셜 로그인용
     public TokenDto createToken(String email, String role, String provider) {
         return generateToken(email, role, provider);
     }
 
-    // 일반 로그인/테스트용 (Authentication 객체 사용)
+    // 일반 로그인용
     public TokenDto createToken(Authentication authentication) {
         String authorities = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
@@ -57,7 +57,6 @@ public class JwtTokenProvider {
         return generateToken(authentication.getName(), authorities, "LOCAL");
     }
 
-    // 공통 토큰 생성 로직
     private TokenDto generateToken(String subject, String authorities, String provider) {
         long now = (new Date()).getTime();
         Date accessTokenExpiresIn = new Date(now + accessTokenValidityInMilliseconds);
@@ -86,7 +85,6 @@ public class JwtTokenProvider {
                 .build();
     }
 
-    // 토큰에서 인증 정보 조회
     public Authentication getAuthentication(String accessToken) {
         Claims claims = parseClaims(accessToken);
 
@@ -99,13 +97,11 @@ public class JwtTokenProvider {
 
         UserDetails userDetails;
 
-        // Provider가 유효하면 소셜 로그인 방식으로 조회
         if (providerStr != null && !providerStr.equals("LOCAL") && !providerStr.equals("EMPTY")) {
             try {
                 SocialProvider provider = SocialProvider.valueOf(providerStr);
                 userDetails = customUserDetailsService.loadUserByEmailAndProvider(email, provider);
             } catch (IllegalArgumentException e) {
-                // 혹시라도 이상한 문자열이 들어오면 일반 조회 시도
                 userDetails = customUserDetailsService.loadUserByUsername(email);
             }
         } else {
@@ -119,15 +115,12 @@ public class JwtTokenProvider {
     public String getSocialProvider(String token) {
         Claims claims = parseClaims(token);
         String provider = (String) claims.get("provider");
-
-        // null이거나 없으면 기본값 처리 (혹은 에러 처리)
         if (provider == null) {
-            return "LOCAL"; // 또는 예외 발생
+            return "LOCAL";
         }
         return provider;
     }
 
-    // 토큰 검증
     public boolean validateToken(String token) {
         try {
             Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);

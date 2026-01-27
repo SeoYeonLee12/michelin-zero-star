@@ -8,6 +8,7 @@ import com.michelin0.michelinzerostar.domain.recipe.domain.Recipe;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeIngredient;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeQueryRepository;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeRegister;
+import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeRepository;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeStep;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeTag;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeUpdate;
@@ -28,6 +29,7 @@ public class RecipeService {
     private final RecipeRegister recipeRegister;
     private final UserRepository userRepository;
     private final RecipeQueryRepository recipeQueryRepository;
+    private final RecipeRepository recipeRepository;
     private final RecipeUpdate recipeUpdate;
 
     public Long saveRecipe(RecipeRegisterCommand command) {
@@ -59,4 +61,9 @@ public class RecipeService {
     }
 
 
+    public void deleteRecipe(Long recipeId, Long userId) {
+        Recipe searchedRecipe = recipeRepository.getById(recipeId);
+        searchedRecipe.validateRecipeEnrolledUser(userId);
+        recipeRepository.deleteById(recipeId);
+    }
 }
