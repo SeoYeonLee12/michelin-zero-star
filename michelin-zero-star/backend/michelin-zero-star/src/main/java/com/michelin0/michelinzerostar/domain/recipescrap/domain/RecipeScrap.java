@@ -39,8 +39,4 @@ public class RecipeScrap extends BaseDomain {
         this.user = user;
         this.recipe = recipe;
     }
-
-    // TODO 이미 할당되지 않았는지 체크
-
-
 }
