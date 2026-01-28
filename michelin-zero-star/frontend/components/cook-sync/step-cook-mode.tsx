@@ -23,6 +23,10 @@ import { Progress } from "@/components/ui/progress"
 import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import type { RecipeStep } from "@/lib/types"
+import { fetchSpeechToken, postChat } from "@/lib/voice-api"
+import { startSttOnce } from "@/lib/stt"
+import { createPorcupineController } from "@/lib/kws/porcupine"
 
 type SkillLevel = "beginner" | "intermediate" | "expert"
 
@@ -51,57 +55,358 @@ const getAdjustedDuration = (baseDuration: number, level: SkillLevel) => {
   }
 }
 
-export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete, recipeName }: any) {
+export function StepCookMode({
+  steps,
+  currentStepIndex,
+  onStepChange,
+  onComplete,
+  recipeName,
+}: {
+  steps: RecipeStep[]
+  currentStepIndex: number
+  onStepChange: (index: number) => void
+  onComplete: () => void
+  recipeName?: string
+}) {
   const router = useRouter()
-  
+
   // ===== State 관리 =====
   const [skillLevel, setSkillLevel] = React.useState<SkillLevel>("intermediate")
   const [timerSeconds, setTimerSeconds] = React.useState(0)
   const [isTimerRunning, setIsTimerRunning] = React.useState(false)
   const [completedSteps, setCompletedSteps] = React.useState<Set<number>>(new Set())
   const [autoAdvance, setAutoAdvance] = React.useState(true)
+
+  // ✅ 음성 제어(마이크/KWS 켜기) 상태
   const [isListening, setIsListening] = React.useState(false)
   const [micPermission, setMicPermission] = React.useState<"unknown" | "granted" | "denied">("unknown")
-  
-  // AI 플로팅 관련
+
+  // ✅ AI 플로팅 관련
   const [aiOpen, setAiOpen] = React.useState(false)
   const [aiInput, setAiInput] = React.useState("")
   const [aiMessages, setAiMessages] = React.useState<Array<{ role: "user" | "ai"; content: string }>>([
     { role: "ai", content: "요리 중 궁금한 걸 말씀해 주세요. (예: '다음 단계 요약해줘')" },
   ])
-  
+  const aiEndRef = React.useRef<HTMLDivElement>(null)
+
   const pendingAdvanceRef = React.useRef(false)
   const prevStepRef = React.useRef(currentStepIndex)
   const prevSkillLevelRef = React.useRef(skillLevel)
-  const aiEndRef = React.useRef<HTMLDivElement>(null)
 
   const currentStep = steps[currentStepIndex]
   const totalProgress = ((currentStepIndex + 1) / steps.length) * 100
   const adjustedDuration = getAdjustedDuration(currentStep.duration, skillLevel)
 
-  // ===== X 버튼 클릭 핸들러 =====
+  // ====== refs (클로저 버그 방지: NEXT/PREV/PLAY 등) ======
+  const sttStopRef = React.useRef<null | (() => void)>(null)
+  const porcupineRef = React.useRef<ReturnType<typeof createPorcupineController> | null>(null)
+
+  const isListeningRef = React.useRef(isListening)
+  const aiOpenRef = React.useRef(aiOpen)
+  const stepIndexRef = React.useRef(currentStepIndex)
+  const timerSecondsRef = React.useRef(timerSeconds)
+  const isTimerRunningRef = React.useRef(isTimerRunning)
+  const sttRetryTimerRef = React.useRef<number | null>(null)
+  const aiToggleLockRef = React.useRef(false)
+
+  const [aiVoiceEnabled, setAiVoiceEnabled] = React.useState(false)
+  const [aiTurn, setAiTurn] = React.useState<"listening" | "thinking">("listening")
+
+  const aiVoiceEnabledRef = React.useRef(aiVoiceEnabled)
+  const aiTurnRef = React.useRef(aiTurn)
+
+  React.useEffect(() => { aiVoiceEnabledRef.current = aiVoiceEnabled }, [aiVoiceEnabled])
+  React.useEffect(() => { aiTurnRef.current = aiTurn }, [aiTurn])
+
+  React.useEffect(() => { isListeningRef.current = isListening }, [isListening])
+  React.useEffect(() => { aiOpenRef.current = aiOpen }, [aiOpen])
+  React.useEffect(() => { stepIndexRef.current = currentStepIndex }, [currentStepIndex])
+  React.useEffect(() => { timerSecondsRef.current = timerSeconds }, [timerSeconds])
+  React.useEffect(() => { isTimerRunningRef.current = isTimerRunning }, [isTimerRunning])
+
+  const safeStopStt = React.useCallback(() => {
+    try { sttStopRef.current?.() } catch {}
+    sttStopRef.current = null
+  }, [])
+
+  // ===== X 버튼 클릭 핸들러(페이지 닫기) =====
   const handleClose = () => {
+    // 페이지 떠날 때 리소스 정리
+    clearSttRetryTimer()
+    safeStopStt()
+    porcupineRef.current?.stop()
     router.back()
   }
 
-  // ===== 마이크 권한 체크 =====
+
   React.useEffect(() => {
-    const requestMicPermission = async () => {
+    const check = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-        stream.getTracks().forEach((t) => t.stop())
-        setMicPermission("granted")
-      } catch (e) {
-        setMicPermission("denied")
+        const p = await navigator.permissions.query({ name: "microphone" as PermissionName })
+        const state = p.state // "granted" | "denied" | "prompt"
+        setMicPermission(state === "granted" ? "granted" : state === "denied" ? "denied" : "unknown")
+
+        if (state === "granted") {
+          setIsListening(true) // ✅ 권한이 이미 있으면 자동으로 KWS ON
+        }
+      } catch {
+        // permissions API 미지원 브라우저 대비: unknown으로 두고 버튼 누를 때 요청
+        setMicPermission("unknown")
       }
     }
-    requestMicPermission()
+    check()
   }, [])
 
-  // ===== AI 플로팅 이벤트 리스너 =====
+  // ===== AI 메시지 자동 스크롤 =====
   React.useEffect(() => {
-    const onOpen = () => setAiOpen(true)
-    const onClose = () => setAiOpen(false)
+    if (!aiOpen) return
+    aiEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [aiMessages, aiOpen])
+
+  // ====== 스텝 이동(클로저 안전) ======
+  const goNextStep = React.useCallback(async () => {
+    const idx = stepIndexRef.current
+    setCompletedSteps(prev => new Set([...prev, idx]))
+
+    if (idx < steps.length - 1) onStepChange(idx + 1)
+    else {
+      clearSttRetryTimer()
+      safeStopStt()
+      setAiOpenSafe(false)
+      setAiVoiceEnabled(false)
+      setIsListening(false)
+      await porcupineRef.current?.stop()
+      onComplete()
+    }
+  }, [steps.length, onStepChange, onComplete, safeStopStt])
+
+  const goPrevStep = React.useCallback(() => {
+    const idx = stepIndexRef.current
+    if (idx > 0) onStepChange(idx - 1)
+  }, [onStepChange])
+
+  const handleStartTimer = React.useCallback(() => {
+    // 이미 실행중이면 아무것도 하지 않기
+    if (isTimerRunningRef.current) return
+
+    // 남아있는 시간이 있으면(일시정지 상태) 그대로 이어하기
+    if (timerSecondsRef.current > 0) {
+      setIsTimerRunning(true)
+      return
+    }
+
+    // 시간이 0이면 새로 시작
+    setTimerSeconds(adjustedDuration)
+    setIsTimerRunning(true)
+  }, [adjustedDuration])
+
+  const handlePauseTimer = React.useCallback(() => {
+    setIsTimerRunning(false)
+  }, [])
+
+  const handleResetTimer = React.useCallback(() => {
+    setIsTimerRunning(false)
+    setTimerSeconds(adjustedDuration)
+  }, [adjustedDuration])
+
+  const handleAddMinute = React.useCallback(() => {
+    setTimerSeconds((prev) => prev + 60)
+  }, [])
+
+  const setAiOpenSafe = (v: boolean) => {
+    aiOpenRef.current = v
+    setAiOpen(v)
+  }
+
+  const setAiVoiceEnabledSafe = (v: boolean) => {
+    aiVoiceEnabledRef.current = v
+    setAiVoiceEnabled(v)
+  }
+
+  const setAiTurnSafe = (v: "listening" | "thinking") => {
+    aiTurnRef.current = v
+    setAiTurn(v)
+  }
+
+  // ====== STT 1회 실행 + 자동 재시작(채팅 열려있을 때만) ======
+  const runSttOnce = React.useCallback(async () => {
+    // 중복 STT 방지
+    safeStopStt()
+
+    // STT는 채팅 중일 때만
+    if (micPermission !== "granted") return
+//    if (!isListeningRef.current) return
+    if (!aiOpenRef.current) return
+    if (!aiVoiceEnabledRef.current) return
+    if (aiTurnRef.current !== "listening") return
+
+    // 마이크 충돌 방지: KWS는 잠깐 끔
+    await porcupineRef.current?.stop()
+
+    try {
+      const { token, region } = await fetchSpeechToken()
+
+      const ctrl = await startSttOnce({
+        token,
+        region,
+        onFinal: async (text) => {
+          const raw = (text || "").trim()
+          if (!raw) return
+
+          // 닫기 인텐트 개선(너가 겪던 "채팅 종료가 안먹힘" 해결)
+          const norm = raw.replace(/[^\p{L}\p{N}\s]/gu, "").trim()
+          const isCloseIntent = /(채팅|챗봇|셰프|도우미)?\s*(닫아|닫기|종료|끝|그만|나가|꺼)/.test(norm)
+
+          if (isCloseIntent) {
+            clearSttRetryTimer()
+            safeStopStt()
+            setAiOpenSafe(false)
+            setAiVoiceEnabledSafe(false)
+            // 채팅 닫히면 KWS 재개
+            // if (isListeningRef.current) {
+            //   await porcupineRef.current?.start()
+            // }
+            await startKwsIfNeeded()
+            return
+          }
+          
+          setAiMessages((prev) => [...prev, { role: "user", content: raw }])
+
+          setAiTurnSafe("thinking")
+
+          try { 
+            const res = await postChat({ text: raw })
+            setAiMessages((prev) => [...prev, { role: "ai", content: res.answer }])
+          } catch {
+            setAiMessages((prev) => [...prev, { role: "ai", content: "서버 응답을 받지 못했어요." }])
+          }
+
+          setAiTurnSafe("listening")
+
+          if (aiOpenRef.current && aiVoiceEnabledRef.current) {
+            scheduleSttRetry(150)
+          }
+        },
+        onError: () => {
+          // 에러 시에도 채팅 열려있으면 재시도
+          if (aiOpenRef.current && aiVoiceEnabledRef.current && aiTurnRef.current === "listening") {
+            scheduleSttRetry(400)
+          } else {
+            // 채팅 닫혔으면 KWS 재개
+//            porcupineRef.current?.start()
+            startKwsIfNeeded()
+          }
+        },
+      })
+
+      sttStopRef.current = ctrl.stop
+    } catch {
+      if (aiOpenRef.current && aiVoiceEnabledRef.current && aiTurnRef.current === "listening") {
+        scheduleSttRetry(400)
+      } else {
+//        porcupineRef.current?.start()
+        startKwsIfNeeded()
+      }
+    }
+  }, [micPermission, safeStopStt])
+
+  const clearSttRetryTimer = React.useCallback(() => {
+    if (sttRetryTimerRef.current !== null) {
+      window.clearTimeout(sttRetryTimerRef.current)
+      sttRetryTimerRef.current = null
+    }
+  }, [])
+
+  // ✅ 재시작 예약은 항상 1개만 유지
+  const scheduleSttRetry = React.useCallback((delayMs: number) => {
+    clearSttRetryTimer()
+    sttRetryTimerRef.current = window.setTimeout(() => {
+      sttRetryTimerRef.current = null
+
+      // 채팅이 닫혔거나 음성모드가 아니면 재시작 금지
+      if (!aiOpenRef.current) return
+      if (!aiVoiceEnabledRef.current) return
+      if (aiTurnRef.current !== "listening") return
+
+      runSttOnce()
+    }, delayMs)
+  }, [clearSttRetryTimer, runSttOnce])
+
+  const startKwsIfNeeded = React.useCallback(async () => {
+    if (!isListeningRef.current) return
+    if (aiOpenRef.current) return
+    await porcupineRef.current?.start()
+  }, [])
+
+  const stopKws = React.useCallback(async () => {
+    await porcupineRef.current?.stop()
+  }, [])
+
+  // ====== Porcupine KWS: isListening=true AND aiOpen=false 일 때만 켜기 ======
+  React.useEffect(() => {
+    if (micPermission !== "granted") return
+
+    // 듣기 OFF면: KWS 끄기 + STT도 끄기
+    if (!isListening) {
+      safeStopStt()
+      porcupineRef.current?.stop()
+      return
+    }
+
+    // 채팅 열려있으면 KWS 끔 (원래 너가 원했던 정책)
+    if (aiOpen) {
+      porcupineRef.current?.stop()
+      return
+    }
+
+    // 처음 한 번만 컨트롤러 생성
+    if (!porcupineRef.current) {
+      porcupineRef.current = createPorcupineController({
+        accessKey: "YOUR_PRIVATE_KEY",
+        modelPublicPath: "/porcupine/ko.pv",
+        keywords: [
+          { label: "WAKE", publicPath: "/porcupine/wake.ppn" },
+          { label: "NEXT", publicPath: "/porcupine/next.ppn" },
+          { label: "PREV", publicPath: "/porcupine/prev.ppn" },
+          { label: "PLAY", publicPath: "/porcupine/play.ppn" },
+          { label: "PAUSE", publicPath: "/porcupine/pause.ppn" },
+        ],
+        onCommand: async (cmd) => {
+          console.log("[KWS] detected:", cmd)
+
+          // WAKE: 채팅 열고 STT 시작
+          if (cmd === "WAKE") {
+            await porcupineRef.current?.stop()
+            setAiOpenSafe(true)
+
+            setAiVoiceEnabledSafe(true)
+            aiVoiceEnabledRef.current = true
+            setAiTurnSafe("listening")
+            aiTurnRef.current = "listening"
+
+            scheduleSttRetry(50)
+            return
+          }
+
+          if (cmd === "NEXT") goNextStep()
+          if (cmd === "PREV") goPrevStep()
+          if (cmd === "PLAY") handleStartTimer()
+          if (cmd === "PAUSE") handlePauseTimer()
+        },
+      })
+    }
+
+    porcupineRef.current.start()  
+
+    return () => {
+      porcupineRef.current?.stop()
+    }
+  }, [isListening, aiOpen, micPermission, runSttOnce, goNextStep, goPrevStep, handleStartTimer, handlePauseTimer, safeStopStt])
+
+  // ===== AI 플로팅 이벤트 리스너(유지) =====
+  React.useEffect(() => {
+    const onOpen = () => setAiOpenSafe(true)
+    const onClose = () => setAiOpenSafe(false)
     const onToggle = () => setAiOpen((v) => !v)
 
     window.addEventListener("cooksync:ai-open", onOpen)
@@ -115,44 +420,29 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
     }
   }, [])
 
-  // ===== AI 메시지 자동 스크롤 =====
-  React.useEffect(() => {
-    if (!aiOpen) return
-    aiEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [aiMessages, aiOpen])
-
-  // ===== AI 메시지 전송 =====
-  const handleAiSend = () => {
+  // ===== AI 메시지 전송(팀원 코드: 더미 → 네 코드: 실제 postChat) =====
+  const handleAiSend = async () => {
     if (!aiInput.trim()) return
     const userText = aiInput.trim()
 
     setAiMessages((prev) => [...prev, { role: "user", content: userText }])
     setAiInput("")
 
-    // TODO: 실제 AI 연동 시 여기만 교체
-    setTimeout(() => {
-      setAiMessages((prev) => [
-        ...prev,
-        {
-          role: "ai",
-          content: `(${userText}) 관련해서 도와드릴게요.\n현재 STEP ${currentStep.stepNumber}: ${currentStep.action}\n필요하면 '핵심만', '주의점만' 같이 요청해 주세요.`,
-        },
-      ])
-    }, 400)
+    try {
+      const res = await postChat({ text: userText })
+      setAiMessages((prev) => [...prev, { role: "ai", content: res.answer }])
+    } catch {
+      setAiMessages((prev) => [...prev, { role: "ai", content: "서버 연결에 실패했어요. 잠시 후 다시 시도해 주세요." }])
+    }
   }
 
-  // ===== 단계 변경 시 타이머 초기화 =====
+  // ===== 단계 변경 시 타이머 초기화 (자동 타이머 시작/마이크 자동ON은 하지 않음: 덜 꼬임) =====
   React.useEffect(() => {
-    if (prevStepRef.current !== currentStepIndex) {
-      setTimerSeconds(getAdjustedDuration(currentStep.duration, skillLevel))
-      if (currentStepIndex > 0) {
-        setIsTimerRunning(true)
-        if (micPermission === "granted") setIsListening(true)
-        else setIsListening(false)
-      }
-    }
+    setTimerSeconds(getAdjustedDuration(currentStep.duration, skillLevel))
+//    setIsTimerRunning(false) // (원하면 true로 자동 시작)
+    setIsTimerRunning(isTimerRunningRef.current)
     prevStepRef.current = currentStepIndex
-  }, [currentStepIndex, currentStep.duration, skillLevel, micPermission])
+  }, [currentStepIndex, currentStep.duration, skillLevel])
 
   // ===== 숙련도 변경 시 타이머 비례 조정 =====
   React.useEffect(() => {
@@ -187,7 +477,7 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
 
   // ===== 타이머 카운트다운 =====
   React.useEffect(() => {
-    let interval: NodeJS.Timeout
+    let interval: NodeJS.Timeout | null = null
 
     if (isTimerRunning && timerSeconds > 0) {
       interval = setInterval(() => {
@@ -195,44 +485,45 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
           const newValue = prev - 1
           if (newValue <= 0) {
             setIsTimerRunning(false)
-            setIsListening(false)
-            if (autoAdvance) {
-              pendingAdvanceRef.current = true
-            }
+            // ✅ 타이머 끝나도 isListening 끄지 않음 (KWS 꺼짐 방지)
+            if (autoAdvance) pendingAdvanceRef.current = true
             return 0
           }
           return newValue
         })
       }, 1000)
     }
-    return () => clearInterval(interval)
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
   }, [isTimerRunning, timerSeconds, autoAdvance])
 
-  // ===== 타이머 핸들러 =====
-  const handleStartTimer = () => {
-    if (timerSeconds === 0) {
-      setTimerSeconds(adjustedDuration)
+  React.useEffect(() => {
+    if (!aiOpen) {
+      clearSttRetryTimer()
+      safeStopStt()
+      // 음성모드 상태도 같이 꺼두는 게 안전
+      setAiVoiceEnabledSafe(false)
+      aiVoiceEnabledRef.current = false
+      setAiTurnSafe("listening")
+      startKwsIfNeeded()
     }
-    setIsTimerRunning(true)
-    if (micPermission === "granted") setIsListening(true)
-  }
-
-  const handlePauseTimer = () => {
-    setIsTimerRunning(false)
-  }
-
-  const handleResetTimer = () => {
-    setIsTimerRunning(false)
-    setTimerSeconds(adjustedDuration)
-  }
-
-  const handleAddMinute = () => {
-    setTimerSeconds((prev) => prev + 60)
-  }
+  }, [aiOpen, clearSttRetryTimer, safeStopStt])
 
   // ===== 음성 제어 토글 =====
-  const handleVoiceToggle = () => {
-    if (micPermission !== "granted") return
+  const handleVoiceToggle = async () => {
+    if (micPermission !== "granted") {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        stream.getTracks().forEach((t) => t.stop())
+        setMicPermission("granted")
+        setIsListening(true)  // 권한 받았으면 바로 ON
+      } catch {
+        setMicPermission("denied")
+      }
+      return
+    }
     setIsListening((prev) => !prev)
   }
 
@@ -241,21 +532,9 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
     setSkillLevel(newLevel)
   }
 
-  // ===== 단계 이동 핸들러 =====
-  const handleNextStep = () => {
-    setCompletedSteps((prev) => new Set([...prev, currentStepIndex]))
-    if (currentStepIndex === steps.length - 1) {
-      onComplete()
-    } else {
-      onStepChange(currentStepIndex + 1)
-    }
-  }
-
-  const handlePrevStep = () => {
-    if (currentStepIndex > 0) {
-      onStepChange(currentStepIndex - 1)
-    }
-  }
+  // ===== 단계 이동 핸들러 (UI 버튼용) =====
+  const handleNextStep = () => goNextStep()
+  const handlePrevStep = () => goPrevStep()
 
   // ===== 타이머 포맷팅 =====
   const formatTime = (seconds: number) => {
@@ -280,7 +559,7 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
             <span className="text-[10px] font-bold text-gray-400">{Math.round(totalProgress)}%</span>
           </div>
           {/* X 버튼: hover 효과 제거 및 클릭 시 뒤로가기 */}
-          <button 
+          <button
             onClick={handleClose}
             className="h-8 w-8 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors"
             aria-label="닫기"
@@ -292,14 +571,13 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
 
       {/* 2. 메인: 상단 여백 조정 */}
       <main className="flex-1 max-w-[1000px] mx-auto w-full flex flex-col lg:flex-row gap-5 px-6 pt-5 overflow-hidden pb-24">
-        
         {/* 왼쪽: 이미지(4:3) + 설명 */}
         <section className="flex-[1.1] flex flex-col gap-3 min-w-0">
           <div className="relative aspect-[4/3] w-full rounded-xl overflow-hidden border border-gray-100 shadow-sm">
-            <img 
-              src={currentStep.imageUrl || "/placeholder.svg"} 
-              className="w-full h-full object-cover" 
-              alt="조리 단계" 
+            <img
+              src={currentStep.imageUrl || "/placeholder.svg"}
+              className="w-full h-full object-cover"
+              alt="조리 단계"
             />
           </div>
           <div className="space-y-2">
@@ -317,7 +595,6 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
 
         {/* 오른쪽: 박스 일렬 배치 */}
         <aside className="lg:w-[260px] shrink-0 flex flex-col gap-3 h-full overflow-y-auto pr-1">
-          
           {/* 타이머 박스 */}
           <div className="bg-white rounded-xl p-3.5 border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between mb-2">
@@ -326,10 +603,10 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
               </span>
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-bold text-gray-500">자동 다음 단계</span>
-                <Switch 
+                <Switch
                   checked={autoAdvance}
                   onCheckedChange={setAutoAdvance}
-                  className="scale-[0.6] data-[state=checked]:bg-[#800020]" 
+                  className="scale-[0.6] data-[state=checked]:bg-[#800020]"
                 />
               </div>
             </div>
@@ -337,8 +614,8 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
               {formatTime(timerSeconds)}
             </div>
             <div className="grid grid-cols-2 gap-1.5">
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 onClick={isTimerRunning ? handlePauseTimer : handleStartTimer}
                 className="bg-[#800020]/5 border border-[#800020] text-[#800020] hover:bg-[#800020]/10 h-8 text-[11px] font-bold rounded-lg"
               >
@@ -354,17 +631,17 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
                   </>
                 )}
               </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
+              <Button
+                size="sm"
+                variant="outline"
                 onClick={handleResetTimer}
                 className="h-8 rounded-lg border-gray-100"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
               </Button>
             </div>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               onClick={handleAddMinute}
               className="w-full h-7 mt-1.5 text-gray-500 font-bold text-[10px] hover:bg-gray-50"
             >
@@ -378,21 +655,21 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
               <ChefHat className="w-3.5 h-3.5" />
               <span>숙련도</span>
             </div>
-            
+
             <div className="grid grid-cols-3 gap-2">
               {[
-                { id: 'beginner' as SkillLevel, label: '초보', percent: '125%' },
-                { id: 'intermediate' as SkillLevel, label: '중수', percent: '100%' },
-                { id: 'expert' as SkillLevel, label: '고수', percent: '75%' }
+                { id: "beginner" as SkillLevel, label: "초보", percent: "125%" },
+                { id: "intermediate" as SkillLevel, label: "중수", percent: "100%" },
+                { id: "expert" as SkillLevel, label: "고수", percent: "75%" },
               ].map((level) => (
                 <button
                   key={level.id}
                   onClick={() => handleSkillLevelChange(level.id)}
                   className={cn(
                     "flex flex-col items-center justify-center py-2 rounded-lg border transition-all gap-0.5 bg-transparent",
-                    skillLevel === level.id 
+                    skillLevel === level.id
                       ? "border-[#800020] text-[#800020] bg-[#800020]/5 font-bold shadow-sm"
-                      : "border-gray-100 bg-transparent text-gray-400 hover:border-gray-200"
+                      : "border-gray-100 bg-transparent text-gray-400 hover:border-gray-200",
                   )}
                 >
                   <span className="text-[11px] leading-none">{level.label}</span>
@@ -401,7 +678,7 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
               ))}
             </div>
           </div>
-         
+
           {/* 음성 제어 박스 */}
           <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
             <div className="flex items-center gap-1.5 mb-3 text-[12px] font-bold text-gray-500 uppercase tracking-tight">
@@ -423,22 +700,22 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
                       onClick={handleVoiceToggle}
                       className={cn(
                         "w-14 h-14 rounded-full flex items-center justify-center transition-all border shadow-sm",
-                        isListening 
-                          ? "bg-[#800020] border-[#800020] shadow-[#800020]/20 animate-pulse text-white" 
-                          : "bg-transparent border-gray-100 text-gray-400 hover:border-[#800020] hover:bg-[#800020]/5 hover:text-[#800020]"
+                        isListening
+                          ? "bg-[#800020] border-[#800020] shadow-[#800020]/20 animate-pulse text-white"
+                          : "bg-transparent border-gray-100 text-gray-400 hover:border-[#800020] hover:bg-[#800020]/5 hover:text-[#800020]",
                       )}
                     >
                       {isListening ? <Mic className="h-7 w-7" /> : <MicOff className="h-7 w-7" />}
                     </button>
                     <span className="text-[13px] text-gray-400 uppercase">다음</span>
                   </div>
-                  
-                  <p className={cn(
-                    "text-[9px] px-2.5 py-1 rounded-full font-bold transition-colors mt-1",
-                    isListening 
-                      ? "bg-[#800020]/5 text-[#800020]" 
-                      : "bg-gray-50 text-gray-400"
-                  )}>
+
+                  <p
+                    className={cn(
+                      "text-[9px] px-2.5 py-1 rounded-full font-bold transition-colors mt-1",
+                      isListening ? "bg-[#800020]/5 text-[#800020]" : "bg-gray-50 text-gray-400",
+                    )}
+                  >
                     {isListening ? <WaveText text="음성 명령을 기다리고 있어요..." /> : "버튼을 눌러 음성 제어 켜기"}
                   </p>
                 </>
@@ -451,8 +728,8 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
       {/* 3. 하단 바 */}
       <footer className="fixed bottom-0 left-0 right-0 bg-white border-t px-6 py-2 z-40">
         <div className="max-w-[1100px] mx-auto flex items-center justify-between">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             onClick={handlePrevStep}
             disabled={currentStepIndex === 0}
             className="font-bold text-gray-500 hover:text-[#800020] h-9 px-0"
@@ -461,22 +738,22 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
           </Button>
 
           <div className="flex gap-1.5">
-            {steps.map((_: any, i: number) => (
-              <div 
-                key={i} 
+            {steps.map((_, i) => (
+              <div
+                key={i}
                 className={cn(
-                  "w-1 h-1 rounded-full", 
-                  i === currentStepIndex 
-                    ? "bg-[#800020] w-3 transition-all" 
+                  "w-1 h-1 rounded-full",
+                  i === currentStepIndex
+                    ? "bg-[#800020] w-3 transition-all"
                     : completedSteps.has(i) || i < currentStepIndex
                       ? "bg-[#800020]/60"
-                      : "bg-gray-200"
-                )} 
+                      : "bg-gray-200",
+                )}
               />
             ))}
           </div>
 
-          <Button 
+          <Button
             onClick={handleNextStep}
             className="bg-[#800020] hover:bg-[#800020]/90 h-9 px-8 rounded-lg font-bold text-sm"
           >
@@ -507,7 +784,15 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
                 type="button"
                 variant="ghost"
                 size="icon"
-                onClick={() => setAiOpen(false)}
+                onClick={async () => {
+                  clearSttRetryTimer()
+                  setAiOpenSafe(false)
+                  safeStopStt()
+                  // 채팅을 수동으로 닫으면 KWS 재개(음성 제어 켜져있을 때)
+                  if (isListeningRef.current) {
+                    await porcupineRef.current?.start()
+                  }
+                }}
                 aria-label="AI 닫기"
                 className="h-8 w-8"
               >
@@ -565,7 +850,44 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
         {/* Floating Button */}
         <button
           type="button"
-          onClick={() => setAiOpen((v) => !v)}
+          // onClick={async () => {
+          //   setAiOpenSafe(true)
+          //   aiOpenRef.current = true
+
+          //   setAiVoiceEnabledSafe(true)
+          //   setAiTurn("listening")
+
+          //   scheduleSttRetry(50)
+          //   await porcupineRef.current?.stop()
+          // }}
+          onClick={async () => {
+            if (aiToggleLockRef.current) return
+            aiToggleLockRef.current = true
+            try {
+              if (aiOpenRef.current) {
+                clearSttRetryTimer()
+                safeStopStt()
+                setAiVoiceEnabledSafe(false)
+                setAiTurnSafe("listening")
+                setAiOpenSafe(false)
+                // 채팅을 닫으면 KWS는 음성 제어 켜져있을 때만 재개
+                if (isListeningRef.current) {
+                  await porcupineRef.current?.start()
+                }
+              } else {
+                // ---- 열기 ----
+                setAiOpenSafe(true)
+                setAiVoiceEnabledSafe(true)
+                setAiTurnSafe("listening")
+                // 마이크 충돌 방지: KWS 먼저 stop
+                await porcupineRef.current?.stop()
+                scheduleSttRetry(50)
+              }
+            } finally {
+              // 짧게 딜레이 주면 더 안정적(더블클릭/연타 흡수)
+              setTimeout(() => { aiToggleLockRef.current = false }, 150)
+            }
+          }}
           aria-label="AI 열기"
           className={cn(
             "h-14 w-14 rounded-full shadow-2xl shadow-[#800020]/25 grid place-items-center",
