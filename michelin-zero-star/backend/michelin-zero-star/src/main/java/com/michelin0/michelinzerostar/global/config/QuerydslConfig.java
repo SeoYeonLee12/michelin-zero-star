@@ -7,10 +7,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@RequiredArgsConstructor // 1. 롬복으로 생성자 자동 생성
+@RequiredArgsConstructor
 public class QuerydslConfig {
 
-    private final EntityManager em; // 2. final 붙여서 필수 의존성으로 선언
+    private final EntityManager em;
 
     @Bean
     public JPAQueryFactory jpaQueryFactory() {

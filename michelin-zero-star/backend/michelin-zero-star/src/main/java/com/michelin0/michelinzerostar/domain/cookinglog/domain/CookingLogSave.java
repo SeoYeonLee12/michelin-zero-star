@@ -29,7 +29,6 @@ public class CookingLogSave {
 
         CookingLog newCookingLog = new CookingLog(user, recipe);
         cookingLogRepository.save(newCookingLog);
-        // TODO 의심스러운 코드 햄에게 물어보기
         Double rewardCompleteAmount = recipe.getRewardCompleteAmount();
 
         LocalDate today = LocalDate.now();
