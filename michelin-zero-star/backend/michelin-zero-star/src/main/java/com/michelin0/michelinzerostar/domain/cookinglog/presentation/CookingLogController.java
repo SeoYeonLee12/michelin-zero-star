@@ -6,7 +6,6 @@ import com.michelin0.michelinzerostar.domain.cookinglog.presentation.dto.Cooking
 import com.michelin0.michelinzerostar.domain.cookinglog.presentation.dto.CookingLogCompleteResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,7 +17,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/api/cooking")
-@Slf4j
 public class CookingLogController {
 
     private final CookingLogService cookingLogService;
@@ -30,7 +28,6 @@ public class CookingLogController {
     ) {
         Long currentUserId = principal.getId();
         Long cookingLogId = cookingLogService.saveCookingLog(currentUserId, request.recipeId());
-        log.info("Cooking log ID: " + cookingLogId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new CookingLogCompleteResponse(cookingLogId));
     }

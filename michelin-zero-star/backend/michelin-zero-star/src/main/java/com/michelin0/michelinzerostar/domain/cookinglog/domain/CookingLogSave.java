@@ -1,12 +1,10 @@
 package com.michelin0.michelinzerostar.domain.cookinglog.domain;
 
 import com.michelin0.michelinzerostar.domain.recipe.domain.Recipe;
-import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeRepository;
 import com.michelin0.michelinzerostar.domain.starhistory.domain.StarHistory;
 import com.michelin0.michelinzerostar.domain.starhistory.domain.StarHistoryRepository;
 import com.michelin0.michelinzerostar.domain.starhistory.domain.enums.StarHistoryType;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
-import com.michelin0.michelinzerostar.domain.user.repository.UserRepository;
 import com.michelin0.michelinzerostar.global.exception.errorcode.CookingLogErrorCode;
 import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
 import java.time.LocalDate;
@@ -22,8 +20,6 @@ import org.springframework.stereotype.Component;
 public class CookingLogSave {
 
     private final CookingLogRepository cookingLogRepository;
-    private final UserRepository userRepository;
-    private final RecipeRepository recipeRepository;
     private final StarHistoryRepository starHistoryRepository;
 
     public Long saveCookingLog(User user, Recipe recipe) {
