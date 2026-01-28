@@ -12,12 +12,13 @@ public record RecipeListSearchCondition(
         @NotBlank(message = "정렬 기준을 입력해주세요.")
         String sort
 ) {
-        public RecipesSearchCondition toCondition() {
-                return new RecipesSearchCondition(
-                        this.recipeType,
-                        this.category,
-                        this.searchWord,
-                        RecipeSortType.valueOf(this.sort.toUpperCase())
-                );
-        }
+
+    public RecipesSearchCondition toCondition() {
+        return new RecipesSearchCondition(
+                this.recipeType,
+                this.category,
+                this.searchWord,
+                RecipeSortType.valueOf(this.sort.toUpperCase())
+        );
+    }
 }

@@ -1,7 +1,6 @@
 package com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response;
 
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeListCommand;
-import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeListProjection;
 
 public record RecipesResponse(
         Long recipeId,

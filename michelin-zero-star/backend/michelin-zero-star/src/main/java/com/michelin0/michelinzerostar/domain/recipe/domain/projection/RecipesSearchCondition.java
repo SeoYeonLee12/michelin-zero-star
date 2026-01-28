@@ -8,4 +8,5 @@ public record RecipesSearchCondition(
         String searchWord,
         RecipeSortType sort
 ) {
+
 }

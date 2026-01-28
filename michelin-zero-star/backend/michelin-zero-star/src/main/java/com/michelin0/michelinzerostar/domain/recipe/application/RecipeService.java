@@ -18,7 +18,6 @@ import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModePr
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeDetailProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeListProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipesSearchCondition;
-import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request.RecipeListSearchCondition;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.domain.user.repository.UserRepository;
 import com.michelin0.michelinzerostar.global.exception.errorcode.RecipeErrorCode;
@@ -88,7 +87,8 @@ public class RecipeService {
             Pageable pageable,
             Long userId
     ) {
-        Page<RecipeListProjection> result = recipeQueryRepository.findAllRecipes(condition, pageable,
+        Page<RecipeListProjection> result = recipeQueryRepository.findAllRecipes(condition,
+                pageable,
                 userId);
         return result.map(RecipeListCommand::from);
     }

@@ -153,7 +153,8 @@ public class RecipeQueryRepository {
         ));
     }
 
-    public Page<RecipeListProjection> findAllRecipes(RecipesSearchCondition condition, Pageable pageable,Long userId) {
+    public Page<RecipeListProjection> findAllRecipes(RecipesSearchCondition condition,
+            Pageable pageable, Long userId) {
         List<Long> ids = queryFactory
                 .select(recipe.recipeId)
                 .from(recipe)
