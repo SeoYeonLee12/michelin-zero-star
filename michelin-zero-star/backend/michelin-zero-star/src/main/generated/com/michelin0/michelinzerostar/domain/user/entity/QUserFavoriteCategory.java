@@ -50,7 +50,7 @@ public class QUserFavoriteCategory extends EntityPathBase<UserFavoriteCategory> 
     public QUserFavoriteCategory(Class<? extends UserFavoriteCategory> type, PathMetadata metadata, PathInits inits) {
         super(type, metadata, inits);
         this.category = inits.isInitialized("category") ? new com.michelin0.michelinzerostar.domain.category.domain.QCategory(forProperty("category")) : null;
-        this.user = inits.isInitialized("user") ? new QUser(forProperty("user")) : null;
+        this.user = inits.isInitialized("user") ? new QUser(forProperty("user"), inits.get("user")) : null;
     }
 
 }

@@ -225,11 +225,20 @@ export default function MyPage() {
                         </Button>
                       </CollapsibleTrigger>
                       <CollapsibleContent className="absolute z-50 mt-2 w-64 bg-white border rounded-lg shadow-xl p-4">
-                        <p className="text-xs font-semibold mb-2">별 획득 방법</p>
-                        <ul className="text-[11px] text-muted-foreground space-y-1">
-                          <li>• 요리 완료: 1개 / 레시피 등록: 2개</li>
-                          <li>• 하루 최대 3개까지 획득 가능</li>
-                        </ul>
+                        <div className="space-y-3 text-sm">
+                          <div className="p-2 bg-muted rounded-lg">
+                            <p className="font-medium mb-1">별 획득 방법</p>
+                            <ul className="space-y-0.5 text-muted-foreground text-xs">
+                              <li>• 요리 완료: 1개</li>
+                              <li>• 레시피 등록: 2개</li>
+                              <li>• 나눔 완료: 1개</li>
+                            </ul>
+                          </div>
+                          <div className="p-2 bg-muted rounded-lg">
+                            <p className="font-medium mb-1">일일 제한</p>
+                            <p className="text-muted-foreground text-xs">하루 최대 3개까지 획득 가능</p>
+                          </div>
+                      </div>
                       </CollapsibleContent>
                     </Collapsible>
                   </div>

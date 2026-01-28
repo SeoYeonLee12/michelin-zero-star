@@ -79,7 +79,7 @@ public class QRecipe extends EntityPathBase<Recipe> {
     public QRecipe(Class<? extends Recipe> type, PathMetadata metadata, PathInits inits) {
         super(type, metadata, inits);
         this.nutrition = inits.isInitialized("nutrition") ? new QNutrition(forProperty("nutrition")) : null;
-        this.user = inits.isInitialized("user") ? new com.michelin0.michelinzerostar.domain.user.entity.QUser(forProperty("user")) : null;
+        this.user = inits.isInitialized("user") ? new com.michelin0.michelinzerostar.domain.user.entity.QUser(forProperty("user"), inits.get("user")) : null;
     }
 
 }

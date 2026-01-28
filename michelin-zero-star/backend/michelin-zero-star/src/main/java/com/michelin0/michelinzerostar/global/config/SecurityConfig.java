@@ -39,7 +39,6 @@ public class SecurityConfig {
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
-        // [핵심 수정] 생성자에 customUserDetailsService 주입
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(
                 customUserDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());
@@ -75,17 +74,19 @@ public class SecurityConfig {
                         .requestMatchers("/css/**", "/images/**", "/js/**", "/favicon.*",
                                 "/*/icon-*").permitAll()
 
-                        // [핵심 수정] 인증 없이 접근 가능한 URL 목록
+                        // 인증 없이 접근 가능한 URL 목록
                         .requestMatchers(
                                 "/",
                                 "/error",
                                 "/api/v1/auth/**", // 회원가입, 로그인 등 auth 하위 경로 모두 허용
-                                "/api/users/login", // 혹시 몰라 기존 경로도 유지
+                                "/api/users/login",
                                 "/api/users/signup",
                                 "/api-docs/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/h2-console/**"
+                                "/h2-console/**",
+                                "/api/recipes/",
+                                "/api/recipes/*"
                         ).permitAll()
 
                         .anyRequest().authenticated()
