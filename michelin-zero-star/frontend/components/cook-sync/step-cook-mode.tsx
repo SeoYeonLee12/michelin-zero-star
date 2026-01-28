@@ -147,10 +147,9 @@ export function StepCookMode({
         setMicPermission(state === "granted" ? "granted" : state === "denied" ? "denied" : "unknown")
 
         if (state === "granted") {
-          setIsListening(true) // ✅ 권한이 이미 있으면 자동으로 KWS ON
+          setIsListening(true)
         }
       } catch {
-        // permissions API 미지원 브라우저 대비: unknown으로 두고 버튼 누를 때 요청
         setMicPermission("unknown")
       }
     }
@@ -186,7 +185,6 @@ export function StepCookMode({
   }, [onStepChange])
 
   const handleStartTimer = React.useCallback(() => {
-    // 이미 실행중이면 아무것도 하지 않기
     if (isTimerRunningRef.current) return
 
     // 남아있는 시간이 있으면(일시정지 상태) 그대로 이어하기
@@ -230,17 +228,13 @@ export function StepCookMode({
 
   // ====== STT 1회 실행 + 자동 재시작(채팅 열려있을 때만) ======
   const runSttOnce = React.useCallback(async () => {
-    // 중복 STT 방지
     safeStopStt()
 
-    // STT는 채팅 중일 때만
     if (micPermission !== "granted") return
-//    if (!isListeningRef.current) return
     if (!aiOpenRef.current) return
     if (!aiVoiceEnabledRef.current) return
     if (aiTurnRef.current !== "listening") return
 
-    // 마이크 충돌 방지: KWS는 잠깐 끔
     await porcupineRef.current?.stop()
 
     try {
@@ -253,7 +247,6 @@ export function StepCookMode({
           const raw = (text || "").trim()
           if (!raw) return
 
-          // 닫기 인텐트 개선(너가 겪던 "채팅 종료가 안먹힘" 해결)
           const norm = raw.replace(/[^\p{L}\p{N}\s]/gu, "").trim()
           const isCloseIntent = /(채팅|챗봇|셰프|도우미)?\s*(닫아|닫기|종료|끝|그만|나가|꺼)/.test(norm)
 
@@ -263,9 +256,6 @@ export function StepCookMode({
             setAiOpenSafe(false)
             setAiVoiceEnabledSafe(false)
             // 채팅 닫히면 KWS 재개
-            // if (isListeningRef.current) {
-            //   await porcupineRef.current?.start()
-            // }
             await startKwsIfNeeded()
             return
           }
@@ -293,7 +283,6 @@ export function StepCookMode({
             scheduleSttRetry(400)
           } else {
             // 채팅 닫혔으면 KWS 재개
-//            porcupineRef.current?.start()
             startKwsIfNeeded()
           }
         },
@@ -304,7 +293,6 @@ export function StepCookMode({
       if (aiOpenRef.current && aiVoiceEnabledRef.current && aiTurnRef.current === "listening") {
         scheduleSttRetry(400)
       } else {
-//        porcupineRef.current?.start()
         startKwsIfNeeded()
       }
     }
@@ -317,7 +305,6 @@ export function StepCookMode({
     }
   }, [])
 
-  // ✅ 재시작 예약은 항상 1개만 유지
   const scheduleSttRetry = React.useCallback((delayMs: number) => {
     clearSttRetryTimer()
     sttRetryTimerRef.current = window.setTimeout(() => {
@@ -485,7 +472,6 @@ export function StepCookMode({
           const newValue = prev - 1
           if (newValue <= 0) {
             setIsTimerRunning(false)
-            // ✅ 타이머 끝나도 isListening 끄지 않음 (KWS 꺼짐 방지)
             if (autoAdvance) pendingAdvanceRef.current = true
             return 0
           }
@@ -850,16 +836,6 @@ export function StepCookMode({
         {/* Floating Button */}
         <button
           type="button"
-          // onClick={async () => {
-          //   setAiOpenSafe(true)
-          //   aiOpenRef.current = true
-
-          //   setAiVoiceEnabledSafe(true)
-          //   setAiTurn("listening")
-
-          //   scheduleSttRetry(50)
-          //   await porcupineRef.current?.stop()
-          // }}
           onClick={async () => {
             if (aiToggleLockRef.current) return
             aiToggleLockRef.current = true
@@ -884,7 +860,6 @@ export function StepCookMode({
                 scheduleSttRetry(50)
               }
             } finally {
-              // 짧게 딜레이 주면 더 안정적(더블클릭/연타 흡수)
               setTimeout(() => { aiToggleLockRef.current = false }, 150)
             }
           }}
