@@ -177,7 +177,10 @@ export default function CommunityDetailPage() {
       router.push("/login")
       return
     }
-    router.push(`/messages/${post.user.id}`)
+    // router.push(`/messages/${post.user.id}`)
+    // router.push(`/messages/${post.user.id}?name=${encodeURIComponent(post.user.name)}`)
+    // router.push(`/messages/${post.user.id}?name=${encodeURIComponent(post.user.name)}&avatar=${encodeURIComponent(post.user.avatar)}`)
+    router.push(`/messages/${post.user.id}?name=${encodeURIComponent(post.user.name)}&avatar=${encodeURIComponent(post.user.avatar)}&from=post`)
   }
 
   const nextImage = () => {
@@ -206,7 +209,7 @@ export default function CommunityDetailPage() {
       <ScrollToTop />
       <main className="flex-1 container mx-auto max-w-4xl px-4 py-8">
         <Button variant="ghost" size="sm" className="mb-4" onClick={() => router.push("/community")}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
+          <ArrowLeft className="h-4 w-4 mr-1" />
           목록으로
         </Button>
 

@@ -6,14 +6,16 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Navbar } from "@/components/cook-sync/navbar"
 import { ScrollToTop } from "@/components/cook-sync/scroll-to-top"
+import { AccessDenied } from "@/components/cook-sync/access-denied"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Plus, Search, ChevronLeft, ChevronRight, Heart } from "lucide-react"
+import { Plus, Search, ChevronLeft, ChevronRight, Heart, MessageCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
+
 
 const initialShares = [
   {
@@ -78,6 +80,26 @@ export default function CommunityPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
   const [hideCompleted, setHideCompleted] = useState(false)
+
+  // 로그인 체크
+  if (!isLoggedIn) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Navbar />
+        <AccessDenied type="login" />
+      </div>
+    )
+  }
+
+  // 동네 인증 체크
+  if (!user?.location) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Navbar />
+        <AccessDenied type="location" />
+      </div>
+    )
+  }
 
   const userLocation = user?.location ? user.location.split(" ").slice(-1)[0] : "우리 동네"
 
@@ -165,7 +187,6 @@ export default function CommunityPage() {
           <div className="min-h-[9px]" />
         </div>
 
-
         {/* Search row + Create button (center-fixed, 700px) */}
         <div className="grid grid-cols-[1fr_minmax(0,700px)_1fr] items-center mb-6">
           {/* 왼쪽: 빈 공간(중앙 고정용) */}
@@ -189,7 +210,7 @@ export default function CommunityPage() {
             </div>
           </div>
 
-          {/* 오른쪽: N빵 팟 구함 버튼 */}
+          {/* 오른쪽: 나눔 팟 구함 버튼 */}
           <div className="justify-self-end">
             <Button className="gap-2 bg-[#800020] hover:bg-[#800020]/90" onClick={handleCreatePost}>
               <Plus className="h-4 w-4" />
@@ -232,16 +253,35 @@ export default function CommunityPage() {
               </div>
 
               {/* 상품명 */}
-              <h3 className="font-medium text-sm leading-tight line-clamp-2 mb-1 text-foreground">{share.title}</h3>
+              {/* <h3 className="font-medium text-sm leading-tight line-clamp-2 mb-1 text-foreground">{share.title}</h3> */}
+              <h3 className="font-medium text-sm leading-tight truncate mb-1 text-foreground">{share.title}</h3>
 
               {/* 가격 */}
               <p className="font-bold text-base text-foreground mb-1">{share.price}</p>
 
               {/* 위치 · 시간 */}
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              {/* <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <span>{share.place}</span>
                 <span>·</span>
                 <span>끌올 {share.timeAgo}</span>
+              </div> */}
+              {/* 위치 · 시간 · 관심 · 채팅 */}
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <span>{share.place}</span>
+                  <span>·</span>
+                  <span>끌올 {share.timeAgo}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center gap-0.5">
+                    <Heart className="h-3 w-3" />
+                    {share.likes}
+                  </span>
+                  <span className="flex items-center gap-0.5">
+                    <MessageCircle className="h-3 w-3" />
+                    {share.chatCount}
+                  </span>
+                </div>
               </div>
             </div>
           ))}

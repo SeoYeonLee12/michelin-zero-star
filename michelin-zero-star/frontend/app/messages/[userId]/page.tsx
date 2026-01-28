@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect, useRef, useMemo } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Navbar } from "@/components/cook-sync/navbar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,6 +31,7 @@ interface ParsedMessage {
 export default function ChatPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { isLoggedIn, conversations, getMessages, sendMessage, deleteConversation } = useAuth()
   const [messageText, setMessageText] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -78,8 +79,13 @@ export default function ChatPage() {
 
   if (!isLoggedIn) return null
 
-  const recipientName = conversation?.recipientName || decodeURIComponent(userId)
-  const recipientAvatar = conversation?.recipientAvatar || "/placeholder.svg"
+  const nameFromQuery = searchParams.get("name")
+  const avatarFromQuery = searchParams.get("avatar")
+  const fromQuery = searchParams.get("from")
+  const recipientName = conversation?.recipientName || nameFromQuery || decodeURIComponent(userId)
+  // const recipientName = conversation?.recipientName || decodeURIComponent(userId)
+  // const recipientAvatar = conversation?.recipientAvatar || "/placeholder.svg"
+  const recipientAvatar = conversation?.recipientAvatar || avatarFromQuery || "/placeholder.svg"
 
   const handleSend = () => {
     if (!messageText.trim() && !imagePreview) return
@@ -116,11 +122,25 @@ export default function ChatPage() {
         {/* Header with user info */}
         <div className="flex items-center justify-between px-6 py-4 border-b bg-white">
           <div className="flex items-center gap-3 flex-1">
-            <Link href="/messages">
-              <Button variant="ghost" size="icon" className="h-10 w-10">
+            {/* <Link href="/messages">
+              <Button variant="ghost" size="icon" className="h-10 w-10 hover:bg-transparent">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-            </Link>
+            </Link> */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-10 w-10 hover:bg-transparent"
+              onClick={() => {
+                if (fromQuery === "post") {
+                  router.back()  // 게시글로 돌아가기
+                } else {
+                  router.push("/messages")  // 채팅함으로 가기
+                }
+              }}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
             <Avatar className="h-12 w-12">
               <AvatarImage src={recipientAvatar || "/placeholder.svg"} />
               <AvatarFallback>{recipientName[0]}</AvatarFallback>
@@ -218,7 +238,7 @@ export default function ChatPage() {
             <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
             <div className="flex-1 relative">
               <Input
-                placeholder="Write Something..."
+                // placeholder="Write Something..."
                 value={messageText}
                 onChange={(e) => setMessageText(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
