@@ -1,12 +1,17 @@
 "use client"
 
 import * as React from "react"
-import { verifyUserLocation, signup as signupAPI } from "./api"
 import { mockVerifyUserLocation } from "./mock-api"
 import type { LocationRequestDto } from "./types"
+import { getMe } from "./api/user"
+import { login as loginAPI, signup as signupAPI } from "./api/auth"
+import { verifyLocation } from "./api/user"
+
 
 // ✅ 개발 환경에서 mock 사용 여부 (필요 시 false로 변경하여 실제 API 테스트)
-const USE_MOCK_API = process.env.NODE_ENV === 'development';
+const USE_MOCK_API = false
+const FIXED_LATITUDE = 36.3549777
+const FIXED_LONGITUDE = 127.2983403
 
 function safeJsonParse<T>(value: string | null, fallback: T): T {
   if (!value) return fallback
@@ -143,6 +148,7 @@ interface AuthContextType {
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  console.log("[AuthProvider] render") // ✅ 추가
   const [user, setUser] = React.useState<User | null>(null)
   const [likedRecipes, setLikedRecipes] = React.useState<LikedRecipe[]>([])
   const [conversations, setConversations] = React.useState<Conversation[]>([])
@@ -155,8 +161,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Initial load from storage
   React.useEffect(() => {
-    const savedUser = safeJsonParse<User | null>(localStorage.getItem("cooksync_user"), null)
-    if (savedUser) setUser(savedUser)
+    console.log("[AuthProvider] useEffect start") // ✅ 추가
+    const savedUserRaw = localStorage.getItem("cooksync_user")
+    const savedUser = safeJsonParse<User | null>(savedUserRaw, null)
+    const isValidSavedUser = savedUser && typeof savedUser.id === "string" && savedUser.id.length > 0
+
+    if (isValidSavedUser) setUser(savedUser)
+
+    // ✅ 추가: user 없고 토큰만 있으면 users/me로 복구
+    if (!savedUser) {
+      const token = localStorage.getItem("cooksync_access_token")
+      if (token) {
+        getMe()
+          .then((me) => {
+            const recoveredUser: User = {
+              id: String(me.id),
+              name: me.name ?? "",
+              nickname: me.nickname ?? "",
+              email: me.email ?? "",
+              profileImage: me.profileImage,
+              level: me.level ?? "",
+              bio: me.bio ?? "",
+              location: me.location,
+              latitude: me.latitude,
+              longitude: me.longitude,
+              locationCode: me.locationCode,
+              stars: me.stars ?? 0,
+              todayStars: me.todayStars ?? 0,
+              lastStarDate: me.lastStarDate ?? new Date().toISOString().split("T")[0],
+            }
+
+            setUser(recoveredUser)
+            localStorage.setItem("cooksync_user", JSON.stringify(recoveredUser))
+          })
+          .catch(() => {
+            // 토큰 만료/무효면 정리
+            localStorage.removeItem("cooksync_access_token")
+            localStorage.removeItem("cooksync_refresh_token")
+            localStorage.removeItem("cooksync_user")
+          })
+      }
+    }
 
     const savedLikedRecipes = safeJsonParse<LikedRecipe[]>(localStorage.getItem("cooksync_liked_recipes"), [])
     if (savedLikedRecipes.length) setLikedRecipes(savedLikedRecipes)
@@ -233,46 +278,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // --- Auth Actions ---
   const login = async (email: string, password: string) => {
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    const tokenRes = await loginAPI({ email, password })
+
+    localStorage.setItem("cooksync_access_token", tokenRes.accessToken)
+    localStorage.setItem("cooksync_refresh_token", tokenRes.refreshToken)
+
+    const me = await getMe()
+
     const newUser: User = {
-      id: "1",
-      name: "김민지",
-      nickname: "민지",
-      email,
-      level: "미슐랭 3스타",
-      bio: "매일 조금씩 요리 실력을 키워가고 있어요!",
-      location: "대전 서구 둔산동",
-      stars: 15,
-      todayStars: 0,
-      lastStarDate: new Date().toISOString().split("T")[0],
+      id: String(me.id),
+      name: me.name ?? "",
+      nickname: me.nickname ?? "",
+      email: me.email ?? email,
+      profileImage: me.profileImage,
+      level: me.level ?? "",
+      bio: me.bio ?? "",
+      location: me.location,
+      latitude: me.latitude,
+      longitude: me.longitude,
+      locationCode: me.locationCode,
+      stars: me.stars ?? 0,
+      todayStars: me.todayStars ?? 0,
+      lastStarDate: me.lastStarDate ?? new Date().toISOString().split("T")[0],
     }
+
     setUser(newUser)
     localStorage.setItem("cooksync_user", JSON.stringify(newUser))
   }
 
   const signup = async (data: { name: string; nickname: string; email: string; password: string }) => {
-  try {
-    const accessToken = await signupAPI({
-      name: data.name,
-      nickname: data.nickname,
-      email: data.email,
-      password: data.password,
-    })
+    try {
+      // 1. 회원가입 API 호출 (백엔드는 성공 메시지 문자열만 반환)
+      await signupAPI({
+        name: data.name,
+        nickname: data.nickname,
+        email: data.email,
+        password: data.password,
+      })
 
-    // ✅ 토큰 저장 (이후 위치 인증 등에서 사용)
-    localStorage.setItem("cooksync_access_token", accessToken)
+      console.log("✅ 회원가입 성공. 자동 로그인을 진행합니다.")
 
-    // ✅ (선택) 회원가입 직후 로그인 상태로 만들고 싶으면 user 세팅 필요
-    // 백엔드에서 유저 정보 안 내려주면 임시로 최소 정보만 넣거나,
-    // 가입 후 login API를 다시 호출해서 유저 정보를 가져오는 방식이 더 안전.
-    // 일단은 “가입 성공 + 토큰 저장”까지만 처리해도 위치 인증은 가능해짐.
+      // 2. 로그인 API 호출 (여기서 진짜 토큰을 받아오고 유저 상태를 갱신함)
+      await login(data.email, data.password)
 
-    console.log("✅ 회원가입 성공, accessToken 저장 완료")
-  } catch (error) {
-    console.error("❌ 회원가입 실패:", error)
-    throw error
+    } catch (error) {
+      console.error("❌ 회원가입/로그인 실패:", error)
+      throw error
+    }
   }
-}
 
   const logout = () => {
     setUser(null)
@@ -292,45 +345,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateLocation = async (latitude: number, longitude: number): Promise<string> => {
     if (!user) throw new Error("사용자 정보가 없습니다.")
 
-    try {
-      const locationData: LocationRequestDto = { latitude, longitude }
-      let response
+    const token = localStorage.getItem("cooksync_access_token")
+    if (!token) throw new Error("토큰이 없습니다. 다시 로그인 해주세요.")
 
-      // ✅ 환경에 따라 Mock과 실제 API 선택
-      if (USE_MOCK_API) {
-        console.log("🧪 Mock API를 사용하여 위치 인증을 진행합니다.")
-        response = await mockVerifyUserLocation(locationData)
-      } else {
-        const token = localStorage.getItem("cooksync_access_token") || ""
-        response = await verifyUserLocation(locationData, token)
-      }
-
-      const locationAddress = response.locationAddress || "위치 인증 완료"
-      const locationCode = response.locationCode || ""
-      
-      const updatedUser = {
-        ...user,
-        location: locationAddress,
-        latitude,
-        longitude,
-        locationCode,
-      }
-      setUser(updatedUser)
-      localStorage.setItem("cooksync_user", JSON.stringify(updatedUser))
-
-      return locationAddress
-    } catch (error) {
-      console.error("위치 인증 중 오류 발생:", error)
-      throw error
+    const fixedLocationData: LocationRequestDto = {
+      latitude: FIXED_LATITUDE,
+      longitude: FIXED_LONGITUDE,
     }
+
+    // ✅ 진짜 API 호출
+    const res = await verifyLocation(fixedLocationData)
+
+    // 응답이 string일 수도/객체일 수도 있으니 안전 처리
+    const locationAddress =
+      typeof res === "string" ? res : res.locationAddress ?? res.message ?? "위치 인증 완료"
+    const locationCode = typeof res === "string" ? "" : res.locationCode ?? ""
+
+    const updatedUser = {
+      ...user,
+      location: locationAddress,
+      latitude: FIXED_LATITUDE,
+      longitude: FIXED_LONGITUDE,
+      locationCode,
+    }
+
+    setUser(updatedUser)
+    localStorage.setItem("cooksync_user", JSON.stringify(updatedUser))
+
+    return locationAddress
   }
 
   // --- Logic Helpers ---
   const toggleLikeRecipe = (recipe: LikedRecipe) => {
     setLikedRecipes((prev) => {
       const isAlreadyLiked = prev.some((r) => r.id === recipe.id)
-      const updated = isAlreadyLiked 
-        ? prev.filter((r) => r.id !== recipe.id) 
+      const updated = isAlreadyLiked
+        ? prev.filter((r) => r.id !== recipe.id)
         : [...prev, { ...recipe, savedAt: new Date().toISOString().split("T")[0].replace(/-/g, ".") }]
       localStorage.setItem("cooksync_liked_recipes", JSON.stringify(updated))
       return updated

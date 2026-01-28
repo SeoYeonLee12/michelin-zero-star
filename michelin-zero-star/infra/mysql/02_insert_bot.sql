@@ -24,6 +24,8 @@ INSERT INTO user_profiles (
     users_id, 
     location_address, 
     location_code, 
+    latitude,
+    longitude,
     is_verified, 
     created_at, 
     updated_at
@@ -31,6 +33,8 @@ INSERT INTO user_profiles (
     LAST_INSERT_ID(),
     'System Server',
     '00000',
+    0.0,
+    0.0,
     1,
     NOW(), 
     NOW()

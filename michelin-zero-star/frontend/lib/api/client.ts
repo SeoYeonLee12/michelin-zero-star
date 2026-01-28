@@ -10,7 +10,6 @@ function tryParseJson(text: string) {
   const trimmed = text.trim()
   if (!trimmed) return null
 
-  // content-type이 없거나 이상해도, 바디가 JSON 모양이면 파싱 시도
   const looksLikeJson =
     (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
     (trimmed.startsWith("[") && trimmed.endsWith("]"))
@@ -24,16 +23,52 @@ function tryParseJson(text: string) {
   }
 }
 
+/** 브라우저에서만 접근 가능 */
+// client.ts
+function getAccessToken(): string | null {
+  if (typeof window === "undefined") return null
+  // ✅ cooksync 키로 통일
+  return (
+    localStorage.getItem("cooksync_access_token") ||
+    localStorage.getItem("accessToken") // (혹시 예전 키 남아있을 때 fallback)
+  )
+}
+/**
+ * 상대경로("/api/v1/...")로 호출해도 백엔드로 보내기 위한 base URL
+ * - Docker에서도 브라우저 기준 주소여야 하므로 보통 http://localhost:8080
+ */
+function resolveUrl(url: string): string {
+  // 이미 절대 URL이면 그대로 사용
+  if (/^https?:\/\//i.test(url)) return url
+
+  const base = process.env.NEXT_PUBLIC_BACKEND_URL
+  if (!base) return url // base가 없으면 기존 동작 유지(상대경로 그대로)
+
+  // url이 "/..." 형태면 base + url, 아니면 base + "/" + url
+  if (url.startsWith("/")) return `${base}${url}`
+  return `${base}/${url}`
+}
+
 export async function apiFetch<T = unknown>(
   url: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const res = await fetch(url, {
+  const token = getAccessToken()
+
+  // 헤더 병합 (options.headers가 Headers일 수도 있어서 안전하게 처리)
+  const headers = new Headers(options.headers || {})
+  // Content-Type은 body가 있을 때만 기본 세팅 (GET에도 붙어도 큰 문제는 없지만 깔끔하게)
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json")
+  }
+  // ✅ accessToken 있으면 Authorization 자동 첨부
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`)
+  }
+
+  const res = await fetch(resolveUrl(url), {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
+    headers,
   })
 
   const contentType = res.headers.get("content-type") || ""
@@ -42,9 +77,7 @@ export async function apiFetch<T = unknown>(
   const isJsonHeader = contentType.includes("application/json")
   const parsed = isJsonHeader ? (raw ? tryParseJson(raw) : null) : tryParseJson(raw)
 
-  // 실패 응답 처리
   if (!res.ok) {
-    // JSON이면 message 추출, 아니면 raw 그대로
     const payload = (parsed ?? {}) as ApiErrorPayload
     const message =
       payload.message ||
@@ -56,7 +89,5 @@ export async function apiFetch<T = unknown>(
     throw new Error(message)
   }
 
-  // 성공 응답 처리
-  // JSON이면 JSON 반환, 아니면 문자열(raw) 반환
   return (parsed ?? (raw as unknown)) as T
 }

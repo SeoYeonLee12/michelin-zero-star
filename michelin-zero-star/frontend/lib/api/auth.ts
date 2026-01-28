@@ -15,3 +15,37 @@ export function join(body: JoinRequest) {
     body: JSON.stringify(body),
   })
 }
+
+/** ✅ 추가: 서비스 로그인 */
+export type LoginRequest = {
+email: string
+password: string
+}
+
+
+export type LoginResponse = {
+grantType: string
+accessToken: string
+refreshToken: string
+accessTokenExpiresIn: number
+}
+
+
+export function login(body: LoginRequest) {
+return apiFetch<LoginResponse>("/api/v1/auth/login", {
+method: "POST",
+body: JSON.stringify(body),
+})
+}
+
+export async function signup(payload: {
+email: string
+password: string
+name: string
+nickname: string
+}): Promise<string> {
+return apiFetch("/api/v1/auth/join", {
+method: "POST",
+body: JSON.stringify(payload),
+})
+}
