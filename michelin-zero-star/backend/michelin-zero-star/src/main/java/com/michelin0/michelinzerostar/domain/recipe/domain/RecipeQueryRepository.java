@@ -9,21 +9,28 @@ import static com.michelin0.michelinzerostar.domain.recipe.domain.QRecipeTag.rec
 import static com.michelin0.michelinzerostar.domain.recipescrap.domain.QRecipeScrap.recipeScrap;
 import static com.michelin0.michelinzerostar.domain.user.entity.QUser.user;
 
+import com.michelin0.michelinzerostar.domain.recipe.domain.enums.RecipeSortType;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModeProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModeRecipeStepProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeDetailProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeIngredientProjection;
+import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeListProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeStepProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeTagProjection;
 import com.querydsl.core.Tuple;
+import com.querydsl.core.types.Expression;
+import com.querydsl.core.types.Order;
+import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
+import org.springframework.util.StringUtils;
 
 @Repository
 @RequiredArgsConstructor
@@ -138,6 +145,66 @@ public class RecipeQueryRepository {
                 totalStep,
                 steps
         ));
+    }
+
+    public List<RecipeListProjection> findAllRecipes(Long userId) {
+        return queryFactory
+                .select(Projections.constructor(
+                        RecipeListProjection.class,
+                        recipe.recipeId,
+                        recipe.title,
+                        recipe.mainImageUrl,
+                        recipe.cookTime,
+                        recipe.averageRating,
+                        recipe.servings,
+                        isScrappedExpression(userId),
+                        recipe.user.nickname
+                ))
+                .from(recipe)
+                .join(recipe.user)
+                .where()
+                .fetch();
+    }
+
+    private OrderSpecifier<?> getOrderSpecifier(RecipeSortType sortType) {
+        if (sortType == null) {
+            return recipe.createdAt.desc();
+        }
+
+        Order direction = sortType.getDirection().equalsIgnoreCase("ASC")
+                ? Order.ASC : Order.DESC;
+
+        Expression<? extends Comparable> field = switch (sortType) {
+            case RATING -> recipe.averageRating;
+            case TIME -> recipe.cookTime;
+            case LATEST -> recipe.createdAt;
+        };
+
+        return new OrderSpecifier(direction, field);
+    }
+
+    private BooleanExpression isScrappedExpression(Long userId) {
+        if (userId == null) {
+            return Expressions.asBoolean(false);
+        }
+
+        return JPAExpressions
+                .selectOne()
+                .from(recipeScrap)
+                .where(
+                        recipeScrap.recipe.recipeId.eq(recipe.recipeId),
+                        recipeScrap.user.id.eq(userId)
+                )
+                .exists();
+    }
+
+    private BooleanExpression containsSearchWord(String searchWord) {
+        if (!StringUtils.hasText(searchWord)) {
+            return null;
+        }
+        String replacedSearchWord = searchWord.replace(" ", "");
+        return Expressions.stringTemplate("REPLACE({0}, ' ', '')", recipe.title)
+                .contains(replacedSearchWord);
     }
 
     private Boolean checkIsScrapped(Long recipeId, Long userId) {

@@ -15,6 +15,7 @@ import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeTag;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeUpdate;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModeProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeDetailProjection;
+import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeListProjection;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.domain.user.repository.UserRepository;
 import com.michelin0.michelinzerostar.global.exception.errorcode.RecipeErrorCode;
@@ -61,7 +62,7 @@ public class RecipeService {
         recipeUpdate.updateRecipe(command.recipeId(), recipe, ingredient, steps, tags, categoryIds);
         return command.recipeId();
     }
-    
+
     public void deleteRecipe(Long recipeId, Long userId) {
         Recipe searchedRecipe = recipeRepository.getById(recipeId);
         searchedRecipe.validateRecipeEnrolledUser(userId);
@@ -74,5 +75,11 @@ public class RecipeService {
         CookModeProjection projection = recipeQueryRepository.findRecipeStepByRecipeId(recipeId)
                 .orElseThrow(() -> new GlobalException(RecipeErrorCode.RECIPE_NOT_FOUND));
         return CookModeCommand.from(projection);
+    }
+
+    public List<RecipeListCommand> getRecipeList(Long userId) {
+        User user = userRepository.getById(userId);
+        List<RecipeListProjection> projection = recipeQueryRepository.findAllRecipes(userId);
+        //TODO
     }
 }

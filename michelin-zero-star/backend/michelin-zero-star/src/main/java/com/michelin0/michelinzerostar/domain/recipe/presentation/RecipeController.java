@@ -5,17 +5,22 @@ import com.michelin0.michelinzerostar.domain.recipe.application.RecipeService;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.CookModeCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeDetailCommand;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.CookModeDetailResponse;
+import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request.RecipeListSearchCondition;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request.RecipeRegisterRequest;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeDetailResponse;
+import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeListResponse;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeRegisterResponse;
 import jakarta.validation.Valid;
+import java.awt.print.Pageable;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -82,5 +87,15 @@ public class RecipeController {
         CookModeCommand command = recipeService.getCookModeDetail(recipeId, currentUserId);
         CookModeDetailResponse response = CookModeDetailResponse.from(command);
         return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
+    @GetMapping
+    public ResponseEntity<RecipeListResponse> getRecipes(
+            @AuthenticationPrincipal UserPrincipal principle,
+            @PageableDefault(page = 1, size = 20) Pageable pageable,
+            @ModelAttribute @Valid RecipeListSearchCondition condition
+    ) {
+        Long userId = principle.getId();
+        return null;
     }
 }
