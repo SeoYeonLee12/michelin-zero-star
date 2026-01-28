@@ -47,7 +47,6 @@ public class CookingLogSave {
             user.awardComplete(rewardCompleteAmount);
         }
 
-        // TODO 테스팅 후 타입에 String이 삽입으로 바꿔보기 -> 이건 안 바꿀 거 같음
         StarHistory newStarHistory = new StarHistory(user, StarHistoryType.COOK_COMPLETE,
                 rewardCompleteAmount);
         starHistoryRepository.save(newStarHistory);
