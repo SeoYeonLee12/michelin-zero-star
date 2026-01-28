@@ -48,7 +48,7 @@ export default function ProfileEditPage() {
     nickname: user?.nickname || "",
     email: user?.email || "",
     bio: user?.bio || "",
-    location: user?.location || "",
+    location: "",
     categories: [] as string[],
   })
 
@@ -72,7 +72,7 @@ export default function ProfileEditPage() {
         nickname: user.nickname || "",
         email: user.email,
         bio: user.bio || "",
-        location: user.location || "",
+        // location: user.location || "",
       }))
       if (user.profileImage) {
         setProfileImagePreview(user.profileImage)
@@ -382,11 +382,26 @@ export default function ProfileEditPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-2">
-                <Input
+                {/* <Input
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   placeholder="예: 대전 서구 둔산동"
                   className="flex-1"
+                /> */}
+
+                {/* <Input
+                  value={formData.location}
+                  readOnly
+                  disabled
+                  placeholder="현재 위치 버튼을 눌러 위치를 인증해주세요"
+                  className="flex-1 bg-muted cursor-not-allowed"
+                /> */}
+                <Input
+                  value={isGettingLocation ? "" : formData.location}
+                  readOnly
+                  disabled={!formData.location}
+                  placeholder={isGettingLocation ? "위치 탐색 중입니다..." : "현재 위치 버튼을 눌러 위치를 인증해주세요"}
+                  className={`flex-1 ${!formData.location ? "bg-muted cursor-not-allowed" : ""}`}
                 />
                 <Button
                   variant="outline"
@@ -399,10 +414,14 @@ export default function ProfileEditPage() {
                 </Button>
               </div>
 
-              <p className="text-xs text-muted-foreground">
+              {/* <p className="text-xs text-muted-foreground">
                 위치 정보는 주변 재료 나눔 게시글을 찾는 데 사용됩니다.
                 {isGettingLocation && " GPS로 위치를 탐색 중입니다..."}
-              </p>
+              </p> */}
+              {/* <p className="text-xs text-muted-foreground">
+                현재 위치 버튼을 눌러 동네 인증을 해주세요. 위치 정보는 주변 재료 나눔 게시글을 찾는 데 사용됩니다. */}
+                {/* {isGettingLocation && " 위치를 탐색 중입니다..."} */}
+              {/* </p> */}
             </CardContent>
           </Card>
 
