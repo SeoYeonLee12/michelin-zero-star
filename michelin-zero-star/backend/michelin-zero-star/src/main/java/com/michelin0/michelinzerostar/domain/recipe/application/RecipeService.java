@@ -61,14 +61,14 @@ public class RecipeService {
         recipeUpdate.updateRecipe(command.recipeId(), recipe, ingredient, steps, tags, categoryIds);
         return command.recipeId();
     }
-
-
+    
     public void deleteRecipe(Long recipeId, Long userId) {
         Recipe searchedRecipe = recipeRepository.getById(recipeId);
         searchedRecipe.validateRecipeEnrolledUser(userId);
         recipeRepository.deleteById(recipeId);
     }
 
+    @Transactional(readOnly = true)
     public CookModeCommand getCookModeDetail(Long recipeId, Long userId) {
         User user = userRepository.getById(userId);
         CookModeProjection projection = recipeQueryRepository.findRecipeStepByRecipeId(recipeId)

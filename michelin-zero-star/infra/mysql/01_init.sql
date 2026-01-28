@@ -1,6 +1,7 @@
+-- [1] 외래 키 검사 비활성화
 SET FOREIGN_KEY_CHECKS = 0;
 
-
+-- [2] 테이블 초기화 (DROP)
 DROP TABLE IF EXISTS ai_chat_message;
 DROP TABLE IF EXISTS chat_messages;
 DROP TABLE IF EXISTS chat_rooms;
@@ -22,6 +23,7 @@ DROP TABLE IF EXISTS star_history;
 DROP TABLE IF EXISTS user_profiles;
 DROP TABLE IF EXISTS users;
 
+-- [3] 테이블 생성 (CREATE)
 
 CREATE TABLE users (
     users_id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -40,14 +42,17 @@ CREATE TABLE users (
 ) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE user_profiles (
-    users_id BIGINT NOT NULL PRIMARY KEY,
+    users_id BIGINT NOT NULL,
     location_address VARCHAR(255) NULL,
     location_code VARCHAR(50) NULL,
+    latitude DECIMAL(10, 8) NOT NULL,
+    longitude DECIMAL(11, 8) NOT NULL,
     is_verified TINYINT(1) NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_profiles_user FOREIGN KEY (users_id) REFERENCES users (users_id) ON DELETE CASCADE
-) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4;
+    PRIMARY KEY (users_id),
+    CONSTRAINT fk_user_profiles_users FOREIGN KEY (users_id) REFERENCES users (users_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE star_history (
     star_history_id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -113,17 +118,17 @@ CREATE TABLE recipe_categories (
 
 CREATE TABLE recipe_ingredients (
     recipe_ingredients_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    recipe_id BIGINT NOT NULL,
+    recipes_id BIGINT NOT NULL,  -- 변경됨 (recipe_id -> recipes_id)
     name VARCHAR(100) NOT NULL,
     amount VARCHAR(50) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_ri_recipe FOREIGN KEY (recipe_id) REFERENCES recipes (recipes_id)
+    CONSTRAINT fk_ri_recipe FOREIGN KEY (recipes_id) REFERENCES recipes (recipes_id)
 ) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE recipe_steps (
     recipe_steps_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    recipe_id BIGINT NOT NULL,
+    recipes_id BIGINT NOT NULL, -- 변경됨 (recipe_id -> recipes_id)
     step_number INT NOT NULL,
     description TEXT NOT NULL,
     timer_seconds INT NOT NULL,
@@ -131,46 +136,45 @@ CREATE TABLE recipe_steps (
     tip TEXT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_rs_recipe FOREIGN KEY (recipe_id) REFERENCES recipes (recipes_id)
+    CONSTRAINT fk_rs_recipe FOREIGN KEY (recipes_id) REFERENCES recipes (recipes_id)
 ) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE recipe_tags (
     recipe_tags_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    recipe_id BIGINT NOT NULL,
+    recipes_id BIGINT NOT NULL, -- 변경됨 (recipe_id -> recipes_id)
     tag_name VARCHAR(50) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_rt_recipe FOREIGN KEY (recipe_id) REFERENCES recipes (recipes_id)
+    CONSTRAINT fk_rt_recipe FOREIGN KEY (recipes_id) REFERENCES recipes (recipes_id)
 ) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE user_recipe_scraps (
     user_recipe_scraps_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    recipe_id BIGINT NOT NULL,
+    users_id BIGINT NOT NULL,
+    recipes_id BIGINT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_urs_user FOREIGN KEY (user_id) REFERENCES users (users_id),
-    CONSTRAINT fk_urs_recipe FOREIGN KEY (recipe_id) REFERENCES recipes (recipes_id)
+    CONSTRAINT fk_urs_user FOREIGN KEY (users_id) REFERENCES users (users_id),  -- 오타 수정 (user_id -> users_id)
+    CONSTRAINT fk_urs_recipe FOREIGN KEY (recipes_id) REFERENCES recipes (recipes_id) -- 오타 수정 (recipe_id -> recipes_id)
 ) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE recipe_reviews (
     recipe_reviews_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    recipe_id BIGINT NOT NULL,
+    users_id BIGINT NOT NULL,   -- 변경됨 (user_id -> users_id)
+    recipes_id BIGINT NOT NULL, -- 변경됨 (recipe_id -> recipes_id)
     rating DOUBLE NOT NULL DEFAULT 0.0,
     content TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL,
-    CONSTRAINT fk_rr_user FOREIGN KEY (user_id) REFERENCES users (users_id),
-    CONSTRAINT fk_rr_recipe FOREIGN KEY (recipe_id) REFERENCES recipes (recipes_id)
+    CONSTRAINT fk_rr_user FOREIGN KEY (users_id) REFERENCES users (users_id),
+    CONSTRAINT fk_rr_recipe FOREIGN KEY (recipes_id) REFERENCES recipes (recipes_id)
 ) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE cooking_logs (
     cooking_logs_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     users_id BIGINT NOT NULL,
     recipes_id BIGINT NOT NULL,
-    completed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_cl_user FOREIGN KEY (users_id) REFERENCES users (users_id),
@@ -179,7 +183,7 @@ CREATE TABLE cooking_logs (
 
 CREATE TABLE market_posts (
     market_posts_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    writer_id BIGINT NOT NULL,
+    users_id BIGINT NOT NULL, -- 변경됨 (writer_id -> users_id)
     title VARCHAR(255) NOT NULL,
     content TEXT NULL,
     price INT NOT NULL DEFAULT 0,
@@ -194,7 +198,7 @@ CREATE TABLE market_posts (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL,
-    CONSTRAINT fk_mp_writer FOREIGN KEY (writer_id) REFERENCES users (users_id)
+    CONSTRAINT fk_mp_writer FOREIGN KEY (users_id) REFERENCES users (users_id)
 ) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE market_post_images (
@@ -220,21 +224,21 @@ CREATE TABLE market_likes (
 CREATE TABLE market_comments (
     market_comments_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     post_id BIGINT NOT NULL,
-    writer_id BIGINT NOT NULL,
+    users_id BIGINT NOT NULL, -- 변경됨 (writer_id -> users_id)
     content TEXT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
     parent_id BIGINT NULL,
     CONSTRAINT fk_mc_post FOREIGN KEY (post_id) REFERENCES market_posts (market_posts_id),
-    CONSTRAINT fk_mc_writer FOREIGN KEY (writer_id) REFERENCES users (users_id),
+    CONSTRAINT fk_mc_writer FOREIGN KEY (users_id) REFERENCES users (users_id),
     CONSTRAINT fk_mc_parent FOREIGN KEY (parent_id) REFERENCES market_comments (market_comments_id)
 ) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE chat_rooms (
     chat_rooms_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     post_id BIGINT NOT NULL,
-    seller_id BIGINT NOT NULL,
-    buyer_id BIGINT NOT NULL,
+    seller_id BIGINT NOT NULL, -- 중복 방지를 위해 유지 (users_id 참조)
+    buyer_id BIGINT NOT NULL,  -- 중복 방지를 위해 유지 (users_id 참조)
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
     last_message TEXT NULL,
@@ -247,20 +251,20 @@ CREATE TABLE chat_rooms (
 CREATE TABLE chat_messages (
     chat_messages_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     room_id BIGINT NOT NULL,
-    sender_id BIGINT NOT NULL,
+    users_id BIGINT NOT NULL, -- 변경됨 (sender_id -> users_id)
     message TEXT NULL,
     image_url VARCHAR(255) NULL,
     is_read TINYINT(1) NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_cm_room FOREIGN KEY (room_id) REFERENCES chat_rooms (chat_rooms_id),
-    CONSTRAINT fk_cm_sender FOREIGN KEY (sender_id) REFERENCES users (users_id)
+    CONSTRAINT fk_cm_sender FOREIGN KEY (users_id) REFERENCES users (users_id)
 ) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE ai_chat_message (
     ai_chat_message_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     users_id BIGINT NOT NULL,
-    recipe_id BIGINT NULL COMMENT 'NULL이면 일반 채팅, 값이 있으면 해당 레시피 문맥 채팅',
+    recipes_id BIGINT NULL COMMENT 'NULL이면 일반 채팅, 값이 있으면 해당 레시피 문맥 채팅', -- 변경됨 (recipe_id -> recipes_id)
     sender_type ENUM('USER', 'AI') NOT NULL,
     content TEXT NOT NULL,
     recommended_recipes JSON NULL,
@@ -268,49 +272,12 @@ CREATE TABLE ai_chat_message (
     updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
     
     CONSTRAINT fk_acm_user FOREIGN KEY (users_id) REFERENCES users (users_id),
-    CONSTRAINT fk_acm_recipe FOREIGN KEY (recipe_id) REFERENCES recipes (recipes_id) ON DELETE SET NULL
+    CONSTRAINT fk_acm_recipe FOREIGN KEY (recipes_id) REFERENCES recipes (recipes_id) ON DELETE SET NULL
 ) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 성능 최적화를 위한 인덱스
 CREATE INDEX idx_ai_chat_user_date ON ai_chat_message (users_id, created_at);
+CREATE INDEX idx_ai_chat_user_recipe ON ai_chat_message (users_id, recipes_id); -- 변경됨
 
-CREATE INDEX idx_ai_chat_user_recipe ON ai_chat_message (users_id, recipe_id);
-
+-- [4] 외래 키 검사 다시 활성화
 SET FOREIGN_KEY_CHECKS = 1;
-
-INSERT INTO users (
-    email, 
-    password, 
-    name, 
-    nickname, 
-    role, 
-    total_star, 
-    created_at, 
-    updated_at
-) VALUES (
-    'crawling_bot@michelin0.com', 
-    '$2a$10$DUMMYHASHFOREXAMPLE',
-    '시스템 관리자',   
-    'CRAWLINGBOT',  
-    'USER',     
-    5.0,   
-    NOW(), 
-    NOW()
-);
-
-
-INSERT INTO user_profiles (
-    users_id, 
-    location_address, 
-    location_code, 
-    is_verified, 
-    created_at, 
-    updated_at
-) VALUES (
-    LAST_INSERT_ID(), 
-    'System Server',
-    '00000',  
-    1,                             
-    NOW(), 
-    NOW()
-);
-

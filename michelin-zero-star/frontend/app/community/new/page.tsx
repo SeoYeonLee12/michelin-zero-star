@@ -106,7 +106,7 @@ export default function CommunityNewPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">N빵 팟 구함</h1>
+            <h1 className="text-2xl font-bold tracking-tight">나눔 팟 구함</h1>
             <p className="text-muted-foreground">이웃과 재료를 나눠보세요</p>
           </div>
         </div>
@@ -189,7 +189,12 @@ export default function CommunityNewPage() {
               </Label>
               <Textarea
                 id="description"
-                placeholder="구매한 재료, 상태, 나눔 방법 등을 자세히 적어주세요.&#10;&#10;예시:&#10;- 오늘 마트에서 구매한 신선한 양배추예요&#10;- 반 통씩 나눠서 가져가시면 됩니다&#10;- 둔산동 롯데마트 앞에서 직거래 원해요"
+                placeholder={`구매한 재료, 상태, 나눔 방법 등을 자세히 적어주세요.
+    
+  예시:
+  - 오늘 마트에서 구매한 신선한 양배추예요
+  - 반 통씩 나눠서 가져가시면 됩니다
+  - 둔산동 롯데마트 앞에서 직거래 원해요`}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={6}

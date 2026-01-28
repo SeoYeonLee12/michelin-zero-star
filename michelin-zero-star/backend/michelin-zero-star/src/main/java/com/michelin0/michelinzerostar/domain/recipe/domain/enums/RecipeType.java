@@ -1,4 +1,4 @@
-package com.michelin0.michelinzerostar.domain.recipe.enums;
+package com.michelin0.michelinzerostar.domain.recipe.domain.enums;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

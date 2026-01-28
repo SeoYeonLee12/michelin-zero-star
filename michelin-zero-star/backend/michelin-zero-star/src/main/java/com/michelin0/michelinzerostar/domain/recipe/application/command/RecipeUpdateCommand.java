@@ -5,7 +5,7 @@ import com.michelin0.michelinzerostar.domain.recipe.domain.Recipe;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeIngredient;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeStep;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeTag;
-import com.michelin0.michelinzerostar.domain.recipe.enums.RecipeType;
+import com.michelin0.michelinzerostar.domain.recipe.domain.enums.RecipeType;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import java.util.List;
 

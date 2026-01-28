@@ -88,7 +88,9 @@ public class SecurityConfig {
                                 "/api-docs/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/h2-console/**"
+                                "/h2-console/**",
+                                "/api/recipes/",
+                                "/api/recipes/*"
                         ).permitAll()
 
                         // 그 외 모든 요청은 인증 필요
