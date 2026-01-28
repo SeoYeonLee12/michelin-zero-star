@@ -1,4 +1,4 @@
-package com.michelin0.michelinzerostar.domain.recipe.presentation.dto;
+package com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response;
 
 import com.michelin0.michelinzerostar.domain.recipe.application.command.CookModeRecipeStepCommand;
 

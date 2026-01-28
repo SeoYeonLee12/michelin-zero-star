@@ -10,6 +10,7 @@ import static com.michelin0.michelinzerostar.domain.recipescrap.domain.QRecipeSc
 import static com.michelin0.michelinzerostar.domain.user.entity.QUser.user;
 
 import com.michelin0.michelinzerostar.domain.recipe.domain.enums.RecipeSortType;
+import com.michelin0.michelinzerostar.domain.recipe.domain.enums.RecipeType;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModeProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModeRecipeStepProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeDetailProjection;
@@ -17,6 +18,7 @@ import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeIngr
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeListProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeStepProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeTagProjection;
+import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipesSearchCondition;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Expression;
 import com.querydsl.core.types.Order;
@@ -26,9 +28,13 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
@@ -147,8 +153,25 @@ public class RecipeQueryRepository {
         ));
     }
 
-    public List<RecipeListProjection> findAllRecipes(Long userId) {
-        return queryFactory
+    public Page<RecipeListProjection> findAllRecipes(RecipesSearchCondition condition, Pageable pageable,Long userId) {
+        List<Long> ids = queryFactory
+                .select(recipe.recipeId)
+                .from(recipe)
+                .where(
+                        eqRecipeType(condition.recipeType()),
+                        eqCategory(condition.category()),
+                        containsSearchWord(condition.searchWord())
+                )
+                .orderBy(getOrderSpecifier(condition.sort()))
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        if (ids.isEmpty()) {
+            return new PageImpl<>(Collections.emptyList(), pageable, 0);
+        }
+
+        List<RecipeListProjection> content = queryFactory
                 .select(Projections.constructor(
                         RecipeListProjection.class,
                         recipe.recipeId,
@@ -162,8 +185,21 @@ public class RecipeQueryRepository {
                 ))
                 .from(recipe)
                 .join(recipe.user)
-                .where()
+                .where(recipe.recipeId.in(ids))
+                .orderBy(getOrderSpecifier(condition.sort()))
                 .fetch();
+
+        Long totalCount = queryFactory
+                .select(recipe.count())
+                .from(recipe)
+                .where(
+                        eqRecipeType(condition.recipeType()),
+                        eqCategory(condition.category()),
+                        containsSearchWord(condition.searchWord())
+                )
+                .fetchOne();
+
+        return new PageImpl<>(content, pageable, totalCount != null ? totalCount : 0);
     }
 
     private OrderSpecifier<?> getOrderSpecifier(RecipeSortType sortType) {
@@ -181,6 +217,30 @@ public class RecipeQueryRepository {
         };
 
         return new OrderSpecifier(direction, field);
+    }
+
+    private BooleanExpression eqRecipeType(String recipeTypeStr) {
+        if (!StringUtils.hasText(recipeTypeStr)) {
+            return null;
+        }
+        try {
+            RecipeType type = RecipeType.valueOf(recipeTypeStr.toUpperCase());
+            return recipe.recipeType.eq(type);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private BooleanExpression eqCategory(String categoryName) {
+        if (!StringUtils.hasText(categoryName)) {
+            return null;
+        }
+        return recipe.recipeId.in(
+                JPAExpressions.select(recipeCategory.recipe.recipeId)
+                        .from(recipeCategory)
+                        .join(recipeCategory.category, category)
+                        .where(category.categoryName.eq(categoryName))
+        );
     }
 
     private BooleanExpression isScrappedExpression(Long userId) {

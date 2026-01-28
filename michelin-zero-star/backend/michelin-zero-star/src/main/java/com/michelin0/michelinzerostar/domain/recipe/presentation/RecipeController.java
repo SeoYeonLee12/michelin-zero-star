@@ -4,15 +4,21 @@ import com.michelin0.michelinzerostar.domain.auth.UserPrincipal;
 import com.michelin0.michelinzerostar.domain.recipe.application.RecipeService;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.CookModeCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeDetailCommand;
-import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.CookModeDetailResponse;
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeListCommand;
+import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeListProjection;
+import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipesSearchCondition;
+import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.CookModeDetailResponse;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request.RecipeListSearchCondition;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request.RecipeRegisterRequest;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeDetailResponse;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeListResponse;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeRegisterResponse;
+import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipesResponse;
 import jakarta.validation.Valid;
-import java.awt.print.Pageable;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -92,10 +98,15 @@ public class RecipeController {
     @GetMapping
     public ResponseEntity<RecipeListResponse> getRecipes(
             @AuthenticationPrincipal UserPrincipal principle,
-            @PageableDefault(page = 1, size = 20) Pageable pageable,
+            @PageableDefault(page = 0, size = 20) Pageable pageable,
             @ModelAttribute @Valid RecipeListSearchCondition condition
     ) {
-        Long userId = principle.getId();
-        return null;
+        Long userId = (principle != null) ? principle.getId() : null;
+        Page<RecipeListCommand> result = recipeService.getRecipeList(
+                condition.toCondition(),
+                pageable,
+                userId
+        );
+        return ResponseEntity.status(HttpStatus.OK).body(RecipeListResponse.from(result));
     }
 }
