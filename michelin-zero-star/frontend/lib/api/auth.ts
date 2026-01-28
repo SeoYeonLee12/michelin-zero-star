@@ -37,3 +37,15 @@ method: "POST",
 body: JSON.stringify(body),
 })
 }
+
+export async function signup(payload: {
+email: string
+password: string
+name: string
+nickname: string
+}): Promise<string> {
+return apiFetch("/api/v1/auth/join", {
+method: "POST",
+body: JSON.stringify(payload),
+})
+}

@@ -28,7 +28,11 @@ export default function LoginPage() {
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [isLoading, setIsLoading] = React.useState(false)
-  
+
+  const handleSocialLogin = (provider: "google" | "naver" | "kakao") => {
+    window.location.href = `http://localhost:8080/oauth2/authorization/${provider}`
+  }
+
   // ✅ Hydration 에러 및 초기 로직 통합
   const [mounted, setMounted] = React.useState(false)
   const [funMessage, setFunMessage] = React.useState("")
@@ -37,7 +41,7 @@ export default function LoginPage() {
   React.useEffect(() => {
     // 1. 컴포넌트 마운트 표시
     setMounted(true)
-    
+
     // 2. 클라이언트에서만 랜덤 문구 설정 (서버와 불일치 방지)
     const randomMsg = funMessages[Math.floor(Math.random() * funMessages.length)]
     setFunMessage(randomMsg)
@@ -158,6 +162,7 @@ export default function LoginPage() {
             <h2 className="text-2xl font-bold tracking-tight">로그인</h2>
             <p className="text-muted-foreground">로그인하여 요리를 시작하세요</p>
           </div>
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
               <div className="space-y-2">
@@ -226,8 +231,15 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* ✅ Social Login Buttons */}
           <div className="grid grid-cols-3 gap-3">
-            <Button variant="outline" className="h-12 bg-transparent">
+            {/* Google */}
+            <Button
+              type="button"
+              variant="outline"
+              className="h-12 bg-transparent"
+              onClick={() => handleSocialLogin("google")}
+            >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
                   fill="currentColor"
@@ -247,12 +259,23 @@ export default function LoginPage() {
                 />
               </svg>
             </Button>
-            <Button variant="outline" className="h-12 bg-[#03C75A] hover:bg-[#03C75A]/90 text-white border-[#03C75A]">
+
+            {/* Naver */}
+            <Button
+              type="button"
+              variant="outline"
+              className="h-12 bg-[#03C75A] hover:bg-[#03C75A]/90 text-white border-[#03C75A]"
+              onClick={() => handleSocialLogin("naver")}
+            >
               <span className="font-bold text-lg">N</span>
             </Button>
+
+            {/* Kakao */}
             <Button
+              type="button"
               variant="outline"
               className="h-12 bg-[#FEE500] hover:bg-[#FEE500]/90 text-[#3C1E1E] border-[#FEE500]"
+              onClick={() => handleSocialLogin("kakao")}
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
