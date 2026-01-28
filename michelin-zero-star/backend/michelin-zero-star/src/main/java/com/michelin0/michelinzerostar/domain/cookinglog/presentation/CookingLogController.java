@@ -29,7 +29,7 @@ public class CookingLogController {
             @RequestBody @Valid CookingLogCompleteRequest request
     ) {
         Long currentUserId = principal.getId();
-        Long cookingLogId = cookingLogService.saveCookingLog(request.recipeId(), currentUserId);
+        Long cookingLogId = cookingLogService.saveCookingLog(currentUserId, request.recipeId());
         log.info("Cooking log ID: " + cookingLogId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new CookingLogCompleteResponse(cookingLogId));

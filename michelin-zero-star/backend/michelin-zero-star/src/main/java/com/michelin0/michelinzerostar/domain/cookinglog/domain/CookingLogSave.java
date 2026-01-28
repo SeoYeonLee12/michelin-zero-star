@@ -26,9 +26,7 @@ public class CookingLogSave {
     private final RecipeRepository recipeRepository;
     private final StarHistoryRepository starHistoryRepository;
 
-    public Long saveCookingLog(Long userId, Long recipeId) {
-        User user = userRepository.getById(userId);
-        Recipe recipe = recipeRepository.getById(recipeId);
+    public Long saveCookingLog(User user, Recipe recipe) {
         if (cookingLogRepository.existsByUserAndRecipe(user, recipe)) {
             throw new GlobalException(CookingLogErrorCode.ALREADY_EXISTS_LOG);
         }
