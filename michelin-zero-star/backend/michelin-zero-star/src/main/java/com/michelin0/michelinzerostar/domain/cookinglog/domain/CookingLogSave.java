@@ -37,6 +37,8 @@ public class CookingLogSave {
         LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
         long todayRewardCount = starHistoryRepository.countByUserAndCreatedAtBetween(
                 user, startOfDay, endOfDay);
+        log.debug("Today Date: {} startOfDay: {} endOfDay: {} todayRewardCount: {}",
+                today, startOfDay, endOfDay, todayRewardCount);
         if (user.validAwardReward(todayRewardCount)) {
             user.awardComplete(rewardCompleteAmount);
         }
