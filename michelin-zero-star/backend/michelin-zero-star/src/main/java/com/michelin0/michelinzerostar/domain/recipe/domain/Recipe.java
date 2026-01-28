@@ -3,6 +3,7 @@ package com.michelin0.michelinzerostar.domain.recipe.domain;
 import static com.michelin0.michelinzerostar.global.SqlRestrictionClause.DELETED_AT_IS_NULL;
 
 import com.michelin0.michelinzerostar.domain.recipe.domain.enums.RecipeType;
+import com.michelin0.michelinzerostar.domain.starhistory.domain.enums.StarHistoryType;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.global.domain.SoftDeleteDomain;
 import com.michelin0.michelinzerostar.global.exception.errorcode.ErrorCode;
@@ -104,6 +105,10 @@ public class Recipe extends SoftDeleteDomain {
         this.averageRating = updatedRecipe.getAverageRating();
         this.recipeType = updatedRecipe.getRecipeType();
         this.nutrition = updatedRecipe.getNutrition();
+    }
+
+    public Double getRewardCompleteAmount() {
+        return StarHistoryType.COOK_COMPLETE.getAmount();
     }
 
     public void deleteIngredients(List<RecipeIngredient> recipeIngredients) {

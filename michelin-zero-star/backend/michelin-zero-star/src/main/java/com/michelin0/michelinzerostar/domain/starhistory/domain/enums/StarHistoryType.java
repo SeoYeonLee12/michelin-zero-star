@@ -1,5 +1,10 @@
 package com.michelin0.michelinzerostar.domain.starhistory.domain.enums;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
+@Getter
+@RequiredArgsConstructor
 public enum StarHistoryType {
 
     COOK_COMPLETE("요리완성", 0.5),
@@ -9,7 +14,8 @@ public enum StarHistoryType {
     private String type;
     private Double amount;
 
-    StarHistory(String type, double amount) {
-
+    StarHistoryType(String type, double amount) {
+        this.type = type;
+        this.amount = amount;
     }
 }
