@@ -418,10 +418,10 @@ export default function ProfileEditPage() {
                 위치 정보는 주변 재료 나눔 게시글을 찾는 데 사용됩니다.
                 {isGettingLocation && " GPS로 위치를 탐색 중입니다..."}
               </p> */}
-              <p className="text-xs text-muted-foreground">
-                현재 위치 버튼을 눌러 동네 인증을 해주세요. 위치 정보는 주변 재료 나눔 게시글을 찾는 데 사용됩니다.
+              {/* <p className="text-xs text-muted-foreground">
+                현재 위치 버튼을 눌러 동네 인증을 해주세요. 위치 정보는 주변 재료 나눔 게시글을 찾는 데 사용됩니다. */}
                 {/* {isGettingLocation && " 위치를 탐색 중입니다..."} */}
-              </p>
+              {/* </p> */}
             </CardContent>
           </Card>
 
