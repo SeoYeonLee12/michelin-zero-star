@@ -13,7 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod; // ★ 추가된 Import
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -75,10 +75,10 @@ public class SecurityConfig {
                         .requestMatchers("/css/**", "/images/**", "/js/**", "/favicon.*",
                                 "/*/icon-*").permitAll()
 
-                        .requestMatchers(HttpMethod.GET, "/api/v1/market/posts/**").permitAll()
+                        // GET 요청만 허용 (조회는 누구나, 수정/삭제는 로그인 필요)
                         .requestMatchers(HttpMethod.GET, "/api/recipes/**").permitAll()
 
-                        // 인증 없이 접근 가능한 URL 목록 (로그인, 회원가입, Swagger 등)
+                        // 3. 완전 허용 URL (로그인, 회원가입 등)
                         .requestMatchers(
                                 "/",
                                 "/error",
@@ -88,12 +88,10 @@ public class SecurityConfig {
                                 "/api-docs/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/h2-console/**",
-                                "/api/recipes/",
-                                "/api/recipes/*"
+                                "/h2-console/**"
                         ).permitAll()
 
-                        // 그 외 모든 요청은 인증 필요
+                        // 나머지는 인증 필요
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
