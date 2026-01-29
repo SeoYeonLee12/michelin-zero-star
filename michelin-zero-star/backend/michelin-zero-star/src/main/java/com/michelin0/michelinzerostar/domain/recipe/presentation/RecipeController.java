@@ -5,11 +5,13 @@ import com.michelin0.michelinzerostar.domain.recipe.application.RecipeService;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.CookModeCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeDetailCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeListCommand;
+import com.michelin0.michelinzerostar.domain.recipe.application.result.RecipeSaveResult;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request.RecipeListSearchCondition;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request.RecipeRegisterRequest;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.CookModeDetailResponse;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeDetailResponse;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeListResponse;
+import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeModifyResponse;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeRegisterResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -41,9 +43,9 @@ public class RecipeController {
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestBody @Valid RecipeRegisterRequest recipeRegisterRequest
     ) {
-        Long recipeId = recipeService.saveRecipe(
+        RecipeSaveResult result = recipeService.saveRecipe(
                 recipeRegisterRequest.toCommand(principal.getId()));
-        return ResponseEntity.status(HttpStatus.CREATED).body(new RecipeRegisterResponse(recipeId));
+        return ResponseEntity.status(HttpStatus.CREATED).body(RecipeRegisterResponse.from(result));
 
     }
 
@@ -59,7 +61,7 @@ public class RecipeController {
     }
 
     @PutMapping("/{recipeId}")
-    public ResponseEntity<RecipeRegisterResponse> modifyRecipe(
+    public ResponseEntity<RecipeModifyResponse> modifyRecipe(
             @AuthenticationPrincipal UserPrincipal principle,
             @PathVariable Long recipeId,
             @RequestBody @Valid RecipeRegisterRequest recipeRegisterRequest
@@ -67,7 +69,7 @@ public class RecipeController {
         Long currentUserId = (principle != null) ? principle.getId() : null;
         Long response = recipeService.updateRecipe(
                 recipeRegisterRequest.toCommand(currentUserId, recipeId));
-        return ResponseEntity.status(HttpStatus.OK).body(new RecipeRegisterResponse(response));
+        return ResponseEntity.status(HttpStatus.OK).body(new RecipeModifyResponse(response));
     }
 
     @DeleteMapping("/{recipeId}")

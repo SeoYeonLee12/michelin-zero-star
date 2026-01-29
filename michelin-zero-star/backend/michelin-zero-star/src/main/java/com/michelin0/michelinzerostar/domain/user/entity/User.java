@@ -1,8 +1,6 @@
 package com.michelin0.michelinzerostar.domain.user.entity;
 
 import com.michelin0.michelinzerostar.global.domain.SoftDeleteDomain;
-import com.michelin0.michelinzerostar.global.exception.errorcode.StarHistoryErrorCode;
-import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -116,7 +114,7 @@ public class User extends SoftDeleteDomain {
 
     public boolean validAwardReward(long todayRewardCount) {
         if (todayRewardCount >= 3) {
-            throw new GlobalException(StarHistoryErrorCode.DAILY_LIMIT_EXCEEDED);
+            return false;
         }
         return true;
     }

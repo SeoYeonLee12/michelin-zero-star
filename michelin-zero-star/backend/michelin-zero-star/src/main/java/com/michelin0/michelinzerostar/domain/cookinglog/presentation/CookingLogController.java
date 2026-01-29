@@ -2,6 +2,7 @@ package com.michelin0.michelinzerostar.domain.cookinglog.presentation;
 
 import com.michelin0.michelinzerostar.domain.auth.UserPrincipal;
 import com.michelin0.michelinzerostar.domain.cookinglog.application.CookingLogService;
+import com.michelin0.michelinzerostar.domain.cookinglog.application.result.CookingCompleteResult;
 import com.michelin0.michelinzerostar.domain.cookinglog.presentation.dto.CookingLogCompleteRequest;
 import com.michelin0.michelinzerostar.domain.cookinglog.presentation.dto.CookingLogCompleteResponse;
 import jakarta.validation.Valid;
@@ -27,9 +28,10 @@ public class CookingLogController {
             @RequestBody @Valid CookingLogCompleteRequest request
     ) {
         Long currentUserId = principal.getId();
-        Long cookingLogId = cookingLogService.saveCookingLog(currentUserId, request.recipeId());
+        CookingCompleteResult result = cookingLogService.saveCookingLog(currentUserId,
+                request.recipeId());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new CookingLogCompleteResponse(cookingLogId));
+                .body(CookingLogCompleteResponse.from(result));
     }
 
 }

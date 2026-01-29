@@ -6,6 +6,7 @@ import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeDe
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeListCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeRegisterCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeUpdateCommand;
+import com.michelin0.michelinzerostar.domain.recipe.application.result.RecipeSaveResult;
 import com.michelin0.michelinzerostar.domain.recipe.domain.Recipe;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeIngredient;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeQueryRepository;
@@ -18,6 +19,8 @@ import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModePr
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeDetailProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeListProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipesSearchCondition;
+import com.michelin0.michelinzerostar.domain.starhistory.domain.RewardSaver;
+import com.michelin0.michelinzerostar.domain.starhistory.domain.enums.StarHistoryType;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.domain.user.repository.UserRepository;
 import com.michelin0.michelinzerostar.global.exception.errorcode.RecipeErrorCode;
@@ -38,15 +41,23 @@ public class RecipeService {
     private final RecipeQueryRepository recipeQueryRepository;
     private final RecipeRepository recipeRepository;
     private final RecipeUpdate recipeUpdate;
+    private final RewardSaver rewardSaver;
 
-    public Long saveRecipe(RecipeRegisterCommand command) {
+    public RecipeSaveResult saveRecipe(RecipeRegisterCommand command) {
         User user = userRepository.getById(command.userId());
         Recipe recipe = command.toRecipe(user);
         List<RecipeStep> steps = command.toSteps();
         List<RecipeIngredient> ingredients = command.toIngredients();
         List<RecipeTag> tags = command.toTags();
         List<Long> categoryIds = command.categoryIds();
-        return recipeRegister.registerRecipe(recipe, steps, tags, ingredients, categoryIds);
+        Long recipeId = recipeRegister.registerRecipe(recipe, steps, tags, ingredients,
+                categoryIds);
+
+        double rewardRegisterAmount = recipe.getRewardRegisterAmount();
+        StarHistoryType registerType = recipe.getRewardRegisterType();
+        boolean isAwardedRecipeRegisterReward = rewardSaver.tryAward(user, rewardRegisterAmount,
+                registerType);
+        return new RecipeSaveResult(recipeId, isAwardedRecipeRegisterReward);
     }
 
     @Transactional(readOnly = true)
