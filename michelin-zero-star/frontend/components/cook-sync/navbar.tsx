@@ -93,6 +93,9 @@ export function Navbar({ onLogoClick }: NavbarProps) {
   const userLocation = user?.location ? user.location.split(" ").slice(-1)[0] : "우리 동네"
 
   const handleLogoClick = (e: React.MouseEvent) => {
+    // ✅ 라우팅 전 오디오 셧다운
+    window.dispatchEvent(new Event("cooksync:audio-shutdown"))
+
     if (onLogoClick) {
       e.preventDefault()
       onLogoClick()
@@ -104,6 +107,7 @@ export function Navbar({ onLogoClick }: NavbarProps) {
   const unreadDmCount = conversations.reduce((acc, c) => acc + c.unreadCount, 0)
 
   const handleNotificationClick = (notif: NotificationItem) => {
+    window.dispatchEvent(new Event("cooksync:audio-shutdown"))
     notificationsActions.markRead(notif.id)
     setNotificationOpen(false)
     router.push(notif.link)
@@ -130,7 +134,16 @@ export function Navbar({ onLogoClick }: NavbarProps) {
   const starStates = [true, true, true, false, false]
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header
+      className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+      // ✅ Navbar 전체: 링크 클릭이면 라우팅 전에 오디오 종료 이벤트 발사
+      onClickCapture={(e) => {
+        const t = e.target as HTMLElement | null
+        const a = t?.closest?.("a[href]")
+        if (!a) return
+        window.dispatchEvent(new Event("cooksync:audio-shutdown"))
+      }}
+    >
       <div className="mx-auto flex h-16 max-w-6xl items-center px-6">
         <Link
           href="/"

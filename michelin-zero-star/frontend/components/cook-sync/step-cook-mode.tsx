@@ -114,6 +114,7 @@ export function StepCookMode({
 
   const aiVoiceEnabledRef = React.useRef(aiVoiceEnabled)
   const aiTurnRef = React.useRef(aiTurn)
+  const shuttingDownRef = React.useRef(false)
 
   React.useEffect(() => { aiVoiceEnabledRef.current = aiVoiceEnabled }, [aiVoiceEnabled])
   React.useEffect(() => { aiTurnRef.current = aiTurn }, [aiTurn])
@@ -329,6 +330,50 @@ export function StepCookMode({
     await porcupineRef.current?.stop()
   }, [])
 
+  const stopAllAudio = React.useCallback(() => {
+    // STT 재시작 타이머 끊기
+    clearSttRetryTimer()
+
+    // STT stop
+    safeStopStt()
+
+    // STT 관련 상태도 꺼두기(재점화 방지)
+    setAiVoiceEnabledSafe(false)
+    setAiTurnSafe("listening")
+    setAiOpenSafe(false)
+
+    // KWS stop (비동기지만 cleanup에선 fire-and-forget)
+    porcupineRef.current?.stop()
+  }, [clearSttRetryTimer, safeStopStt])
+
+  const shutdownAudioForNavigation = React.useCallback(() => {
+    // ✅ 셧다운 중 플래그 (재시작 방지)
+    shuttingDownRef.current = true
+
+    // STT 재시작 타이머 끊기
+    clearSttRetryTimer()
+
+    // STT stop
+    safeStopStt()
+
+    // AI 상태 OFF
+    setAiVoiceEnabledSafe(false)
+    setAiTurnSafe("listening")
+    setAiOpenSafe(false)
+
+    // ✅ 제일 중요: 음성 제어 자체를 OFF로 내려서 KWS effect가 다시 start 못 하게 함
+    setIsListening(false)
+    isListeningRef.current = false
+
+    // KWS stop
+    porcupineRef.current?.stop()
+  }, [clearSttRetryTimer, safeStopStt])
+
+  React.useEffect(() => {
+    return () => {
+      stopAllAudio()
+    }
+  }, [stopAllAudio])
   // ====== Porcupine KWS: isListening=true AND aiOpen=false 일 때만 켜기 ======
   React.useEffect(() => {
     if (micPermission !== "granted") return
@@ -349,7 +394,7 @@ export function StepCookMode({
     // 처음 한 번만 컨트롤러 생성
     if (!porcupineRef.current) {
       porcupineRef.current = createPorcupineController({
-        accessKey: "YOUR_PRIVATE_KEY",
+        accessKey: "1r8W1qECGfTQBkcinHH2MBud1NtH832F1mw4de4VfSEY4GMgSjuYCw==",
         modelPublicPath: "/porcupine/ko.pv",
         keywords: [
           { label: "WAKE", publicPath: "/porcupine/wake.ppn" },
@@ -389,6 +434,27 @@ export function StepCookMode({
       porcupineRef.current?.stop()
     }
   }, [isListening, aiOpen, micPermission, runSttOnce, goNextStep, goPrevStep, handleStartTimer, handlePauseTimer, safeStopStt])
+
+  React.useEffect(() => {
+    const onPageHide = () => stopAllAudio()
+    const onVis = () => {
+      if (document.visibilityState === "hidden") stopAllAudio()
+    }
+
+    window.addEventListener("pagehide", onPageHide)
+    document.addEventListener("visibilitychange", onVis)
+
+    return () => {
+      window.removeEventListener("pagehide", onPageHide)
+      document.removeEventListener("visibilitychange", onVis)
+    }
+  }, [stopAllAudio])
+
+  React.useEffect(() => {
+    const onShutdown = () => shutdownAudioForNavigation()
+    window.addEventListener("cooksync:audio-shutdown", onShutdown)
+    return () => window.removeEventListener("cooksync:audio-shutdown", onShutdown)
+  }, [shutdownAudioForNavigation])
 
   // ===== AI 플로팅 이벤트 리스너(유지) =====
   React.useEffect(() => {
@@ -499,6 +565,7 @@ export function StepCookMode({
 
   // ===== 음성 제어 토글 =====
   const handleVoiceToggle = async () => {
+    if (shuttingDownRef.current) return
     if (micPermission !== "granted") {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
