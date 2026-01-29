@@ -1,8 +1,7 @@
 package com.michelin0.michelinzerostar.domain.cookinglog.domain;
 
 import com.michelin0.michelinzerostar.domain.recipe.domain.Recipe;
-import com.michelin0.michelinzerostar.domain.starhistory.domain.StarHistory;
-import com.michelin0.michelinzerostar.domain.starhistory.domain.StarHistoryRepository;
+import com.michelin0.michelinzerostar.domain.starhistory.domain.RewardSaver;
 import com.michelin0.michelinzerostar.domain.starhistory.domain.enums.StarHistoryType;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.global.exception.errorcode.CookingLogErrorCode;
@@ -17,7 +16,7 @@ import org.springframework.stereotype.Component;
 public class CookingLogSave {
 
     private final CookingLogRepository cookingLogRepository;
-    private final StarHistoryRepository starHistoryRepository;
+    private final RewardSaver rewardSaver;
 
     public Long saveCookingLog(User user, Recipe recipe) {
         if (cookingLogRepository.existsByUserAndRecipe(user, recipe)) {
@@ -27,14 +26,9 @@ public class CookingLogSave {
         CookingLog newCookingLog = new CookingLog(user, recipe);
         cookingLogRepository.save(newCookingLog);
 
-        Double rewardCompleteAmount = recipe.getRewardCompleteAmount();
-        long todayRewardCount = starHistoryRepository.countByUserAndDateBetween(user);
-        if (user.validAwardReward(todayRewardCount)) {
-            user.awardComplete(rewardCompleteAmount);
-            StarHistory newStarHistory = new StarHistory(user, StarHistoryType.COOK_COMPLETE,
-                    rewardCompleteAmount);
-            starHistoryRepository.save(newStarHistory);
-        }
+        double rewardCompleteAmount = recipe.getRewardCompleteAmount();
+        StarHistoryType type = recipe.getRewardCompleteType();
+        rewardSaver.tryAward(user, rewardCompleteAmount, type);
 
         return newCookingLog.getCookingLogId();
     }

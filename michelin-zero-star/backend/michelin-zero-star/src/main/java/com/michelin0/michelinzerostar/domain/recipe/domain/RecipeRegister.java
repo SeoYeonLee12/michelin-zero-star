@@ -4,8 +4,7 @@ import com.michelin0.michelinzerostar.domain.category.domain.Category;
 import com.michelin0.michelinzerostar.domain.category.domain.CategoryRepository;
 import com.michelin0.michelinzerostar.domain.category.domain.RecipeCategory;
 import com.michelin0.michelinzerostar.domain.category.domain.RecipeCategoryRepository;
-import com.michelin0.michelinzerostar.domain.starhistory.domain.StarHistory;
-import com.michelin0.michelinzerostar.domain.starhistory.domain.StarHistoryRepository;
+import com.michelin0.michelinzerostar.domain.starhistory.domain.RewardSaver;
 import com.michelin0.michelinzerostar.domain.starhistory.domain.enums.StarHistoryType;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.global.exception.errorcode.RecipeErrorCode;
@@ -25,7 +24,7 @@ public class RecipeRegister {
     private final RecipeTagRepository tagRepository;
     private final RecipeCategoryRepository recipeCategoryRepository;
     private final CategoryRepository categoryRepository;
-    private final StarHistoryRepository starHistoryRepository;
+    private final RewardSaver rewardSaver;
 
     @Transactional
     public Long registerRecipe(Recipe recipe,
@@ -59,13 +58,8 @@ public class RecipeRegister {
         recipeCategoryRepository.saveAll(recipeCategories);
 
         double rewardRegisterAmount = recipe.getRewardRegisterAmount();
-        long todayRewardCount = starHistoryRepository.countByUserAndDateBetween(user);
-        if (user.validAwardReward(todayRewardCount)) {
-            user.awardComplete(rewardRegisterAmount);
-            StarHistory newStarHistory = new StarHistory(user, StarHistoryType.COOK_COMPLETE,
-                    rewardRegisterAmount);
-            starHistoryRepository.save(newStarHistory);
-        }
+        StarHistoryType registerType = recipe.getRewardRegisterType();
+        rewardSaver.tryAward(user, rewardRegisterAmount, registerType);
 
         return savedRecipe.getRecipeId();
     }
