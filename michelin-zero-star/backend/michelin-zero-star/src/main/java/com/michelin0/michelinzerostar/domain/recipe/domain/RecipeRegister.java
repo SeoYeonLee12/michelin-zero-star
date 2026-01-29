@@ -5,7 +5,6 @@ import com.michelin0.michelinzerostar.domain.category.domain.CategoryRepository;
 import com.michelin0.michelinzerostar.domain.category.domain.RecipeCategory;
 import com.michelin0.michelinzerostar.domain.category.domain.RecipeCategoryRepository;
 import com.michelin0.michelinzerostar.domain.starhistory.domain.RewardSaver;
-import com.michelin0.michelinzerostar.domain.starhistory.domain.enums.StarHistoryType;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.global.exception.errorcode.RecipeErrorCode;
 import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
@@ -56,10 +55,6 @@ public class RecipeRegister {
         stepRepository.saveAll(steps);
         tagRepository.saveAll(tags);
         recipeCategoryRepository.saveAll(recipeCategories);
-
-        double rewardRegisterAmount = recipe.getRewardRegisterAmount();
-        StarHistoryType registerType = recipe.getRewardRegisterType();
-        rewardSaver.tryAward(user, rewardRegisterAmount, registerType);
 
         return savedRecipe.getRecipeId();
     }

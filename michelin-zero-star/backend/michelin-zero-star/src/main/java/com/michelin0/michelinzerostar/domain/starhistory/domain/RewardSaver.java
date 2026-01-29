@@ -11,7 +11,6 @@ public class RewardSaver {
 
     private final StarHistoryRepository starHistoryRepository;
 
-    // TODO 응답 어떻게 할 지 고민..
     public boolean tryAward(User user, double rewardAmount, StarHistoryType type) {
         long todayRewardCount = starHistoryRepository.countByUserAndDateBetween(user);
         if (user.validAwardReward(todayRewardCount)) {

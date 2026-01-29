@@ -2,7 +2,6 @@ package com.michelin0.michelinzerostar.domain.cookinglog.domain;
 
 import com.michelin0.michelinzerostar.domain.recipe.domain.Recipe;
 import com.michelin0.michelinzerostar.domain.starhistory.domain.RewardSaver;
-import com.michelin0.michelinzerostar.domain.starhistory.domain.enums.StarHistoryType;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.global.exception.errorcode.CookingLogErrorCode;
 import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
@@ -22,14 +21,8 @@ public class CookingLogSave {
         if (cookingLogRepository.existsByUserAndRecipe(user, recipe)) {
             throw new GlobalException(CookingLogErrorCode.ALREADY_EXISTS_LOG);
         }
-
         CookingLog newCookingLog = new CookingLog(user, recipe);
         cookingLogRepository.save(newCookingLog);
-
-        double rewardCompleteAmount = recipe.getRewardCompleteAmount();
-        StarHistoryType type = recipe.getRewardCompleteType();
-        rewardSaver.tryAward(user, rewardCompleteAmount, type);
-
         return newCookingLog.getCookingLogId();
     }
 }
