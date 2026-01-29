@@ -3,6 +3,7 @@ package com.michelin0.michelinzerostar.domain.recipe.application;
 
 import com.michelin0.michelinzerostar.domain.recipe.application.command.CookModeCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeDetailCommand;
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeListCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeRegisterCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeUpdateCommand;
 import com.michelin0.michelinzerostar.domain.recipe.domain.Recipe;
@@ -15,12 +16,16 @@ import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeTag;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeUpdate;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModeProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeDetailProjection;
+import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeListProjection;
+import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipesSearchCondition;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.domain.user.repository.UserRepository;
 import com.michelin0.michelinzerostar.global.exception.errorcode.RecipeErrorCode;
 import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,7 +66,7 @@ public class RecipeService {
         recipeUpdate.updateRecipe(command.recipeId(), recipe, ingredient, steps, tags, categoryIds);
         return command.recipeId();
     }
-    
+
     public void deleteRecipe(Long recipeId, Long userId) {
         Recipe searchedRecipe = recipeRepository.getById(recipeId);
         searchedRecipe.validateRecipeEnrolledUser(userId);
@@ -74,5 +79,17 @@ public class RecipeService {
         CookModeProjection projection = recipeQueryRepository.findRecipeStepByRecipeId(recipeId)
                 .orElseThrow(() -> new GlobalException(RecipeErrorCode.RECIPE_NOT_FOUND));
         return CookModeCommand.from(projection);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<RecipeListCommand> getRecipeList(
+            RecipesSearchCondition condition,
+            Pageable pageable,
+            Long userId
+    ) {
+        Page<RecipeListProjection> result = recipeQueryRepository.findAllRecipes(condition,
+                pageable,
+                userId);
+        return result.map(RecipeListCommand::from);
     }
 }

@@ -33,7 +33,7 @@ public class UserFavoriteCategory {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "categories_id", nullable = false)
     private Category category;
-    
+
     @Builder
     public UserFavoriteCategory(User user, Category category) {
         this.user = user;
