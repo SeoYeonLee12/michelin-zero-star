@@ -266,7 +266,7 @@ export default function MyPage() {
 
         {/* ✅ Tabs 레이아웃 시작: aside와 content를 모두 감쌈 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="flex flex-col md:flex-row gap-8 items-start relative mt-8">
+          <div className="flex flex-col md:flex-row gap-8 items-start relative mt-4">
             
             {/* [좌측 사이드바] 스크롤 시 상단 고정 */}
             <aside className="hidden md:block w-1/5 sticky top-24 shrink-0">
@@ -277,7 +277,7 @@ export default function MyPage() {
                   { id: "saved", label: "저장한 레시피", icon: Bookmark },
                   { id: "myRecipes", label: "내 레시피", icon: ChefHat },
                   { id: "myPosts", label: "내 나눔", icon: FileText },
-                  { id: "likedPosts", label: "관심있는 나눔", icon: Heart },
+                  { id: "likedPosts", label: "관심 있는 나눔", icon: Heart },
                 ].map((item) => (
                   <button
                     key={item.id}
