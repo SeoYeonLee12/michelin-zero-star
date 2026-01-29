@@ -52,6 +52,10 @@ public class RecipeRegister {
         tagRepository.saveAll(tags);
         recipeCategoryRepository.saveAll(recipeCategories);
 
+        double registerRewardAmount= recipe.getRewardRegisterAmount();
+
+        if()
+
         return savedRecipe.getRecipeId();
     }
 }

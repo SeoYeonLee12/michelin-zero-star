@@ -107,6 +107,10 @@ public class Recipe extends SoftDeleteDomain {
         this.nutrition = updatedRecipe.getNutrition();
     }
 
+    public Double getRewardRegisterAmount() {
+        return StarHistoryType.RECIPE_REGISTER.getAmount();
+    }
+
     public Double getRewardCompleteAmount() {
         return StarHistoryType.COOK_COMPLETE.getAmount();
     }
