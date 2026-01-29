@@ -4,6 +4,10 @@ import com.michelin0.michelinzerostar.domain.category.domain.Category;
 import com.michelin0.michelinzerostar.domain.category.domain.CategoryRepository;
 import com.michelin0.michelinzerostar.domain.category.domain.RecipeCategory;
 import com.michelin0.michelinzerostar.domain.category.domain.RecipeCategoryRepository;
+import com.michelin0.michelinzerostar.domain.starhistory.domain.StarHistory;
+import com.michelin0.michelinzerostar.domain.starhistory.domain.StarHistoryRepository;
+import com.michelin0.michelinzerostar.domain.starhistory.domain.enums.StarHistoryType;
+import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.global.exception.errorcode.RecipeErrorCode;
 import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
 import java.util.List;
@@ -21,6 +25,7 @@ public class RecipeRegister {
     private final RecipeTagRepository tagRepository;
     private final RecipeCategoryRepository recipeCategoryRepository;
     private final CategoryRepository categoryRepository;
+    private final StarHistoryRepository starHistoryRepository;
 
     @Transactional
     public Long registerRecipe(Recipe recipe,
@@ -29,7 +34,8 @@ public class RecipeRegister {
             List<RecipeIngredient> ingredients,
             List<Long> categoryIds
     ) {
-        if (recipeRepository.existsByUserIdAndTitle(recipe.getUser().getId(), recipe.getTitle())) {
+        User user = recipe.getUser();
+        if (recipeRepository.existsByUserIdAndTitle(user.getId(), recipe.getTitle())) {
             throw new GlobalException(RecipeErrorCode.RECIPE_ALREADY_EXISTS);
         }
 
@@ -52,9 +58,14 @@ public class RecipeRegister {
         tagRepository.saveAll(tags);
         recipeCategoryRepository.saveAll(recipeCategories);
 
-        double registerRewardAmount= recipe.getRewardRegisterAmount();
-
-        if()
+        double rewardRegisterAmount = recipe.getRewardRegisterAmount();
+        long todayRewardCount = starHistoryRepository.countByUserAndDateBetween(user);
+        if (user.validAwardReward(todayRewardCount)) {
+            user.awardComplete(rewardRegisterAmount);
+            StarHistory newStarHistory = new StarHistory(user, StarHistoryType.COOK_COMPLETE,
+                    rewardRegisterAmount);
+            starHistoryRepository.save(newStarHistory);
+        }
 
         return savedRecipe.getRecipeId();
     }

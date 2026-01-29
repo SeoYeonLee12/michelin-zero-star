@@ -7,9 +7,6 @@ import com.michelin0.michelinzerostar.domain.starhistory.domain.enums.StarHistor
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.global.exception.errorcode.CookingLogErrorCode;
 import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -29,22 +26,16 @@ public class CookingLogSave {
 
         CookingLog newCookingLog = new CookingLog(user, recipe);
         cookingLogRepository.save(newCookingLog);
-        Double rewardCompleteAmount = recipe.getRewardCompleteAmount();
 
-        LocalDate today = LocalDate.now();
-        LocalDateTime startOfDay = today.atStartOfDay();
-        LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
-        long todayRewardCount = starHistoryRepository.countByUserAndCreatedAtBetween(
-                user, startOfDay, endOfDay);
-        log.debug("Today Date: {} startOfDay: {} endOfDay: {} todayRewardCount: {}",
-                today, startOfDay, endOfDay, todayRewardCount);
+        Double rewardCompleteAmount = recipe.getRewardCompleteAmount();
+        long todayRewardCount = starHistoryRepository.countByUserAndDateBetween(user);
         if (user.validAwardReward(todayRewardCount)) {
             user.awardComplete(rewardCompleteAmount);
+            StarHistory newStarHistory = new StarHistory(user, StarHistoryType.COOK_COMPLETE,
+                    rewardCompleteAmount);
+            starHistoryRepository.save(newStarHistory);
         }
 
-        StarHistory newStarHistory = new StarHistory(user, StarHistoryType.COOK_COMPLETE,
-                rewardCompleteAmount);
-        starHistoryRepository.save(newStarHistory);
         return newCookingLog.getCookingLogId();
     }
 }
