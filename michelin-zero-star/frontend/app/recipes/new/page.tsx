@@ -71,7 +71,7 @@ const CATEGORY_MAP: Record<string, number> = {
 
 export default function NewRecipePage() {
   const router = useRouter()
-  const { isLoggedIn, addUserRecipe } = useAuth()
+  const { isLoggedIn, addUserRecipe, isLoading } = useAuth() // ✅ Added isLoading
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [category, setCategory] = useState("")
@@ -91,6 +91,9 @@ export default function NewRecipePage() {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [exitDialogOpen, setExitDialogOpen] = useState(false)
   const [savedDialogOpen, setSavedDialogOpen] = useState(false)
+
+  // ✅ Wait for loading
+  if (isLoading) return null
 
   if (!isLoggedIn) {
     router.push("/login")

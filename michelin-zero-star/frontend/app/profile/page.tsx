@@ -28,7 +28,7 @@ const categoryOptions = [
 
 export default function ProfileEditPage() {
   const router = useRouter()
-  const { user, isLoggedIn, updateProfile, updateLocation, withdraw } = useAuth()
+  const { user, isLoggedIn, updateProfile, updateLocation, withdraw, isLoading: isAuthLoading } = useAuth() // ✅ Added
 
   const [isLoading, setIsLoading] = React.useState(false)
   const [isGettingLocation, setIsGettingLocation] = React.useState(false)
@@ -38,6 +38,8 @@ export default function ProfileEditPage() {
   const [pendingLocation, setPendingLocation] = React.useState("")
   const [pendingCoordinates, setPendingCoordinates] = React.useState<{ latitude: number; longitude: number } | null>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  // ... ref fix not needed if not crashing ...
+
   const [profileImagePreview, setProfileImagePreview] = React.useState<string | null>(null)
 
   const [formData, setFormData] = React.useState({
@@ -55,10 +57,11 @@ export default function ProfileEditPage() {
   })
 
   React.useEffect(() => {
-    if (!isLoggedIn) {
+    // ✅ Wait for loading
+    if (!isAuthLoading && !isLoggedIn) {
       router.push("/login")
     }
-  }, [isLoggedIn, router])
+  }, [isAuthLoading, isLoggedIn, router])
 
   React.useEffect(() => {
     if (user) {
@@ -225,6 +228,8 @@ export default function ProfileEditPage() {
     { label: "영문 포함", met: /[a-zA-Z]/.test(passwordData.newPassword) },
     { label: "숫자 포함", met: /\d/.test(passwordData.newPassword) },
   ]
+
+  if (isAuthLoading) return null // ✅ Loading
 
   if (!isLoggedIn) {
     return null

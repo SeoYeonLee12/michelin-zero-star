@@ -60,6 +60,7 @@ export default function MyPage() {
   const {
     user,
     isLoggedIn,
+    isLoading, // ✅ Added
     likedRecipes,
     toggleLikeRecipe,
     userRecipes,
@@ -83,8 +84,11 @@ export default function MyPage() {
   const [isLoadingPosts, setIsLoadingPosts] = React.useState(false)
 
   React.useEffect(() => {
-    if (!isLoggedIn) router.push("/login")
-  }, [isLoggedIn, router])
+    // ✅ Wait for loading to finish before redirecting
+    if (!isLoading && !isLoggedIn) {
+      router.push("/login")
+    }
+  }, [isLoading, isLoggedIn, router])
 
   // Fetch My Posts
   React.useEffect(() => {
@@ -132,6 +136,7 @@ export default function MyPage() {
     }
   }, [isLoggedIn, user?.stars])
 
+  if (isLoading) return null // ✅ Loading state
   if (!isLoggedIn) return null
 
   const totalStars = user?.stars || 0

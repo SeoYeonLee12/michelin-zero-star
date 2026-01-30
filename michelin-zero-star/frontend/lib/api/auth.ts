@@ -24,10 +24,7 @@ export type LoginRequest = {
 
 
 export type LoginResponse = {
-  grantType: string
   accessToken: string
-  refreshToken: string
-  accessTokenExpiresIn: number
 }
 
 
@@ -59,7 +56,7 @@ export function logout() {
 
 // ✅ 추가: 토큰 갱신 (쿠키의 리프레시 토큰 사용)
 export function refreshAccessToken() {
-  return apiFetch<LoginResponse>("/api/v1/auth/refresh", {
+  return apiFetch<LoginResponse>("/api/v1/auth/reissue", {
     method: "POST",
   })
 }

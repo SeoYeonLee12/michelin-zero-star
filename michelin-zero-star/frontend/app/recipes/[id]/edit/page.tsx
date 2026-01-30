@@ -72,7 +72,7 @@ export default function EditRecipePage() {
     const router = useRouter()
     const params = useParams()
     const recipeId = params.id as string
-    const { isLoggedIn } = useAuth()
+    const { isLoggedIn, isLoading: isAuthLoading } = useAuth() // ✅ Added isAuthLoading
 
     const [isLoading, setIsLoading] = useState(true)
     const [title, setTitle] = useState("")
@@ -148,12 +148,15 @@ export default function EditRecipePage() {
             }
         }
 
+        // ✅ Wait for Auth Loading
+        if (isAuthLoading) return
+
         if (isLoggedIn) {
             loadRecipe()
         } else {
             router.push("/login")
         }
-    }, [recipeId, isLoggedIn, router])
+    }, [recipeId, isLoggedIn, isAuthLoading, router]) // ✅ Added dependency
 
 
     const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -328,11 +331,13 @@ export default function EditRecipePage() {
 
     const currentStep = steps[currentStepIndex]
 
-    if (isLoading) {
+    if (isAuthLoading || isLoading) { // ✅ Check both loading states
         return (
             <div className="flex min-h-screen flex-col items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-[#800020]" />
-                <p className="mt-4 text-muted-foreground">레시피 정보를 불러오는 중입니다...</p>
+                <p className="mt-4 text-muted-foreground">
+                    {isAuthLoading ? "사용자 정보를 확인 중입니다..." : "레시피 정보를 불러오는 중입니다..."}
+                </p>
             </div>
         )
     }
