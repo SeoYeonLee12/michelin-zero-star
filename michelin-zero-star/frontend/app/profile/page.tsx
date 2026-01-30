@@ -16,14 +16,16 @@ import { Camera, ArrowLeft, Eye, EyeOff, Check, X, MapPin, Loader2, Trash2 } fro
 import Link from "next/link"
 
 const categoryOptions = [
-  { value: "korean", label: "한식" },
-  { value: "chinese", label: "중식" },
-  { value: "japanese", label: "일식" },
-  { value: "western", label: "양식" },
-  { value: "dessert", label: "디저트" },
-  { value: "snack", label: "분식" },
-  { value: "salad", label: "샐러드" },
-  { value: "drink", label: "음료" },
+  { value: "1", label: "밥" },
+  { value: "2", label: "반찬" },
+  { value: "3", label: "국물" },
+  { value: "4", label: "면" },
+  { value: "5", label: "디저트" },
+  { value: "6", label: "분식" },
+  { value: "7", label: "샐러드" },
+  { value: "8", label: "음료" },
+  { value: "9", label: "기타" },
+  { value: "10", label: "야식&술안주" },
 ]
 
 export default function ProfileEditPage() {

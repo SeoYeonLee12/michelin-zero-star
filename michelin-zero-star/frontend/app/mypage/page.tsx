@@ -270,11 +270,11 @@ export default function MyPage() {
                       <CollapsibleContent className="absolute z-50 mt-2 w-64 bg-white border rounded-lg shadow-xl p-4">
                         <div className="space-y-3 text-sm">
                           <div className="p-2 bg-muted rounded-lg">
-                            <p className="font-medium mb-1">별 획득 방법</p>
+                            <p className="font-medium mb-1">스타 획득 방법</p>
                             <ul className="space-y-0.5 text-muted-foreground text-xs">
-                              <li>• 요리 완료: 1개</li>
-                              <li>• 레시피 등록: 2개</li>
-                              <li>• 나눔 완료: 1개</li>
+                              <li>• 요리 완료: 0.5개</li>
+                              <li>• 레시피 등록: 1개</li>
+                              {/* <li>• 나눔 완료: 1개</li> */}
                             </ul>
                           </div>
                           <div className="p-2 bg-muted rounded-lg">

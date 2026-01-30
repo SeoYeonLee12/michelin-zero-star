@@ -198,24 +198,40 @@ export default function HomePage() {
       <ScrollToTop />
 
       <main className="flex-1">
-        <div className="container mx-auto max-w-7xl px-4 py-8 min-h-[calc(100vh-200px)]">
+        <div className="container mx-auto max-w-7xl px-4 py-4 min-h-[calc(100vh-200px)]">
           {/* Back Button */}
           {viewState !== "chat" && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+              {/* <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleBack}
+                  className="mb-4 text-muted-foreground hover:text-foreground hover:bg-accent"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4 hover" />
+                  뒤로 가기
+                </Button> */}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleBack}
-                className="mb-4 text-muted-foreground hover:text-foreground hover:bg-accent"
+                className="
+                    mb-4
+                    text-muted-foreground
+                    hover:text-foreground
+                    hover:bg-transparent
+                    focus-visible:ring-0
+                    focus-visible:ring-offset-0
+                  "
               >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                뒤로가기
+                <ArrowLeft className="mr-0 h-4 w-4" />
+                뒤로 가기
               </Button>
             </motion.div>
           )}
 
           {/* Status Badge */}
-          <div className="mb-6 flex justify-center"></div>
+          <div className="mb-0 flex justify-center"></div>
 
           {/* Chat View */}
           {viewState === "chat" && (

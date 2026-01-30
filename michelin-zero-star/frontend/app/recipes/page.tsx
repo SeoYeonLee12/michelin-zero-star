@@ -10,7 +10,7 @@ import { ScrollToTop } from "@/components/cook-sync/scroll-to-top"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, ChevronLeft, ChevronRight, Plus } from "lucide-react"
+import { Search, ChevronLeft, ChevronRight, Plus, Lock } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -399,7 +399,7 @@ export default function RecipesPage() {
         )}
       </main>
 
-      <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
+      {/* <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>로그인이 필요한 서비스입니다</DialogTitle>
@@ -418,6 +418,45 @@ export default function RecipesPage() {
               로그인 하러가기
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog> */}
+      {/* Modern Minimal Login Dialog */}
+      <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
+        <DialogContent className="sm:max-w-[360px] p-6 border border-border/50 shadow-xl rounded-2xl gap-0">
+          <DialogHeader className="space-y-3 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#800020]/10 flex items-center justify-center">
+                <Lock className="h-5 w-5 text-[#800020]" />
+              </div>
+              <div className="text-left">
+                <DialogTitle className="text-lg font-semibold">
+                  로그인이 필요합니다
+                </DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground">
+                  로그인하고 미슐랭 스타를 획득해보세요!
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="flex gap-2 pt-2">
+            <Button
+              variant="outline"
+              className="flex-1 h-10 bg-transparent hover:bg-muted/50 rounded-lg font-medium text-sm"
+              onClick={() => setShowLoginDialog(false)}
+            >
+              취소
+            </Button>
+            <Button
+              className="flex-1 h-10 bg-[#800020] hover:bg-[#800020]/90 text-white font-medium rounded-lg text-sm"
+              onClick={() => {
+                setShowLoginDialog(false)
+                router.push("/login")
+              }}
+            >
+              로그인
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

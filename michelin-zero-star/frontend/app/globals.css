@@ -8,6 +8,7 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0);
@@ -130,18 +131,14 @@
 @keyframes enter {
   from {
     opacity: var(--tw-enter-opacity, 1);
-    transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0)
-      scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), var(--tw-enter-scale, 1))
-      rotate(var(--tw-enter-rotate, 0));
+    transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0) scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), var(--tw-enter-scale, 1)) rotate(var(--tw-enter-rotate, 0));
   }
 }
 
 @keyframes exit {
   to {
     opacity: var(--tw-exit-opacity, 1);
-    transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0)
-      scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1))
-      rotate(var(--tw-exit-rotate, 0));
+    transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0) scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1)) rotate(var(--tw-exit-rotate, 0));
   }
 }
 
@@ -168,12 +165,15 @@
 .fade-in-0 {
   --tw-enter-opacity: 0;
 }
+
 .fade-out-0 {
   --tw-exit-opacity: 0;
 }
+
 .fade-in {
   --tw-enter-opacity: 0;
 }
+
 .fade-out {
   --tw-exit-opacity: 0;
 }
@@ -181,6 +181,7 @@
 .zoom-in-95 {
   --tw-enter-scale: 0.95;
 }
+
 .zoom-out-95 {
   --tw-exit-scale: 0.95;
 }
@@ -188,9 +189,11 @@
 .slide-in-from-top {
   --tw-enter-translate-y: -100%;
 }
+
 .slide-in-from-top-2 {
   --tw-enter-translate-y: -0.5rem;
 }
+
 .slide-out-to-top {
   --tw-exit-translate-y: -100%;
 }
@@ -198,9 +201,11 @@
 .slide-in-from-bottom {
   --tw-enter-translate-y: 100%;
 }
+
 .slide-in-from-bottom-2 {
   --tw-enter-translate-y: 0.5rem;
 }
+
 .slide-out-to-bottom {
   --tw-exit-translate-y: 100%;
 }
@@ -208,9 +213,11 @@
 .slide-in-from-left {
   --tw-enter-translate-x: -100%;
 }
+
 .slide-in-from-left-2 {
   --tw-enter-translate-x: -0.5rem;
 }
+
 .slide-out-to-left {
   --tw-exit-translate-x: -100%;
 }
@@ -218,9 +225,11 @@
 .slide-in-from-right {
   --tw-enter-translate-x: 100%;
 }
+
 .slide-in-from-right-2 {
   --tw-enter-translate-x: 0.5rem;
 }
+
 .slide-out-to-right {
   --tw-exit-translate-x: 100%;
 }
@@ -232,6 +241,7 @@
     transform: translateY(8px) scale(0.98);
     filter: blur(4px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -240,20 +250,24 @@
 }
 
 @keyframes pulse-listening {
+
   0%,
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
 }
 
 @keyframes pulse-slow {
+
   0%,
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.6;
   }
@@ -264,6 +278,7 @@
     transform: translateY(100%);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -275,6 +290,7 @@
     transform: translateY(100%);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -286,6 +302,7 @@
     transform: translateY(-100%);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -293,10 +310,12 @@
 }
 
 @keyframes wave-char {
+
   0%,
   100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-3px);
   }
@@ -305,21 +324,27 @@
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out forwards;
 }
+
 .animate-pulse-listening {
   animation: pulse-listening 1.5s ease-in-out infinite;
 }
+
 .animate-pulse-slow {
   animation: pulse-slow 2.5s ease-in-out infinite;
 }
+
 .animate-slide-up {
   animation: slide-up 0.2s ease-out forwards;
 }
+
 .animate-slide-up-number {
   animation: slide-up-number 0.15s ease-out forwards;
 }
+
 .animate-slide-down-number {
   animation: slide-down-number 0.15s ease-out forwards;
 }
+
 .animate-wave-char {
   display: inline-block;
   animation: wave-char 1.5s ease-in-out infinite;
@@ -338,17 +363,26 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
 }
 
+/* Prevent layout shift when scrollbars appear/disappear */
 html {
-scrollbar-gutter: stable;
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
 }
 
-
-/* scrollbar-gutter 지원이 애매한 환경까지 커버하려면 */
 body {
-overflow-y: scroll;
+  scrollbar-gutter: stable;
+  /* Ensure scrollbar space is always reserved, even when overflow is hidden */
+  width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Prevent layout shift when Radix UI components lock body scroll */
+body[style*="overflow: hidden"] {
+  padding-right: 0 !important;
 }
