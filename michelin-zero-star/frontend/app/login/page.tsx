@@ -28,6 +28,7 @@ export default function LoginPage() {
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [isLoading, setIsLoading] = React.useState(false)
+  const [errorMessage, setErrorMessage] = React.useState("") // ✅ 에러 메시지 상태 추가
 
   const handleSocialLogin = (provider: "google" | "naver" | "kakao") => {
     window.location.href = `http://localhost:8080/oauth2/authorization/${provider}`
@@ -59,11 +60,13 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setErrorMessage("") // 초기화
     try {
       await login(email, password)
       router.push("/")
     } catch (error) {
       console.error(error)
+      setErrorMessage("이메일 또는 비밀번호가 올바르지 않습니다.") // ✅ 에러 설정
     } finally {
       setIsLoading(false)
     }
@@ -164,6 +167,12 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* ✅ 에러 메시지 표시 */}
+            {errorMessage && (
+              <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md">
+                {errorMessage}
+              </div>
+            )}
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">이메일</Label>

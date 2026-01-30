@@ -17,9 +17,10 @@ interface RecipeCardProps {
   onDelete?: (recipeId: string) => void
   onClick?: () => void
   hideImage?: boolean
+  showAuthor?: boolean
 }
 
-export function RecipeCard({ recipe, isLiked, onHeartClick, onEdit, onDelete, onClick, hideImage }: RecipeCardProps) {
+export function RecipeCard({ recipe, isLiked, onHeartClick, onEdit, onDelete, onClick, hideImage, showAuthor }: RecipeCardProps) {
   // const handleRatingDisplay = (rating: number | string | undefined) => {
   //   if (!rating) return "0"
   //   const numRating = typeof rating === "string" ? parseFloat(rating) : rating
@@ -30,21 +31,21 @@ export function RecipeCard({ recipe, isLiked, onHeartClick, onEdit, onDelete, on
 
   // const renderMichelinStars = (rating: number | string | undefined) => {
   //   if (!rating) return null
-    
+
   //   const numRating = typeof rating === "string" ? parseFloat(rating) : rating
   //   if (isNaN(numRating)) return null
-    
+
   //   const fullStars = Math.floor(numRating)
   //   const hasHalfStar = numRating % 1 !== 0
   //   const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0)
-    
+
   //   return (
   //     <div className="flex items-center gap-0.5">
   //       {/* Full stars */}
   //       {Array.from({ length: fullStars }).map((_, i) => (
   //         <img key={`full-${i}`} src="/michelin-star.png" alt="미슐랭" className="h-4 w-4" />
   //       ))}
-        
+
   //       {/* Half star */}
   //       {hasHalfStar && (
   //         <img
@@ -79,7 +80,7 @@ export function RecipeCard({ recipe, isLiked, onHeartClick, onEdit, onDelete, on
           />
         ) : (
           <Image
-            src={recipe.image || "/placeholder.svg"}
+            src={recipe.thumbnail || "/placeholder.svg"}
             alt={recipe.name}
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-300"
@@ -145,7 +146,14 @@ export function RecipeCard({ recipe, isLiked, onHeartClick, onEdit, onDelete, on
       </div>
       <div className="p-3">
         <div className="flex items-start justify-between gap-2 mb-2">
-          <h3 className="font-semibold text-base leading-tight line-clamp-2 flex-1">{recipe.name}</h3>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-base leading-tight line-clamp-2">{recipe.name}</h3>
+            {showAuthor && recipe.author && (
+              <span className="text-xs text-muted-foreground truncate block mt-0.5">
+                by {recipe.author}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-1 shrink-0">
             <img
               src="/michelin-star.png"

@@ -38,6 +38,18 @@ import {
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
+import { deleteRecipe } from "@/lib/api/recipes"
+import { getCookie } from "@/lib/cookie"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface RecipeDetailViewProps {
   recipe: Recipe
@@ -142,6 +154,29 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
   const [currentPage, setCurrentPage] = React.useState(1)
   const [recipeRating, setRecipeRating] = React.useState(4.5)
   const [nutritionOpen, setNutritionOpen] = React.useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
+
+  const handleEditRecipe = () => {
+    router.push(`/recipes/${recipe.id}/edit`)
+  }
+
+  const handleDeleteRecipe = async () => {
+    try {
+      const token = getCookie("cooksync_access_token")
+      if (!token) {
+        alert("로그인이 필요합니다.")
+        return
+      }
+      await deleteRecipe(recipe.id, token)
+      alert("레시피가 삭제되었습니다.")
+      router.push("/recipes")
+    } catch (error) {
+      console.error("Failed to delete recipe:", error)
+      alert("레시피 삭제에 실패했습니다.")
+    } finally {
+      setDeleteDialogOpen(false)
+    }
+  }
 
   const userAlreadyReviewed = hasUserReviewedRecipe(recipe.id)
   const isLiked = isRecipeLiked(recipe.id)
@@ -162,10 +197,9 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
     })
 
     // Also check for recipe-level ingredients (from new recipe form)
-    if (ingredientMap.size === 0 && (recipe as any).ingredients) {
-      const recipeIngredients = (recipe as any).ingredients
-      if (Array.isArray(recipeIngredients)) {
-        recipeIngredients.forEach((ing: { name: string; amount: string }) => {
+    if (ingredientMap.size === 0 && recipe.ingredients) {
+      if (Array.isArray(recipe.ingredients)) {
+        recipe.ingredients.forEach((ing) => {
           ingredientMap.set(ing.name, ing.amount || "적당량")
         })
       }
@@ -231,7 +265,7 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
       id: recipe.id,
       title: recipe.name,
       image: recipe.thumbnail || "/placeholder.svg",
-      author: recipe.author ?? "",
+      author: typeof recipe.author === "object" ? recipe.author?.name || "" : recipe.author || "",
       savedAt: "",
     })
 
@@ -353,6 +387,26 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
             >
               <Share2 className="h-4 w-4" />
             </Button>
+            {recipe.isMine && (
+              <>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="rounded-full bg-transparent"
+                  onClick={handleEditRecipe}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="rounded-full bg-transparent text-red-500 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -740,7 +794,6 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
         </div>
       </div>
 
-      {/* Share Dialog */}
       <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <div className="space-y-4">
@@ -755,6 +808,23 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>레시피 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              정말로 이 레시피를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteRecipe} className="bg-red-600 hover:bg-red-700">
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

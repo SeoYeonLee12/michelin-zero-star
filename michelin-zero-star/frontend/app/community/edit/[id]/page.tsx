@@ -27,11 +27,13 @@ import { ArrowLeft, Upload, X, MapPin, Receipt } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import Image from "next/image"
 
+import { getPostDetail, updatePost } from "@/lib/api/market"
+
 export default function EditPostPage() {
   const router = useRouter()
   const params = useParams()
   const postId = params.id as string
-  const { isLoggedIn, userPosts, updateUserPost } = useAuth()
+  const { isLoggedIn } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
@@ -44,6 +46,7 @@ export default function EditPostPage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showExitDialog, setShowExitDialog] = useState(false)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -51,40 +54,45 @@ export default function EditPostPage() {
       return
     }
 
-    const post = userPosts.find((p) => p.id === postId)
-    if (post) {
-      setFormData({
-        title: post.title,
-        description: post.description,
-        price: post.price,
-        place: (post as any).place || "",
-      })
-      if (post.image) {
-        setImages([post.image])
+    async function fetchPost() {
+      try {
+        const post = await getPostDetail(postId)
+        if (post) {
+          // 본인 게시글인지 확인
+          if (!post.owner) {
+            alert("수정 권한이 없습니다.")
+            router.push("/community")
+            return
+          }
+
+          setFormData({
+            title: post.title,
+            description: post.content, // API field is content
+            price: String(post.price),
+            place: post.meetingPlace || post.location,
+          })
+          if (post.imageUrls) {
+            setImages(post.imageUrls)
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch post", error)
+        router.push("/community")
+      } finally {
+        setLoading(false)
       }
-    } else {
-      router.push("/mypage")
     }
-  }, [isLoggedIn, postId, userPosts, router])
+    fetchPost()
+  }, [isLoggedIn, postId, router])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files) return
-
-    const remainingSlots = 5 - images.length
-    const filesToProcess = Array.from(files).slice(0, remainingSlots)
-
-    filesToProcess.forEach((file) => {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImages((prev) => [...prev, reader.result as string])
-      }
-      reader.readAsDataURL(file)
-    })
+    // 이미지 수정 기능 미지원 (API 제한)
+    alert("현재 이미지 수정은 지원하지 않습니다.")
   }
 
   const removeImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index))
+    // 이미지 수정 기능 미지원
+    alert("현재 이미지 수정은 지원하지 않습니다.")
   }
 
   const handleSubmit = () => {
@@ -95,23 +103,28 @@ export default function EditPostPage() {
     setShowConfirmDialog(true)
   }
 
-  const confirmSubmit = () => {
-    updateUserPost(postId, {
-      title: formData.title,
-      description: formData.description,
-      price: formData.price || "가격 협의",
-      image: images[0] || "/placeholder.svg",
-      place: formData.place || "장소 미정",
-    } as any)
+  const confirmSubmit = async () => {
+    try {
+      await updatePost(postId, {
+        title: formData.title,
+        content: formData.description,
+        price: parseInt(formData.price.replace(/[^0-9]/g, "")) || 0,
+        meetingPlace: formData.place
+      })
+      alert("게시글이 수정되었습니다.")
+      router.push(`/community/${postId}`)
+    } catch (error) {
+      console.error("Update failed", error)
+      alert("수정 실패")
+    }
     setShowConfirmDialog(false)
-    router.push("/mypage")
   }
 
   const handleCancel = () => {
     setShowExitDialog(true)
   }
 
-  if (!isLoggedIn) return null
+  if (!isLoggedIn || loading) return null // Loading indicator can be added
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -133,10 +146,10 @@ export default function EditPostPage() {
             <CardTitle className="text-lg">기본 정보</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Image Upload */}
-            <div className="space-y-2">
+            {/* Image Upload - Read Only */}
+            <div className="space-y-2 opacity-60 pointer-events-none">
               <Label>
-                이미지 <span className="text-muted-foreground text-sm">(최대 5장)</span>
+                이미지 <span className="text-muted-foreground text-sm">(수정 불가)</span>
               </Label>
               <div className="flex flex-wrap gap-3">
                 {images.map((img, idx) => (
@@ -145,43 +158,10 @@ export default function EditPostPage() {
                       src={img || "/placeholder.svg"}
                       alt={`Image ${idx + 1}`}
                       fill
-                      className="object-cover cursor-pointer"
-                      onClick={() => setPreviewImage(img)}
+                      className="object-cover"
                     />
-                    {idx === 0 && (
-                      <Badge className="absolute top-1 left-1 bg-[#800020] text-white text-[10px] px-1.5 py-0.5">
-                        대표
-                      </Badge>
-                    )}
-                    <button
-                      onClick={() => removeImage(idx)}
-                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
                   </div>
                 ))}
-                {images.length < 5 && (
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-24 h-24 rounded-lg border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center text-muted-foreground hover:border-[#800020] hover:text-[#800020] transition-colors"
-                  >
-                    <Upload className="h-6 w-6 mb-1" />
-                    <span className="text-xs">추가</span>
-                  </button>
-                )}
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={handleImageUpload}
-              />
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
-                <Receipt className="h-4 w-4 shrink-0" />
-                <span>신뢰를 위해 영수증을 함께 첨부해보세요</span>
               </div>
             </div>
 
@@ -214,10 +194,10 @@ export default function EditPostPage() {
 
             {/* Price */}
             <div className="space-y-2">
-              <Label htmlFor="price">가격</Label>
+              <Label htmlFor="price">가격 (숫자만 입력)</Label>
               <Input
                 id="price"
-                placeholder="예: 1,000원, 무료나눔"
+                placeholder="예: 1000"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
               />
@@ -250,21 +230,6 @@ export default function EditPostPage() {
         </div>
       </main>
 
-      {/* Image Preview Dialog */}
-      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
-        <DialogContent className="max-w-3xl p-0">
-          {previewImage && (
-            <Image
-              src={previewImage || "/placeholder.svg"}
-              alt="Preview"
-              width={800}
-              height={600}
-              className="w-full h-auto object-contain rounded-lg"
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-
       {/* Confirm Dialog */}
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
@@ -291,7 +256,7 @@ export default function EditPostPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>계속 수정</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => router.push("/mypage")}
+              onClick={() => router.push(`/community/${postId}`)}
               className="bg-destructive hover:bg-destructive/90"
             >
               나가기

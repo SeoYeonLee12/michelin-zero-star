@@ -12,11 +12,23 @@ export interface RecipeStep {
 
 export interface NutritionInfo {
   protein?: number // grams
-  carbs?: number // grams
+  carbohydrate?: number // grams (backend field name)
+  carbs?: number // grams (legacy support if needed)
   fat?: number // grams
   fiber?: number // grams
   sodium?: number // mg
   sugar?: number // grams
+}
+
+export interface Ingredient {
+  name: string
+  amount: string
+}
+
+export interface Author {
+  name: string
+  image?: string
+  isFollowing?: boolean
 }
 
 export interface Recipe {
@@ -25,15 +37,19 @@ export interface Recipe {
   thumbnail: string
   tags: string[]
   hashtags?: string[] // Added hashtags field for creator/channel info
-  author?: string // Added author field for creator name
+  author?: string | Author // Support both string and object
   rating?: number // Added rating field for michelin stars
-  duration: number // minutes
-  difficulty: "초보" | "중급" | "상급"
+  duration: number // minutes from cookTime
+  difficulty: "초보" | "중급" | "상급" | string
   servings: number
   calories?: number
   nutrition?: NutritionInfo // Added nutrition field
   description?: string // Added description field for recipe intro
   steps: RecipeStep[]
+  ingredients?: Ingredient[] // Top-level ingredients
+  isLiked?: boolean
+  isMine?: boolean
+  createdAt?: string
 }
 
 export interface ChatMessage {

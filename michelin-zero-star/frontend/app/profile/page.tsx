@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/auth-context"
-import { Camera, ArrowLeft, Eye, EyeOff, Check, X, MapPin, Loader2 } from "lucide-react"
+import { Camera, ArrowLeft, Eye, EyeOff, Check, X, MapPin, Loader2, Trash2 } from "lucide-react"
 import Link from "next/link"
 
 const categoryOptions = [
@@ -26,11 +26,9 @@ const categoryOptions = [
   { value: "drink", label: "음료" },
 ]
 
-const mockNicknames = ["민지", "요리왕", "쉐프김", "맛집탐방"]
-
 export default function ProfileEditPage() {
   const router = useRouter()
-  const { user, isLoggedIn, updateProfile, updateLocation } = useAuth()
+  const { user, isLoggedIn, updateProfile, updateLocation, withdraw } = useAuth()
 
   const [isLoading, setIsLoading] = React.useState(false)
   const [isGettingLocation, setIsGettingLocation] = React.useState(false)
@@ -39,7 +37,6 @@ export default function ProfileEditPage() {
   const [locationDialogOpen, setLocationDialogOpen] = React.useState(false)
   const [pendingLocation, setPendingLocation] = React.useState("")
   const [pendingCoordinates, setPendingCoordinates] = React.useState<{ latitude: number; longitude: number } | null>(null)
-  const [nicknameError, setNicknameError] = React.useState("")
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [profileImagePreview, setProfileImagePreview] = React.useState<string | null>(null)
 
@@ -47,7 +44,6 @@ export default function ProfileEditPage() {
     name: user?.name || "",
     nickname: user?.nickname || "",
     email: user?.email || "",
-    bio: user?.bio || "",
     location: "",
     categories: [] as string[],
   })
@@ -71,8 +67,7 @@ export default function ProfileEditPage() {
         name: user.name,
         nickname: user.nickname || "",
         email: user.email,
-        bio: user.bio || "",
-        // location: user.location || "",
+        categories: [],
       }))
       if (user.profileImage) {
         setProfileImagePreview(user.profileImage)
@@ -91,26 +86,9 @@ export default function ProfileEditPage() {
     }
   }
 
-  const checkNicknameDuplicate = (nickname: string) => {
-    if (!nickname.trim()) {
-      setNicknameError("")
-      return
-    }
-    if (nickname === user?.nickname) {
-      setNicknameError("")
-      return
-    }
-    if (mockNicknames.includes(nickname)) {
-      setNicknameError("이미 사용 중인 닉네임입니다")
-    } else {
-      setNicknameError("")
-    }
-  }
-
   const handleNicknameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     setFormData({ ...formData, nickname: value })
-    checkNicknameDuplicate(value)
   }
 
   const handleGetLocation = () => {
@@ -186,7 +164,7 @@ export default function ProfileEditPage() {
       console.log("✅ 위치 저장 완료")
     } catch (error) {
       console.error("위치 저장 오류:", error)
-      alert("위치 저장에 실패했습니다.")
+      // alert("위치 저장에 실패했습니다.")
     } finally {
       setIsGettingLocation(false)
     }
@@ -202,36 +180,45 @@ export default function ProfileEditPage() {
   }
 
   const handleSaveProfile = async () => {
-    if (nicknameError) {
-      alert("닉네임을 확인해주세요.")
-      return
+    // 비밀번호 변경 시도 시 유효성 검사
+    if (passwordData.newPassword || passwordData.currentPassword) {
+      if (!passwordData.currentPassword) {
+        alert("현재 비밀번호를 입력해주세요.")
+        return
+      }
+      if (passwordData.newPassword !== passwordData.confirmPassword) {
+        alert("새 비밀번호가 일치하지 않습니다.")
+        return
+      }
     }
+
     setIsLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 500))
 
-    updateProfile({
-      // name(실명)은 변경 불가: payload에서 제외
-      nickname: formData.nickname,
-      bio: formData.bio,
-      location: formData.location,
-      profileImage: profileImagePreview || undefined,
-    })
+    // 닉네임이 변경되지 않았으면 undefined로 설정하여 서버 전송 제외
+    const nicknameToUpdate = formData.nickname === user?.nickname ? undefined : formData.nickname
 
-    setIsLoading(false)
-    router.push("/mypage")
+    try {
+      await updateProfile({
+        nickname: nicknameToUpdate,
+        // bio 제거됨
+        location: formData.location,
+        profileImage: profileImagePreview || undefined,
+        currentPassword: passwordData.currentPassword || undefined,
+        newPassword: passwordData.newPassword || undefined,
+        newPasswordConfirm: passwordData.confirmPassword || undefined,
+        // categories 제거됨 (API 미지원)
+      })
+      alert("프로필이 성공적으로 수정되었습니다.")
+      router.push("/mypage")
+    } catch (error: any) {
+      const msg = error.message || "프로필 수정에 실패했습니다."
+      alert(msg)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleChangePassword = async () => {
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      alert("새 비밀번호가 일치하지 않습니다.")
-      return
-    }
-    setIsLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" })
-    setIsLoading(false)
-    alert("비밀번호가 변경되었습니다.")
-  }
+
 
   const passwordRequirements = [
     { label: "8자 이상", met: passwordData.newPassword.length >= 8 },
@@ -241,6 +228,16 @@ export default function ProfileEditPage() {
 
   if (!isLoggedIn) {
     return null
+  }
+
+  const handleWithdraw = async () => {
+    if (window.confirm("정말로 탈퇴하시겠습니까? 탈퇴 후에는 계정을 복구할 수 없습니다.")) {
+      try {
+        await withdraw()
+      } catch (error) {
+        // 이미 AuthContext에서 alert 처리됨
+      }
+    }
   }
 
   return (
@@ -321,12 +318,7 @@ export default function ProfileEditPage() {
                     value={formData.nickname}
                     onChange={handleNicknameChange}
                     placeholder="닉네임을 입력하세요"
-                    className={nicknameError ? "border-destructive" : ""}
                   />
-                  {nicknameError && <p className="text-xs text-destructive">{nicknameError}</p>}
-                  {!nicknameError && formData.nickname && formData.nickname !== user?.nickname && (
-                    <p className="text-xs text-green-600">사용 가능한 닉네임입니다</p>
-                  )}
                 </div>
               </div>
 
@@ -336,16 +328,7 @@ export default function ProfileEditPage() {
                 <p className="text-xs text-muted-foreground">이메일은 변경할 수 없습니다</p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="bio">자기소개</Label>
-                <Textarea
-                  id="bio"
-                  value={formData.bio}
-                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                  placeholder="간단한 자기소개를 작성하세요"
-                  rows={3}
-                />
-              </div>
+              {/* 자기소개 삭제됨 */}
 
               {/* Preferred Categories moved here (bottom of Basic Info) */}
               <div className="space-y-2">
@@ -420,16 +403,16 @@ export default function ProfileEditPage() {
               </p> */}
               {/* <p className="text-xs text-muted-foreground">
                 현재 위치 버튼을 눌러 동네 인증을 해주세요. 위치 정보는 주변 재료 나눔 게시글을 찾는 데 사용됩니다. */}
-                {/* {isGettingLocation && " 위치를 탐색 중입니다..."} */}
+              {/* {isGettingLocation && " 위치를 탐색 중입니다..."} */}
               {/* </p> */}
             </CardContent>
           </Card>
 
-          {/* Password Change */}
+          {/* Password Change Information */}
           <Card>
             <CardHeader>
               <CardTitle>비밀번호 변경</CardTitle>
-              <CardDescription>계정 보안을 위해 정기적으로 비밀번호를 변경하세요</CardDescription>
+              <CardDescription>비밀번호를 변경하려면 아래 정보를 입력하고 저장 버튼을 누르세요.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -479,9 +462,8 @@ export default function ProfileEditPage() {
                         className={`flex items-center gap-1 text-xs ${req.met ? "text-[#800020]" : "text-muted-foreground"}`}
                       >
                         <div
-                          className={`w-4 h-4 rounded-full flex items-center justify-center ${
-                            req.met ? "bg-[#800020]/20" : "bg-muted"
-                          }`}
+                          className={`w-4 h-4 rounded-full flex items-center justify-center ${req.met ? "bg-[#800020]/20" : "bg-muted"
+                            }`}
                         >
                           {req.met ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
                         </div>
@@ -505,17 +487,27 @@ export default function ProfileEditPage() {
                   <p className="text-xs text-destructive">비밀번호가 일치하지 않습니다</p>
                 )}
               </div>
+            </CardContent>
+          </Card>
 
+          {/* Account Withdrawal */}
+          <Card className="border-destructive/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <Trash2 className="h-5 w-5" />
+                회원 탈퇴
+              </CardTitle>
+              <CardDescription>
+                탈퇴 시 작성한 레시피와 게시글은 삭제되지 않을 수 있습니다.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
               <Button
-                onClick={handleChangePassword}
-                variant="outline"
-                disabled={
-                  !passwordData.currentPassword ||
-                  !passwordData.newPassword ||
-                  passwordData.newPassword !== passwordData.confirmPassword
-                }
+                variant="destructive"
+                onClick={handleWithdraw}
+                className="w-full sm:w-auto"
               >
-                비밀번호 변경
+                회원 탈퇴하기
               </Button>
             </CardContent>
           </Card>
@@ -527,7 +519,7 @@ export default function ProfileEditPage() {
             </Button>
             <Button
               onClick={handleSaveProfile}
-              disabled={isLoading || !!nicknameError}
+              disabled={isLoading}
               className="bg-[#800020] hover:bg-[#800020]/90"
             >
               {isLoading ? "저장 중..." : "변경사항 저장"}

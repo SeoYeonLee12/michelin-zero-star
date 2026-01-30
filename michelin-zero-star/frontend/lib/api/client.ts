@@ -23,15 +23,14 @@ function tryParseJson(text: string) {
   }
 }
 
+import { getCookie } from "../cookie"
+
 /** 브라우저에서만 접근 가능 */
 // client.ts
 function getAccessToken(): string | null {
   if (typeof window === "undefined") return null
-  // ✅ cooksync 키로 통일
-  return (
-    localStorage.getItem("cooksync_access_token") ||
-    localStorage.getItem("accessToken") // (혹시 예전 키 남아있을 때 fallback)
-  )
+  // ✅ cooksync 키로 통일 (쿠키 우선)
+  return getCookie("cooksync_access_token") || localStorage.getItem("cooksync_access_token")
 }
 /**
  * 상대경로("/api/v1/...")로 호출해도 백엔드로 보내기 위한 base URL
@@ -57,8 +56,8 @@ export async function apiFetch<T = unknown>(
 
   // 헤더 병합 (options.headers가 Headers일 수도 있어서 안전하게 처리)
   const headers = new Headers(options.headers || {})
-  // Content-Type은 body가 있을 때만 기본 세팅 (GET에도 붙어도 큰 문제는 없지만 깔끔하게)
-  if (!headers.has("Content-Type")) {
+  // Content-Type은 body가 있을 때만 기본 세팅 (FormData가 아닐 때만)
+  if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json")
   }
   // ✅ accessToken 있으면 Authorization 자동 첨부

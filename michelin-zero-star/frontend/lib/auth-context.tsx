@@ -3,9 +3,10 @@
 import * as React from "react"
 import { mockVerifyUserLocation } from "./mock-api"
 import type { LocationRequestDto } from "./types"
-import { getMe } from "./api/user"
-import { login as loginAPI, signup as signupAPI } from "./api/auth"
+import { getMe, updateProfile as updateProfileAPI, withdrawUser } from "./api/user"
+import { login as loginAPI, signup as signupAPI, logout as logoutAPI } from "./api/auth"
 import { verifyLocation } from "./api/user"
+import { setCookie, getCookie, removeCookie } from "./cookie"
 
 
 // ✅ 개발 환경에서 mock 사용 여부 (필요 시 false로 변경하여 실제 API 테스트)
@@ -77,7 +78,6 @@ interface UserRecipe {
   id: string
   title: string
   description: string
-  category: string
   servings: number
   thumbnail: string
   tags: string[]
@@ -116,7 +116,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>
   signup: (data: { name: string; nickname: string; email: string; password: string }) => Promise<void>
   logout: () => void
-  updateProfile: (data: Partial<User>) => void
+  updateProfile: (data: Partial<User> & { currentPassword?: string; newPassword?: string; newPasswordConfirm?: string }) => Promise<void>
   updateLocation: (latitude: number, longitude: number) => Promise<string>
   likedRecipes: LikedRecipe[]
   toggleLikeRecipe: (recipe: LikedRecipe) => void
@@ -143,6 +143,7 @@ interface AuthContextType {
   reviewedRecipes: Set<string>
   markRecipeAsReviewed: (recipeId: string) => void
   hasUserReviewedRecipe: (recipeId: string) => boolean
+  withdraw: () => Promise<void>
 }
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined)
@@ -170,7 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // ✅ 추가: user 없고 토큰만 있으면 users/me로 복구
     if (!savedUser) {
-      const token = localStorage.getItem("cooksync_access_token")
+      const token = getCookie("cooksync_access_token")
       if (token) {
         getMe()
           .then((me) => {
@@ -190,14 +191,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               todayStars: me.todayStars ?? 0,
               lastStarDate: me.lastStarDate ?? new Date().toISOString().split("T")[0],
             }
-
             setUser(recoveredUser)
             localStorage.setItem("cooksync_user", JSON.stringify(recoveredUser))
           })
           .catch(() => {
             // 토큰 만료/무효면 정리
-            localStorage.removeItem("cooksync_access_token")
-            localStorage.removeItem("cooksync_refresh_token")
+            removeCookie("cooksync_access_token")
+            removeCookie("cooksync_refresh_token")
             localStorage.removeItem("cooksync_user")
           })
       }
@@ -280,8 +280,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     const tokenRes = await loginAPI({ email, password })
 
-    localStorage.setItem("cooksync_access_token", tokenRes.accessToken)
-    localStorage.setItem("cooksync_refresh_token", tokenRes.refreshToken)
+    setCookie("cooksync_access_token", tokenRes.accessToken)
+    setCookie("cooksync_refresh_token", tokenRes.refreshToken)
 
     const me = await getMe()
 
@@ -327,25 +327,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const logout = () => {
-    setUser(null)
-    setCompletedRecipes(new Set())
-    setReviewedRecipes(new Set())
-    localStorage.removeItem("cooksync_user")
+  const logout = async () => {
+    try {
+      await logoutAPI()
+    } catch (error) {
+      console.error("로그아웃 실패 (토큰 만료 가능성):", error)
+    } finally {
+      setUser(null)
+      setCompletedRecipes(new Set())
+      setReviewedRecipes(new Set())
+      localStorage.removeItem("cooksync_user")
+      removeCookie("cooksync_access_token")
+      removeCookie("cooksync_refresh_token")
+    }
   }
 
-  const updateProfile = (data: Partial<User>) => {
+  const updateProfile = async (data: Partial<User> & { currentPassword?: string; newPassword?: string; newPasswordConfirm?: string }) => {
+    // 1. 백엔드 API 호출
     if (user) {
-      const updatedUser = { ...user, ...data }
-      setUser(updatedUser)
-      localStorage.setItem("cooksync_user", JSON.stringify(updatedUser))
+      try {
+        await updateProfileAPI({
+          nickname: data.nickname,
+          currentPassword: data.currentPassword,
+          newPassword: data.newPassword,
+          newPasswordConfirm: data.newPasswordConfirm
+        })
+        // 2. 성공 시 로컬 상태 업데이트 (비밀번호 등 민감 정보는 제외하고 업데이트)
+        const { currentPassword, newPassword, newPasswordConfirm, ...safeData } = data
+        const updatedUser = { ...user, ...safeData }
+        setUser(updatedUser)
+        localStorage.setItem("cooksync_user", JSON.stringify(updatedUser))
+
+        // 3. (선택) 확실하게 백엔드 데이터로 동기화하고 싶으면 getMe() 다시 호출
+        // const me = await getMe()
+        // setUser(convertMeResponseToUser(me))
+
+      } catch (error) {
+        console.error("프로필 수정 실패:", error)
+        throw error
+      }
     }
   }
 
   const updateLocation = async (latitude: number, longitude: number): Promise<string> => {
     if (!user) throw new Error("사용자 정보가 없습니다.")
 
-    const token = localStorage.getItem("cooksync_access_token")
+    const token = getCookie("cooksync_access_token")
     if (!token) throw new Error("토큰이 없습니다. 다시 로그인 해주세요.")
 
     const fixedLocationData: LocationRequestDto = {
@@ -357,8 +384,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res = await verifyLocation(fixedLocationData)
 
     // 응답이 string일 수도/객체일 수도 있으니 안전 처리
-    const locationAddress =
-      typeof res === "string" ? res : res.locationAddress ?? res.message ?? "위치 인증 완료"
+    let locationAddress = typeof res === "string" ? res : res.locationAddress ?? res.message ?? "위치 인증 완료"
+
+    // 만약 메시지 형태("현재 위치 '학하동' 인증이 완료되었습니다.")라면 '학하동'만 추출
+    const match = locationAddress.match(/'([^']+)'/)
+    if (match && match[1]) {
+      locationAddress = match[1]
+    }
+
     const locationCode = typeof res === "string" ? "" : res.locationCode ?? ""
 
     const updatedUser = {
@@ -542,6 +575,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const hasUserReviewedRecipe = (recipeId: string) => reviewedRecipes.has(recipeId)
 
+  const withdraw = async () => {
+    try {
+      await withdrawUser()
+      logout()
+      alert("회원 탈퇴가 완료되었습니다.")
+    } catch (error) {
+      console.error("회원 탈퇴 실패:", error)
+      throw error
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -550,7 +594,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         deleteConversation, userRecipes, addUserRecipe, updateUserRecipe, deleteUserRecipe,
         userPosts, addUserPost, updateUserPost, deleteUserPost, likedPosts, toggleLikePost,
         isPostLiked, earnStars, getStarLevel, completedRecipes, markRecipeAsCompleted,
-        reviewedRecipes, markRecipeAsReviewed, hasUserReviewedRecipe,
+        reviewedRecipes, markRecipeAsReviewed, hasUserReviewedRecipe, withdraw,
       }}
     >
       {children}

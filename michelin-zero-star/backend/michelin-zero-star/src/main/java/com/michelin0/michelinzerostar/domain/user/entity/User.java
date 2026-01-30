@@ -59,9 +59,6 @@ public class User extends SoftDeleteDomain {
     @Column(name = "total_star", nullable = false)
     private Double totalStar; // 누적 미슐랭 스타
 
-    // ★ [추가된 부분] UserProfile과 1:1 연관관계 매핑
-    // mappedBy = "user"는 UserProfile 엔티티 내의 user 필드를 가리킵니다.
-    // fetch = FetchType.LAZY는 성능 최적화를 위해 지연 로딩을 사용합니다.
     @OneToOne(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private UserProfile userProfile;
 

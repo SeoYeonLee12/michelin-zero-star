@@ -97,7 +97,11 @@ export function ClaudeChatInput({
             <button
               key={i}
               onClick={() => onSendMessage(prompt)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              disabled={isLoading}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
+                isLoading && "opacity-50 cursor-not-allowed pointer-events-none"
+              )}
             >
               <Search className="h-3 w-3" />
               {prompt}

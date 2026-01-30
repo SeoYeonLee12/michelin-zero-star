@@ -18,34 +18,41 @@ export function join(body: JoinRequest) {
 
 /** ✅ 추가: 서비스 로그인 */
 export type LoginRequest = {
-email: string
-password: string
+  email: string
+  password: string
 }
 
 
 export type LoginResponse = {
-grantType: string
-accessToken: string
-refreshToken: string
-accessTokenExpiresIn: number
+  grantType: string
+  accessToken: string
+  refreshToken: string
+  accessTokenExpiresIn: number
 }
 
 
 export function login(body: LoginRequest) {
-return apiFetch<LoginResponse>("/api/v1/auth/login", {
-method: "POST",
-body: JSON.stringify(body),
-})
+  return apiFetch<LoginResponse>("/api/v1/auth/login", {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
 }
 
 export async function signup(payload: {
-email: string
-password: string
-name: string
-nickname: string
+  email: string
+  password: string
+  name: string
+  nickname: string
 }): Promise<string> {
-return apiFetch("/api/v1/auth/join", {
-method: "POST",
-body: JSON.stringify(payload),
-})
+  return apiFetch("/api/v1/auth/join", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
+}
+
+// ✅ 추가: 로그아웃
+export function logout() {
+  return apiFetch<string>("/api/v1/auth/logout", {
+    method: "POST",
+  })
 }

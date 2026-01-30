@@ -32,6 +32,8 @@ import {
 import { Upload, ChevronLeft, ChevronRight, X, Plus, Trash2, CheckCircle2 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
+import { getCookie } from "@/lib/cookie"
+import { registerRecipe, type RegisterRecipeRequest } from "@/lib/api/recipes"
 
 interface RecipeStep {
   id: number
@@ -61,6 +63,11 @@ const categoryOptions = [
   { value: "nightsnack", label: "야식&술안주" },
   { value: "etc", label: "기타" },
 ]
+
+const CATEGORY_MAP: Record<string, number> = {
+  "korean": 1, "chinese": 2, "japanese": 3, "western": 4, "dessert": 5,
+  "snack": 6, "salad": 7, "drink": 8, "nightsnack": 9, "etc": 10
+}
 
 export default function NewRecipePage() {
   const router = useRouter()
@@ -201,26 +208,67 @@ export default function NewRecipePage() {
     setConfirmDialogOpen(true)
   }
 
-  const handleConfirmSubmit = () => {
+
+
+  // ... existing code ...
+
+  const handleConfirmSubmit = async () => {
     setConfirmDialogOpen(false)
-    addUserRecipe({
-      title,
-      description,
-      category,
-      servings: Number(servings) || 1,
-      thumbnail: thumbnailPreview!,
-      tags,
-      ingredients: ingredients.map((i) => ({ name: i.name, amount: i.amount })),
-      steps: steps.map((step) => ({
-        id: step.id,
-        action: step.action,
-        description: step.description,
-        duration: step.duration,
-        imagePreview: step.imagePreview,
-        tips: step.tips,
-      })),
-    })
-    setSuccessDialogOpen(true)
+
+    try {
+      const token = getCookie("cooksync_access_token")
+      if (!token) {
+        alert("로그인이 필요합니다.")
+        router.push("/login")
+        return
+      }
+
+      // 1. 데이터 매핑
+      const requestData: RegisterRecipeRequest = {
+        title,
+        mainImageUrl: thumbnailPreview || "", // URL or Blob string
+        recipeDescription: description,
+        cookTime: totalCookingTime,
+        servings: Number(servings) || 1,
+        // 영양소 정보는 입력 UI가 없으므로 기본값 0 처리
+        calorie: 0,
+        carbohydrate: 0,
+        protein: 0,
+        saturatedFat: 0,
+        cholesterol: 0,
+        sodium: 0,
+        calcium: 0,
+        categoryIds: [CATEGORY_MAP[category] || 10], // Default 'etc'
+        ingredients: ingredients.map(i => ({
+          ingredientName: i.name,
+          ingredientAmount: i.amount
+        })),
+        tags: tags.map(t => ({ tagName: t })),
+        steps: steps.map(s => ({
+          stepNumber: s.id,
+          stepDescription: s.description,
+          timerSeconds: s.duration,
+          stepImageUrl: s.imagePreview || "",
+          cookingTip: s.tips || null
+        }))
+      }
+
+      // 2. API 호출
+      await registerRecipe(requestData, token)
+
+      // 3. 성공 처리
+      // addUserRecipe(localUpdate)는 제거하거나, API 성공 후 리스트 갱신을 위해 유지할지 결정.
+      // API가 성공했으므로 서버(Mock)에는 반영됨.
+      // 로컬 Context 업데이트는 선택사항이지만, addUserRecipe가 로컬 스토리지에만 저장한다면 
+      // API 사용 시에는 제거하는게 맞음. 하지만 원활한 UX를 위해 유지할 수도 있음.
+      // 여기서는 API 호출이 핵심이므로 API 호출만 수행하고 성공 다이얼로그 띄움.
+
+      setSuccessDialogOpen(true)
+
+    } catch (error) {
+      console.error("Recipe registration failed:", error)
+      alert("레시피 등록에 실패했습니다.")
+    }
   }
 
   const handleViewRecipe = () => {
