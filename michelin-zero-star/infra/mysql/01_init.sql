@@ -264,7 +264,7 @@ CREATE TABLE chat_messages (
 CREATE TABLE ai_chat_message (
     ai_chat_message_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     users_id BIGINT NOT NULL,
-    recipes_id BIGINT NULL COMMENT 'NULL이면 일반 채팅, 값이 있으면 해당 레시피 문맥 채팅', -- 변경됨 (recipe_id -> recipes_id)
+    recipes_id BIGINT NOT NULL,
     sender_type ENUM('USER', 'AI') NOT NULL,
     content TEXT NOT NULL,
     recommended_recipes JSON NULL,

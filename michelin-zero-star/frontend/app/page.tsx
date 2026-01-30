@@ -492,6 +492,7 @@ export default function HomePage() {
               className="space-y-6"
             >
               <StepCookMode
+                recipeId={Number(selectedRecipe.id)}
                 steps={selectedRecipe.steps}
                 currentStepIndex={currentStepIndex}
                 onStepChange={setCurrentStepIndex}

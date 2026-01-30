@@ -24,7 +24,9 @@ import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import type { RecipeStep } from "@/lib/types"
-import { fetchSpeechToken, postChat } from "@/lib/voice-api"
+// import { fetchSpeechToken, postChat } from "@/lib/voice-api"
+import { fetchSpeechToken } from "@/lib/voice-api"
+import { postCookingChat } from "@/lib/cooking-chat-api"
 import { startSttOnce } from "@/lib/stt"
 import { createPorcupineController } from "@/lib/kws/porcupine"
 
@@ -56,12 +58,14 @@ const getAdjustedDuration = (baseDuration: number, level: SkillLevel) => {
 }
 
 export function StepCookMode({
+  recipeId,
   steps,
   currentStepIndex,
   onStepChange,
   onComplete,
   recipeName,
 }: {
+  recipeId: number
   steps: RecipeStep[]
   currentStepIndex: number
   onStepChange: (index: number) => void
@@ -266,7 +270,11 @@ export function StepCookMode({
           setAiTurnSafe("thinking")
 
           try { 
-            const res = await postChat({ text: raw })
+            const res = await postCookingChat({
+              recipeId,
+              currentStepIndex: stepIndexRef.current,
+              message: raw,
+            })
             setAiMessages((prev) => [...prev, { role: "ai", content: res.answer }])
           } catch {
             setAiMessages((prev) => [...prev, { role: "ai", content: "서버 응답을 받지 못했어요." }])
@@ -489,7 +497,11 @@ export function StepCookMode({
     setAiInput("")
 
     try {
-      const res = await postChat({ text: userText })
+      const res = await postCookingChat({
+        recipeId,
+        currentStepIndex: stepIndexRef.current,
+        message: userText,
+      })
       setAiMessages((prev) => [...prev, { role: "ai", content: res.answer }])
     } catch {
       setAiMessages((prev) => [...prev, { role: "ai", content: "서버 연결에 실패했어요. 잠시 후 다시 시도해 주세요." }])
