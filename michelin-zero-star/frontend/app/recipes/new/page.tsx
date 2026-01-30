@@ -90,7 +90,6 @@ export default function NewRecipePage() {
   const [successDialogOpen, setSuccessDialogOpen] = useState(false)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [exitDialogOpen, setExitDialogOpen] = useState(false)
-  const [savedDialogOpen, setSavedDialogOpen] = useState(false)
 
   if (!isLoggedIn) {
     router.push("/login")
@@ -271,35 +270,7 @@ export default function NewRecipePage() {
     }
   }
 
-  const handleTempSave = () => {
-    setExitDialogOpen(false)
-    const tempData = {
-      title,
-      description,
-      category,
-      servings,
-      thumbnailPreview,
-      tags,
-      ingredients,
-      steps: steps.map((step) => ({
-        id: step.id,
-        action: step.action,
-        description: step.description,
-        duration: step.duration,
-        imagePreview: step.imagePreview,
-        tips: step.tips,
-      })),
-    }
-    localStorage.setItem("tempRecipe", JSON.stringify(tempData))
-    setSavedDialogOpen(true)
-  }
-
-  const handleSavedDialogClose = () => {
-    setSavedDialogOpen(false)
-    router.push("/")
-  }
-
-  const handleExitWithoutSave = () => {
+  const handleExitConfirm = () => {
     setExitDialogOpen(false)
     router.push("/")
   }
@@ -697,38 +668,19 @@ export default function NewRecipePage() {
       <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>임시저장 하시겠습니까?</AlertDialogTitle>
+            <AlertDialogTitle>작성을 취소하시겠습니까?</AlertDialogTitle>
             <AlertDialogDescription>
               작성 중인 내용이 있습니다. 페이지를 떠나면 작성 중인 내용이 사라집니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleExitWithoutSave}>아니오</AlertDialogCancel>
-            <AlertDialogAction onClick={handleTempSave} className="bg-[#800020] hover:bg-[#800020]/90">
-              임시저장
+            <AlertDialogCancel>계속 작성</AlertDialogCancel>
+            <AlertDialogAction onClick={handleExitConfirm} className="bg-[#800020] hover:bg-[#800020]/90">
+              나가기
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog open={savedDialogOpen} onOpenChange={setSavedDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <div className="flex justify-center mb-4">
-              <div className="h-16 w-16 rounded-full bg-[#800020]/10 flex items-center justify-center">
-                <CheckCircle2 className="h-8 w-8 text-[#800020]" />
-              </div>
-            </div>
-            <DialogTitle className="text-center">임시저장 완료</DialogTitle>
-            <DialogDescription className="text-center">작성 중인 레시피가 임시저장되었습니다.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-4">
-            <Button className="w-full bg-[#800020] hover:bg-[#800020]/90" onClick={handleSavedDialogClose}>
-              확인
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Success Dialog */}
       <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>

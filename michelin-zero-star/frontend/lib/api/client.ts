@@ -85,7 +85,7 @@ export async function apiFetch<T = unknown>(
       // 단, Next.js Rewrite를 통하지 않고 직접 백엔드를 찌를 때는 credentials: 'include' 필요할 수 있음
       // 현재 구조상 Proxy나 Rewrite를 쓴다면 쿠키가 자동으로 감.
       // 여기서는 `fetch`를 직접 사용하여 순환 참조 회피
-      const refreshRes = await fetch(resolveUrl("/api/v1/auth/refresh"), {
+      const refreshRes = await fetch(resolveUrl("/api/v1/auth/reissue"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include", // ✅ 쿠키 전송 보장

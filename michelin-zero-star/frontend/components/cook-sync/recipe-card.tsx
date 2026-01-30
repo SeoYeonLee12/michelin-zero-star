@@ -149,11 +149,6 @@ export function RecipeCard({ recipe, isLiked, onHeartClick, onEdit, onDelete, on
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-base leading-tight line-clamp-2">{recipe.name}</h3>
-            {showAuthor && recipe.author && (
-              <span className="text-xs text-muted-foreground truncate block mt-0.5">
-                by {recipe.author}
-              </span>
-            )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <img
@@ -168,15 +163,19 @@ export function RecipeCard({ recipe, isLiked, onHeartClick, onEdit, onDelete, on
             </span>
           </div>
         </div>
-        <div className="flex flex-wrap gap-1">
-          {recipe.author && (
-            <span className="text-xs text-primary font-medium">#{recipe.author}</span>
-          )}
-          {recipe.hashtags?.slice(0, 1).map((tag) => (
-            <span key={tag} className="text-xs text-primary font-medium">
-              #{tag}
+        <div className="flex items-center justify-between gap-2 mt-2">
+          <div className="flex flex-wrap gap-1 flex-1 min-w-0">
+            {recipe.hashtags?.slice(0, 2).map((tag) => (
+              <span key={tag} className="text-xs text-primary font-medium">
+                #{tag}
+              </span>
+            ))}
+          </div>
+          {showAuthor && recipe.author && (
+            <span className="text-xs text-muted-foreground shrink-0">
+              by {typeof recipe.author === 'string' ? recipe.author : recipe.author.name}
             </span>
-          ))}
+          )}
         </div>
       </div>
     </div>
