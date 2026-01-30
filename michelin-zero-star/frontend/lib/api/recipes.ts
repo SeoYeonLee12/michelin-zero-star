@@ -171,6 +171,10 @@ export interface RegisterRecipeResponse {
  * @param token 인증 토큰
  */
 export async function registerRecipe(data: RegisterRecipeRequest, token: string) {
+  if (!token || token === "undefined" || token.trim() === "") {
+    throw new Error("Authorization token is missing. Please log in.")
+  }
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "Authorization": token.startsWith("Bearer ") ? token : `Bearer ${token}`
@@ -187,6 +191,10 @@ export async function registerRecipe(data: RegisterRecipeRequest, token: string)
  * 레시피 수정 API ("그대로" 요청 바디 사용, ID만 URL 파라미터)
  */
 export async function updateRecipe(recipeId: string, data: RegisterRecipeRequest, token: string) {
+  if (!token || token === "undefined" || token.trim() === "") {
+    throw new Error("Authorization token is missing. Please log in.")
+  }
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "Authorization": token.startsWith("Bearer ") ? token : `Bearer ${token}`
@@ -203,6 +211,10 @@ export async function updateRecipe(recipeId: string, data: RegisterRecipeRequest
  * 레시피 삭제 API
  */
 export async function deleteRecipe(recipeId: string, token: string) {
+  if (!token || token === "undefined" || token.trim() === "") {
+    throw new Error("Authorization token is missing. Please log in.")
+  }
+
   const headers: Record<string, string> = {
     "Authorization": token.startsWith("Bearer ") ? token : `Bearer ${token}`
   }
@@ -233,6 +245,10 @@ export interface CookingModeResponse {
  * 요리 모드 데이터 조회 API
  */
 export async function getCookingModeDetails(recipeId: string, token: string) {
+  if (!token || token === "undefined" || token.trim() === "") {
+    throw new Error("Authorization token is missing. Please log in.")
+  }
+
   const headers: Record<string, string> = {
     "Authorization": token.startsWith("Bearer ") ? token : `Bearer ${token}`
   }
@@ -252,6 +268,10 @@ export interface CookingCompleteResponse {
  * 요리 완료 API
  */
 export async function completeCooking(recipeId: string, token: string) {
+  if (!token || token === "undefined" || token.trim() === "") {
+    throw new Error("Authorization token is missing. Please log in.")
+  }
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "Authorization": token.startsWith("Bearer ") ? token : `Bearer ${token}`

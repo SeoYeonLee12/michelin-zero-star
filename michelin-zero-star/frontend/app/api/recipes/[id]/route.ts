@@ -69,6 +69,7 @@ export async function PUT(
         const targetUrl = `${BACKEND_URL}/api/recipes/${id}`;
 
         console.log(`[Proxy] Forwarding PUT to ${targetUrl}`);
+        console.log(`[Proxy] Auth Header Present: ${!!token}`);
 
         const response = await fetch(targetUrl, {
             method: "PUT",

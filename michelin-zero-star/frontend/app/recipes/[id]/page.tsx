@@ -84,6 +84,7 @@ export default function RecipeDetailPage() {
       try {
         setIsLoading(true)
         const data = await getRecipeDetail(recipeId)
+        console.log("Loaded Recipe Data:", data) // [Debug] Check image URLs
         setRecipe(mapBackendToFrontend(data))
       } catch (error) {
         console.error("레시피를 불러오는데 실패했습니다:", error)

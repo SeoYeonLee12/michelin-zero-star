@@ -10,11 +10,10 @@ export async function GET(
         const id = (await params).id;
         const token = request.headers.get("authorization");
 
+        // Backend Endpoint: /api/recipes/{id}/cooking
         const targetUrl = `${BACKEND_URL}/api/recipes/${id}/cooking`;
 
-        console.log(`[Proxy] Forwarding Cooking Mode GET to ${targetUrl}`);
-        // Trigger rebuild
-
+        console.log(`[Proxy] Forwarding GET to ${targetUrl}`);
 
         const response = await fetch(targetUrl, {
             method: "GET",
@@ -27,8 +26,14 @@ export async function GET(
         if (!response.ok) {
             console.error(`[Proxy] Backend error: ${response.status}`);
             const errorText = await response.text();
+
+            // Helpful debug for 404
+            if (response.status === 404) {
+                console.error(`[Proxy] The backend endpoint ${targetUrl} was not found.`);
+            }
+
             return NextResponse.json(
-                { message: "Backend fetch failed", detail: errorText },
+                { message: `Backend fetch failed (${response.status}): ${response.statusText}`, detail: errorText },
                 { status: response.status }
             );
         }
