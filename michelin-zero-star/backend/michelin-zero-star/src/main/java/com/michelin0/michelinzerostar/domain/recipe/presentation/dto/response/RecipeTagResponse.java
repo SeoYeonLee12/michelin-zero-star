@@ -10,4 +10,8 @@ public record RecipeTagResponse(
         return new RecipeTagResponse(command.tagName());
     }
 
+    public static RecipeTagResponse from(String tagName) {
+        return new RecipeTagResponse(tagName);
+    }
+
 }
