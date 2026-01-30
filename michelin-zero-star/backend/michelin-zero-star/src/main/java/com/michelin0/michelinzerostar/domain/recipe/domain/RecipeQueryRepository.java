@@ -17,6 +17,7 @@ import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeDeta
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeIngredientProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeListProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeStepProjection;
+import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeTagGetListProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeTagProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipesSearchCondition;
 import com.querydsl.core.Tuple;
@@ -30,7 +31,9 @@ import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -178,11 +181,12 @@ public class RecipeQueryRepository {
                         recipe.recipeId,
                         recipe.title,
                         recipe.mainImageUrl,
-                        recipe.cookTime,
+                        recipe.cookTime, // 필요 없어질 것
                         recipe.averageRating,
-                        recipe.servings,
+                        recipe.servings, // 필요 없어질 것
                         isScrappedExpression(userId),
-                        recipe.user.nickname
+                        recipe.user.nickname,
+                        recipe.user.id.eq(userId)
                 ))
                 .from(recipe)
                 .join(recipe.user)
@@ -200,7 +204,28 @@ public class RecipeQueryRepository {
                 )
                 .fetchOne();
 
-        return new PageImpl<>(content, pageable, totalCount != null ? totalCount : 0);
+        List<RecipeTagGetListProjection> tags = queryFactory
+                .select(Projections.constructor(
+                        RecipeTagGetListProjection.class,
+                        recipeTag.recipe.recipeId,
+                        recipeTag.tagName)
+                )
+                .from(recipeTag)
+                .where(recipeTag.recipe.recipeId.in(ids))
+                .fetch();
+
+        Map<Long, List<String>> tagMap = tags.stream()
+                .collect(Collectors.groupingBy(
+                        RecipeTagGetListProjection::recipeId,
+                        Collectors.mapping(RecipeTagGetListProjection::tagName, Collectors.toList())
+                ));
+
+        List<RecipeListProjection> finalContent = content.stream()
+                .map(recipe -> recipe.updateTags(
+                        tagMap.getOrDefault(recipe.recipeId(), Collections.emptyList())))
+                .toList();
+
+        return new PageImpl<>(finalContent, pageable, totalCount != null ? totalCount : 0);
     }
 
     private OrderSpecifier<?> getOrderSpecifier(RecipeSortType sortType) {

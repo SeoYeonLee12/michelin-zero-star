@@ -1,6 +1,7 @@
 package com.michelin0.michelinzerostar.domain.recipe.application.command;
 
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeListProjection;
+import java.util.List;
 
 public record RecipeListCommand(
         Long recipeId,
@@ -10,9 +11,10 @@ public record RecipeListCommand(
         Double averageRating,
         Integer servings,
         boolean isScrapped,
-        String nickName
+        String nickName,
+        Boolean isMine,
+        List<String> tags
 ) {
-
 
     public static RecipeListCommand from(RecipeListProjection projection) {
         return new RecipeListCommand(
@@ -23,7 +25,9 @@ public record RecipeListCommand(
                 projection.averageRating(),
                 projection.servings(),
                 projection.isScrapped(),
-                projection.nickName()
+                projection.nickName(),
+                projection.isMine(),
+                projection.tags()
         );
     }
 }
