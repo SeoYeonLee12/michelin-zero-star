@@ -39,7 +39,6 @@ import {
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
 import { deleteRecipe } from "@/lib/api/recipes"
-import { getCookie } from "@/lib/cookie"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -162,12 +161,7 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
 
   const handleDeleteRecipe = async () => {
     try {
-      const token = getCookie("cooksync_access_token")
-      if (!token) {
-        alert("로그인이 필요합니다.")
-        return
-      }
-      await deleteRecipe(recipe.id, token)
+      await deleteRecipe(recipe.id)
       alert("레시피가 삭제되었습니다.")
       router.push("/recipes")
     } catch (error) {

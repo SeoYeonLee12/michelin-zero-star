@@ -216,13 +216,6 @@ export default function NewRecipePage() {
     setConfirmDialogOpen(false)
 
     try {
-      const token = getCookie("cooksync_access_token")
-      if (!token) {
-        alert("로그인이 필요합니다.")
-        router.push("/login")
-        return
-      }
-
       // 1. 데이터 매핑
       const requestData: RegisterRecipeRequest = {
         title,
@@ -254,15 +247,9 @@ export default function NewRecipePage() {
       }
 
       // 2. API 호출
-      await registerRecipe(requestData, token)
+      await registerRecipe(requestData) // Token argument removed
 
       // 3. 성공 처리
-      // addUserRecipe(localUpdate)는 제거하거나, API 성공 후 리스트 갱신을 위해 유지할지 결정.
-      // API가 성공했으므로 서버(Mock)에는 반영됨.
-      // 로컬 Context 업데이트는 선택사항이지만, addUserRecipe가 로컬 스토리지에만 저장한다면 
-      // API 사용 시에는 제거하는게 맞음. 하지만 원활한 UX를 위해 유지할 수도 있음.
-      // 여기서는 API 호출이 핵심이므로 API 호출만 수행하고 성공 다이얼로그 띄움.
-
       setSuccessDialogOpen(true)
 
     } catch (error) {

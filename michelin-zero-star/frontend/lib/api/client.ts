@@ -1,9 +1,21 @@
 // client.ts
+import { getCookie } from "../cookie"
 
 type ApiErrorPayload = {
   message?: string
   error?: string
   status?: number
+}
+
+// ✅ 메모리 내 액세스 토큰 (브라우저 새로고침 시 초기화됨 -> Silent Refresh로 복구 필요)
+let memoryAccessToken: string | null = null
+
+export function setGlobalAccessToken(token: string | null) {
+  memoryAccessToken = token
+}
+
+export function getGlobalAccessToken() {
+  return memoryAccessToken
 }
 
 function tryParseJson(text: string) {
@@ -23,52 +35,87 @@ function tryParseJson(text: string) {
   }
 }
 
-import { getCookie } from "../cookie"
-
-/** 브라우저에서만 접근 가능 */
-// client.ts
-function getAccessToken(): string | null {
-  if (typeof window === "undefined") return null
-  // ✅ cooksync 키로 통일 (쿠키 우선)
-  return getCookie("cooksync_access_token") || localStorage.getItem("cooksync_access_token")
-}
 /**
  * 상대경로("/api/v1/...")로 호출해도 백엔드로 보내기 위한 base URL
- * - Docker에서도 브라우저 기준 주소여야 하므로 보통 http://localhost:8080
  */
 function resolveUrl(url: string): string {
-  // 이미 절대 URL이면 그대로 사용
   if (/^https?:\/\//i.test(url)) return url
-
   const base = process.env.NEXT_PUBLIC_BACKEND_URL
-  if (!base) return url // base가 없으면 기존 동작 유지(상대경로 그대로)
+  if (!base) return url
 
-  // url이 "/..." 형태면 base + url, 아니면 base + "/" + url
   if (url.startsWith("/")) return `${base}${url}`
   return `${base}/${url}`
 }
 
+// Interceptor 무한 루프 방지용 옵션 추가
+export interface ApiFetchOptions extends RequestInit {
+  skipAuthRefresh?: boolean
+}
+
 export async function apiFetch<T = unknown>(
   url: string,
-  options: RequestInit = {},
+  options: ApiFetchOptions = {},
 ): Promise<T> {
-  const token = getAccessToken()
+  const { skipAuthRefresh, ...fetchOptions } = options
+  const token = memoryAccessToken
 
-  // 헤더 병합 (options.headers가 Headers일 수도 있어서 안전하게 처리)
-  const headers = new Headers(options.headers || {})
-  // Content-Type은 body가 있을 때만 기본 세팅 (FormData가 아닐 때만)
-  if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
+  const headers = new Headers(fetchOptions.headers || {})
+
+  if (!headers.has("Content-Type") && !(fetchOptions.body instanceof FormData)) {
     headers.set("Content-Type", "application/json")
   }
-  // ✅ accessToken 있으면 Authorization 자동 첨부
+
+  // ✅ 메모리 토큰이 있으면 Authorization 헤더 추가
   if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`)
   }
 
   const res = await fetch(resolveUrl(url), {
-    ...options,
+    ...fetchOptions,
     headers,
+    credentials: "include", // ✅ 쿠키 전송 보장
   })
+
+  // ✅ 401 발생 시 토큰 갱신 시도 (skipAuthRefresh가 아닐 때만)
+  if (res.status === 401 && !skipAuthRefresh) {
+    try {
+      console.log("[apiFetch] 401 detected. Attempting Silent Refresh...")
+
+      // 리프레시 토큰은 쿠키(HttpOnly)에 있으므로, Credentials를 포함해서 요청해야 함 (브라우저 기본 동작)
+      // 단, Next.js Rewrite를 통하지 않고 직접 백엔드를 찌를 때는 credentials: 'include' 필요할 수 있음
+      // 현재 구조상 Proxy나 Rewrite를 쓴다면 쿠키가 자동으로 감.
+      // 여기서는 `fetch`를 직접 사용하여 순환 참조 회피
+      const refreshRes = await fetch(resolveUrl("/api/v1/auth/refresh"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include", // ✅ 쿠키 전송 보장
+      })
+
+      if (refreshRes.ok) {
+        const data = await refreshRes.json()
+        const newAccessToken = data.accessToken
+
+        console.log("[apiFetch] Silent Refresh Success. Retrying original request.")
+        setGlobalAccessToken(newAccessToken)
+
+        // 새 토큰으로 재시도
+        const newHeaders = new Headers(fetchOptions.headers || {})
+        newHeaders.set("Authorization", `Bearer ${newAccessToken}`)
+
+        return apiFetch<T>(url, {
+          ...options,
+          headers: newHeaders,
+          skipAuthRefresh: true // 재시도 시에는 또 갱신하지 않음
+        })
+      } else {
+        console.error("[apiFetch] Refresh Failed. User might need to login again.")
+        // 리프레시 실패 시 로그아웃 처리 등을 할 수도 있음
+        setGlobalAccessToken(null)
+      }
+    } catch (refreshError) {
+      console.error("[apiFetch] Error during token refresh:", refreshError)
+    }
+  }
 
   const contentType = res.headers.get("content-type") || ""
   const raw = await res.text()

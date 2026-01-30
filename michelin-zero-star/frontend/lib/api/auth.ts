@@ -56,3 +56,10 @@ export function logout() {
     method: "POST",
   })
 }
+
+// ✅ 추가: 토큰 갱신 (쿠키의 리프레시 토큰 사용)
+export function refreshAccessToken() {
+  return apiFetch<LoginResponse>("/api/v1/auth/refresh", {
+    method: "POST",
+  })
+}

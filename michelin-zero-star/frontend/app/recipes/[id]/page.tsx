@@ -113,15 +113,8 @@ export default function RecipeDetailPage() {
 
   const handleStartCooking = async () => {
     try {
-      const token = getCookie("cooksync_access_token")
-      if (!token) {
-        alert("로그인이 필요합니다.")
-        router.push("/login")
-        return
-      }
-
       setIsCookingLoading(true)
-      const data = await getCookingModeDetails(recipeId, token)
+      const data = await getCookingModeDetails(recipeId)
       setCookingData(data)
       setViewState("cooking")
     } catch (error) {
@@ -134,13 +127,10 @@ export default function RecipeDetailPage() {
 
   const handleCompleteCooking = async () => {
     try {
-      const token = getCookie("cooksync_access_token")
-      if (token) {
-        const response = await completeCooking(recipeId, token)
-        console.log("Cooking completed:", response)
-        if (response.isAwardedCookingCompleteReward) {
-          alert("요리 완료 보상을 획득했습니다!")
-        }
+      const response = await completeCooking(recipeId)
+      console.log("Cooking completed:", response)
+      if (response.isAwardedCookingCompleteReward) {
+        alert("요리 완료 보상을 획득했습니다!")
       }
     } catch (error) {
       console.error("Failed to complete cooking:", error)

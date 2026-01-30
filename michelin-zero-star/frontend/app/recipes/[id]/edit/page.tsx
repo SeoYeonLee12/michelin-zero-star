@@ -129,22 +129,6 @@ export default function EditRecipePage() {
                 if (data.steps && data.steps.length > 0) {
                     setSteps(data.steps.map(step => ({
                         id: step.step_number,
-                        action: "", // Backend typically doesn't have 'title' for step, using fallback if missing? backend only has description
-                        // Actually my mapBackendToFrontend in View used "Step N". Here I should check if backend provides it or just leave empty?
-                        // The backend DTO has `stepDescription`. It doesn't seem to have a step title.
-                        // The `RecipeStepRegisterRequest` has `stepDescription`.
-                        // The `BackendRecipeResponse` has `step_description`.
-                        // The `NewRecipePage` UI has "단계 제목 (action)". 
-                        // The backend API (RecipeStepRegisterRequest) DOES NOT have 'action' or 'title' field for step?
-                        // Let's check `RecipeStepRegisterRequest.java` I viewed earlier.
-                        // Fields: stepNumber, stepDescription, timerSeconds, stepImageUrl, cookingTip.
-                        // It seems 'action' field in frontend is lost when saving to backend? or mapped to description?
-                        // Wait, RegisterRecipeRequest in `recipes.ts` has `stepDescription`.
-                        // In `NewRecipePage`, `stepDescription: s.description` and `s.action` is... ignored?
-                        // Let's check NewRecipePage.
-                        // `stepDescription: s.description`. `s.action` is NOT sent to backend.
-                        // So when editing, I can't restore `action`. I'll just use "Step N" or empty.
-                        // To keep UI happy, I'll set it to `Step ${step.step_number}`.
                         action: `Step ${step.step_number}`, // Fallback
                         description: step.step_description,
                         duration: step.timer_seconds,
@@ -287,13 +271,6 @@ export default function EditRecipePage() {
         setConfirmDialogOpen(false)
 
         try {
-            const token = getCookie("cooksync_access_token")
-            if (!token) {
-                alert("로그인이 필요합니다.")
-                router.push("/login")
-                return
-            }
-
             // 1. 데이터 매핑
             const requestData: RegisterRecipeRequest = {
                 title,
@@ -324,7 +301,7 @@ export default function EditRecipePage() {
             }
 
             // 2. API 호출 (Update)
-            await updateRecipe(recipeId, requestData, token)
+            await updateRecipe(recipeId, requestData)
 
             // 3. 성공 처리
             setSuccessDialogOpen(true)
