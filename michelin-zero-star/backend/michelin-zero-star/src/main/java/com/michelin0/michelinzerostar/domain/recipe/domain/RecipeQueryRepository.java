@@ -181,12 +181,10 @@ public class RecipeQueryRepository {
                         recipe.recipeId,
                         recipe.title,
                         recipe.mainImageUrl,
-                        recipe.cookTime, // 필요 없어질 것
                         recipe.averageRating,
-                        recipe.servings, // 필요 없어질 것
                         isScrappedExpression(userId),
                         recipe.user.nickname,
-                        recipe.user.id.eq(userId)
+                        (userId != null) ? recipe.user.id.eq(userId) : Expressions.asBoolean(false)
                 ))
                 .from(recipe)
                 .join(recipe.user)
