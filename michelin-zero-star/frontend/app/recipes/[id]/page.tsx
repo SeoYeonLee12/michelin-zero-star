@@ -22,7 +22,7 @@ export default function RecipeDetailPage() {
   const params = useParams()
   const router = useRouter()
   const recipeId = params.id as string
-  const { userRecipes, user, completedRecipes } = useAuth()
+  const { userRecipes, user, completedRecipes, isLoading: isAuthLoading } = useAuth()
 
   // [추가] API 연동을 위한 상태 관리
   const [recipe, setRecipe] = React.useState<Recipe | null>(null)

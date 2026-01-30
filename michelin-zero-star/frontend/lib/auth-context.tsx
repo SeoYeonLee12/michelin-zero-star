@@ -189,8 +189,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // 성공 시: 메모리에 액세스 토큰 설정
         setGlobalAccessToken(refreshRes.accessToken)
         console.log("[AuthProvider] Silent Login Success")
-
-        // 3. 최신 유저 정보 동기화
+        // 3. 최신 유저 정보 동기화 하하하
+        // 3. 최신 유저 정보 동기화 하하하
         const me = await getMe()
         const recoveredUser: User = {
           id: String(me.id),
