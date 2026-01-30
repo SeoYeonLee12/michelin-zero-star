@@ -35,7 +35,6 @@ public class AuthService {
     private final RedisUtil redisUtil;
     private final RestTemplate restTemplate = new RestTemplate();
 
-    // 네이버 연동 해제를 위한 설정값 주입 필드 추가
     @Value("${spring.security.oauth2.client.registration.naver.client-id}")
     private String naverClientId;
 
@@ -68,6 +67,46 @@ public class AuthService {
         }
 
         Authentication authentication = authenticationManager.authenticate(authenticationToken);
+        return jwtTokenProvider.createToken(authentication);
+    }
+
+    // 재발급 로직
+    @Transactional
+    public TokenDto reissue(String refreshToken) {
+        // Refresh Token 검증
+        if (!jwtTokenProvider.validateToken(refreshToken)) {
+            throw new RuntimeException("Refresh Token이 유효하지 않습니다.");
+        }
+
+        // Redis에서 저장된 토큰 가져오기
+        Authentication authentication = jwtTokenProvider.getAuthentication(refreshToken);
+        String redisRefreshToken = redisUtil.getRefreshToken(authentication.getName());
+
+        if (redisRefreshToken == null || !refreshToken.equals(redisRefreshToken)) {
+            throw new RuntimeException("토큰 정보가 일치하지 않습니다.");
+        }
+
+        // Refresh Token 남은 시간 체크
+        Long remainingTime = jwtTokenProvider.getExpiration(refreshToken);
+
+        System.out.println("====== [DEBUG] 남은 시간: " + remainingTime + "ms ======");
+
+        // 만료 기간이 3일 이상 남았으면? -> Refresh Token 갱신 안 함
+        long threeDaysInMillis = 1000L * 60 * 60;
+
+        if (remainingTime > threeDaysInMillis) {
+            System.out.println("====== [DEBUG] 기존 토큰 유지 (로그인 풀림 방지 성공) ======");
+            // Access Token만 새로 생성
+            String newAccessToken = jwtTokenProvider.createAccessToken(authentication);
+
+            return TokenDto.builder()
+                    .grantType("Bearer")
+                    .accessToken(newAccessToken)
+                    .refreshToken(refreshToken) // 기존 토큰 그대로 반환
+                    .accessTokenExpiresIn(System.currentTimeMillis() + 1000 * 60 * 30) // 30분 뒤 만료
+                    .build();
+        }
+        System.out.println("====== [DEBUG] 새 토큰 교체 (로그인 풀림 위험) ======");
         return jwtTokenProvider.createToken(authentication);
     }
 

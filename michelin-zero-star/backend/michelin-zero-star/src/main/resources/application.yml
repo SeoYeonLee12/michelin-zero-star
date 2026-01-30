@@ -5,6 +5,37 @@ spring:
   profiles:
     active: local
 
+  # 파일 업로드 용량 제한
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  # [중요] DB 설정 (도커와 로컬 자동 호환)
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 도커 내부에서는 DB_HOST(michelin-db-local)와 DB_PORT(3306)를 사용
+    # 로컬(IntelliJ)에서는 기본값 localhost와 3307을 사용
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3307}/${DB_NAME:michelin-zero-star}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ${DB_USERNAME:michelin-user}
+    password: ${DB_PASSWORD:123}
+
+  # Redis 설정
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        highlight_sql: true
+
   security:
     oauth2:
       client:
@@ -15,7 +46,6 @@ spring:
             scope:
               - email
               - profile
-
           kakao:
             client-id: "a1f418f12dfefbde9916ccaa1897631a"
             client-secret: "exrONHZU97uqu4jCENKEQr4uobZ7xJld"
@@ -27,7 +57,6 @@ spring:
               - profile_image
               - account_email
             client-name: Kakao
-
           naver:
             client-id: "ZeFhdC2mJztKbiGSHFbj"
             client-secret: "rENAQLyW2G"
@@ -46,7 +75,6 @@ spring:
             token-uri: https://kauth.kakao.com/oauth/token
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
-
           naver:
             authorization-uri: https://nid.naver.com/oauth2.0/authorize
             token-uri: https://nid.naver.com/oauth2.0/token
@@ -74,3 +102,13 @@ springdoc:
 
 kakao:
   rest-api-key: "a1f418f12dfefbde9916ccaa1897631a"
+
+file:
+  upload-dir: ${FILE_UPLOAD_DIR:C:\Users\SSAFY\Desktop\image}
+
+logging:
+  level:
+    root: INFO
+    com.michelin0.michelinzerostar: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
