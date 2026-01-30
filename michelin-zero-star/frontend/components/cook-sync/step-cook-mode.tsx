@@ -436,19 +436,26 @@ export function StepCookMode({
   }, [isListening, aiOpen, micPermission, runSttOnce, goNextStep, goPrevStep, handleStartTimer, handlePauseTimer, safeStopStt])
 
   React.useEffect(() => {
-    const onPageHide = () => stopAllAudio()
     const onVis = () => {
-      if (document.visibilityState === "hidden") stopAllAudio()
+      if (document.visibilityState === "hidden") {
+        stopAllAudio()
+        return
+      }
+
+      // ✅ visible로 돌아오면, 사용자가 듣기 ON이고 채팅이 닫혀있을 때만 KWS 재개
+      if (
+        !shuttingDownRef.current &&
+        micPermission === "granted" &&
+        isListeningRef.current &&
+        !aiOpenRef.current
+      ) {
+        porcupineRef.current?.start()
+      }
     }
 
-    window.addEventListener("pagehide", onPageHide)
     document.addEventListener("visibilitychange", onVis)
-
-    return () => {
-      window.removeEventListener("pagehide", onPageHide)
-      document.removeEventListener("visibilitychange", onVis)
-    }
-  }, [stopAllAudio])
+    return () => document.removeEventListener("visibilitychange", onVis)
+  }, [micPermission, stopAllAudio])
 
   React.useEffect(() => {
     const onShutdown = () => shutdownAudioForNavigation()

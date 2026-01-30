@@ -67,23 +67,32 @@ export function RecipeCard({ recipe, isLiked, onHeartClick, onEdit, onDelete, on
   //     </div>
   //   )
   // }
-
+  const src = (recipe as any).image || recipe.thumbnail || "/placeholder.svg"
+  const isBlob = typeof src === "string" && src.startsWith("blob:")
   return (
     <div className="overflow-hidden group cursor-pointer" onClick={onClick}>
       <div className={`relative ${hideImage ? "aspect-square bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center" : "aspect-[4/3]"} overflow-hidden`}>
         {hideImage ? (
-          <img
-            src="/michelin-full-star.png"
-            alt="미슐랭"
-            className="h-16 w-16"
-          />
+          <img src="/michelin-full-star.png" alt="미슐랭" className="h-16 w-16" />
         ) : (
-          <Image
-            src={recipe.image || "/placeholder.svg"}
-            alt={recipe.name}
-            fill
-            className="object-cover group-hover:scale-105 transition-transform duration-300"
-          />
+          (() => {
+            const src = (recipe as any).image || recipe.thumbnail || "/placeholder.svg"
+            const isBlob = typeof src === "string" && src.startsWith("blob:")
+            return isBlob ? (
+              <img
+                src={src}
+                alt={recipe.name}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+            ) : (
+              <Image
+                src={src}
+                alt={recipe.name}
+                fill
+                className="object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+            )
+          })()
         )}
         <div className="absolute top-2 right-2">
           <Button
