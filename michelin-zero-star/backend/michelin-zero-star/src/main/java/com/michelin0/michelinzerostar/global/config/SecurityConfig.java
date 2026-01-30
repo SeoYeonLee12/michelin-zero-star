@@ -9,10 +9,13 @@ import com.michelin0.michelinzerostar.global.security.jwt.JwtTokenProvider;
 import com.michelin0.michelinzerostar.global.security.oauth.handler.OAuth2SuccessHandler;
 import com.michelin0.michelinzerostar.global.security.oauth.service.CustomOAuth2UserService;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Arrays;
+import java.util.Collections;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -25,6 +28,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Slf4j
 @Configuration
@@ -62,6 +68,9 @@ public class SecurityConfig {
         ObjectMapper objectMapper = new ObjectMapper();
 
         http
+                // ★ 1. CORS 설정 추가 (가장 중요!)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -74,21 +83,21 @@ public class SecurityConfig {
                         .requestMatchers("/css/**", "/images/**", "/js/**", "/favicon.*",
                                 "/*/icon-*").permitAll()
 
-                        // 인증 없이 접근 가능한 URL 목록
+                        // GET 요청만 허용
+                        .requestMatchers(HttpMethod.GET, "/api/recipes/**").permitAll()
+
+                        // 로그인, 회원가입, 재발급 등 허용
                         .requestMatchers(
                                 "/",
                                 "/error",
-                                "/api/v1/auth/**", // 회원가입, 로그인 등 auth 하위 경로 모두 허용
-                                "/api/users/login",
-                                "/api/users/signup",
+                                "/api/v1/auth/**", // ★ reissue 포함됨 (중요)
                                 "/api-docs/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/h2-console/**",
-                                "/api/recipes/",
-                                "/api/recipes/*"
+                                "/h2-console/**"
                         ).permitAll()
 
+                        // 나머지는 인증 필요
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
@@ -124,5 +133,21 @@ public class SecurityConfig {
                 );
 
         return http.build();
+    }
+
+    // CORS 설정 빈 등록
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        configuration.setAllowedHeaders(Collections.singletonList("*"));
+
+        // 쿠키(Credential) 전송 허용
+        configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Set-Cookie"));
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }

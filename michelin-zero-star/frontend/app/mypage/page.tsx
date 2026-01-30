@@ -315,7 +315,7 @@ export default function MyPage() {
                   { id: "saved", label: "저장한 레시피", icon: Bookmark },
                   { id: "myRecipes", label: "내 레시피", icon: ChefHat },
                   { id: "myPosts", label: "내 나눔", icon: FileText },
-                  { id: "likedPosts", label: "관심있는 나눔", icon: Heart },
+                  { id: "likedPosts", label: "관심 있는 나눔", icon: Heart },
                 ].map((item) => (
                   <button
                     key={item.id}

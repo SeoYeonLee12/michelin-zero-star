@@ -1,5 +1,6 @@
 package com.michelin0.michelinzerostar.domain.market.service;
 
+import com.michelin0.michelinzerostar.domain.market.dto.response.MarketPostListResponse; // ★ 추가됨
 import com.michelin0.michelinzerostar.domain.market.entity.MarketLike;
 import com.michelin0.michelinzerostar.domain.market.entity.MarketPost;
 import com.michelin0.michelinzerostar.domain.market.repository.MarketLikeRepository;
@@ -9,10 +10,13 @@ import com.michelin0.michelinzerostar.domain.user.repository.UserRepository;
 import com.michelin0.michelinzerostar.global.exception.errorcode.MarketErrorCode;
 import com.michelin0.michelinzerostar.global.exception.errorcode.UserErrorCode;
 import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List; // ★ 추가됨
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -47,5 +51,15 @@ public class MarketLikeService {
         MarketPost post = postRepository.findById(postId)
                 .orElseThrow(() -> new GlobalException(MarketErrorCode.POST_NOT_FOUND));
         return likeRepository.countByMarketPost(post);
+    }
+
+    // 내가 찜한 게시글 목록 조회
+    @Transactional(readOnly = true)
+    public List<MarketPostListResponse> getMyLikedPosts(Long userId) {
+        List<MarketLike> likes = likeRepository.findAllByUserIdOrderByCreatedAtDesc(userId);
+
+        return likes.stream()
+                .map(like -> new MarketPostListResponse(like.getMarketPost()))
+                .collect(Collectors.toList());
     }
 }

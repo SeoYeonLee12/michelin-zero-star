@@ -4,18 +4,27 @@ import com.michelin0.michelinzerostar.domain.auth.UserPrincipal;
 import com.michelin0.michelinzerostar.domain.recipe.application.RecipeService;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.CookModeCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeDetailCommand;
-import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.CookModeDetailResponse;
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeListCommand;
+import com.michelin0.michelinzerostar.domain.recipe.application.result.RecipeSaveResult;
+import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request.RecipeListSearchCondition;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request.RecipeRegisterRequest;
+import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.CookModeDetailResponse;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeDetailResponse;
+import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeListResponse;
+import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeModifyResponse;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.response.RecipeRegisterResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -34,9 +43,9 @@ public class RecipeController {
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestBody @Valid RecipeRegisterRequest recipeRegisterRequest
     ) {
-        Long recipeId = recipeService.saveRecipe(
+        RecipeSaveResult result = recipeService.saveRecipe(
                 recipeRegisterRequest.toCommand(principal.getId()));
-        return ResponseEntity.status(HttpStatus.CREATED).body(new RecipeRegisterResponse(recipeId));
+        return ResponseEntity.status(HttpStatus.CREATED).body(RecipeRegisterResponse.from(result));
 
     }
 
@@ -52,7 +61,7 @@ public class RecipeController {
     }
 
     @PutMapping("/{recipeId}")
-    public ResponseEntity<RecipeRegisterResponse> modifyRecipe(
+    public ResponseEntity<RecipeModifyResponse> modifyRecipe(
             @AuthenticationPrincipal UserPrincipal principle,
             @PathVariable Long recipeId,
             @RequestBody @Valid RecipeRegisterRequest recipeRegisterRequest
@@ -60,7 +69,7 @@ public class RecipeController {
         Long currentUserId = (principle != null) ? principle.getId() : null;
         Long response = recipeService.updateRecipe(
                 recipeRegisterRequest.toCommand(currentUserId, recipeId));
-        return ResponseEntity.status(HttpStatus.OK).body(new RecipeRegisterResponse(response));
+        return ResponseEntity.status(HttpStatus.OK).body(new RecipeModifyResponse(response));
     }
 
     @DeleteMapping("/{recipeId}")
@@ -82,5 +91,20 @@ public class RecipeController {
         CookModeCommand command = recipeService.getCookModeDetail(recipeId, currentUserId);
         CookModeDetailResponse response = CookModeDetailResponse.from(command);
         return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
+    @GetMapping
+    public ResponseEntity<RecipeListResponse> getRecipes(
+            @AuthenticationPrincipal UserPrincipal principle,
+            @PageableDefault(page = 0, size = 20) Pageable pageable,
+            @ModelAttribute @Valid RecipeListSearchCondition condition
+    ) {
+        Long userId = (principle != null) ? principle.getId() : null;
+        Page<RecipeListCommand> result = recipeService.getRecipeList(
+                condition.toCondition(),
+                pageable,
+                userId
+        );
+        return ResponseEntity.status(HttpStatus.OK).body(RecipeListResponse.from(result));
     }
 }
