@@ -73,14 +73,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex relative">
-      {/* 회원가입 성공 토스트 알림 (선택 사항) */}
-      {showSignupSuccess && (
-        <div className="absolute top-5 right-5 z-50 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg animate-in fade-in slide-in-from-top-4">
-          회원가입이 완료되었습니다! 로그인해 주세요.
-        </div>
-      )}
-
+    <div className="min-h-screen flex">
       {/* Left Panel */}
       <DotPatternBackground
         containerClassName="hidden lg:flex lg:w-1/2 min-h-screen bg-background"
@@ -93,6 +86,7 @@ export default function LoginPage() {
               className="bg-[#FEF2F2] shadow-none rounded-2xl"
               imgClassName="h-10 w-10"
             />
+
           </div>
           <span className="text-3xl font-bold tracking-tight">미슐랭 0스타</span>
         </div>
@@ -106,14 +100,13 @@ export default function LoginPage() {
           <Highlight className="text-foreground">셰프님</Highlight> 오셨습니까?
         </motion.h1>
 
-        {/* ✅ mounted 상태일 때만 텍스트를 렌더링하여 Hydration Error 완전 차단 */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3, duration: 0.5 }}
-          className="mt-6 text-muted-foreground text-center max-w-md text-lg h-7"
+          className="mt-6 text-muted-foreground text-center max-w-md text-lg"
         >
-          {mounted ? funMessage : ""}
+          {funMessage}
         </motion.p>
 
         <motion.div
@@ -163,7 +156,7 @@ export default function LoginPage() {
 
           <div className="space-y-2 text-center lg:text-left">
             <h2 className="text-2xl font-bold tracking-tight">로그인</h2>
-            <p className="text-muted-foreground">로그인하여 요리를 시작하세요</p>
+            <p className="text-muted-foreground">계정에 로그인하여 요리를 시작하세요</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -240,15 +233,8 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* ✅ Social Login Buttons */}
           <div className="grid grid-cols-3 gap-3">
-            {/* Google */}
-            <Button
-              type="button"
-              variant="outline"
-              className="h-12 bg-transparent"
-              onClick={() => handleSocialLogin("google")}
-            >
+            <Button variant="outline" className="h-12 bg-transparent">
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
                   fill="currentColor"
@@ -268,23 +254,12 @@ export default function LoginPage() {
                 />
               </svg>
             </Button>
-
-            {/* Naver */}
-            <Button
-              type="button"
-              variant="outline"
-              className="h-12 bg-[#03C75A] hover:bg-[#03C75A]/90 text-white border-[#03C75A]"
-              onClick={() => handleSocialLogin("naver")}
-            >
+            <Button variant="outline" className="h-12 bg-[#03C75A] hover:bg-[#03C75A]/90 text-white border-[#03C75A]">
               <span className="font-bold text-lg">N</span>
             </Button>
-
-            {/* Kakao */}
             <Button
-              type="button"
               variant="outline"
               className="h-12 bg-[#FEE500] hover:bg-[#FEE500]/90 text-[#3C1E1E] border-[#FEE500]"
-              onClick={() => handleSocialLogin("kakao")}
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
