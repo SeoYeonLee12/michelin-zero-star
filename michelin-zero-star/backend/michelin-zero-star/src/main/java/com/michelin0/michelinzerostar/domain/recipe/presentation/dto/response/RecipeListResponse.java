@@ -9,17 +9,6 @@ public record RecipeListResponse(
         PageInfo pageInfo
 ) {
 
-    public record PageInfo(
-            int currentPage,
-            int size,
-            long totalElements,
-            int totalPages,
-            boolean hasNext,
-            boolean hasPrevious
-    ) {
-
-    }
-
     public static RecipeListResponse from(Page<RecipeListCommand> page) {
         List<RecipesResponse> content = page.getContent().stream()
                 .map(RecipesResponse::from)
