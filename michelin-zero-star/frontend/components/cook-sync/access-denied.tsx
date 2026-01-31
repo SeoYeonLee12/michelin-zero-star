@@ -8,7 +8,7 @@ import { motion } from "framer-motion"
 interface AccessDeniedProps {
   type: "login" | "location"
 }
-
+// 커밋을 위한 주석
 export function AccessDenied({ type }: AccessDeniedProps) {
   const router = useRouter()
 
@@ -58,7 +58,7 @@ export function AccessDenied({ type }: AccessDeniedProps) {
         >
           {title}
         </motion.h2>
-        
+
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -83,7 +83,7 @@ export function AccessDenied({ type }: AccessDeniedProps) {
             {primaryButton.label}
             <ChevronRight className="ml-1 w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
           </Button>
-          
+
           {secondaryButton && (
             <Button
               variant="ghost"
