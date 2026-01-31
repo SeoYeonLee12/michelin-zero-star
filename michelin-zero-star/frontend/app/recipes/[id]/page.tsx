@@ -81,6 +81,11 @@ export default function RecipeDetailPage() {
         return
       }
 
+      // ✅ 인증 초기화가 완료될 때까지 대기
+      if (isAuthLoading) {
+        return
+      }
+
       try {
         setIsLoading(true)
         const data = await getRecipeDetail(recipeId)
@@ -95,7 +100,7 @@ export default function RecipeDetailPage() {
     }
 
     loadRecipe()
-  }, [recipeId])
+  }, [recipeId, isAuthLoading])
 
   if (recipeId === "new") {
     return <NewRecipeContent />

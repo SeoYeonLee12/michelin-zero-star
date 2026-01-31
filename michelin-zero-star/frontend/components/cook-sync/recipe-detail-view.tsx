@@ -303,6 +303,17 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
     )
   }, [recipe.hashtags])
 
+  // ✅ 초를 "N분 N초" 형식으로 변환
+  const formatCookTime = (seconds: number) => {
+    if (!seconds || seconds === 0) return "0초"
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+
+    if (minutes === 0) return `${remainingSeconds}초`
+    if (remainingSeconds === 0) return `${minutes}분`
+    return `${minutes}분 ${remainingSeconds}초`
+  }
+
   // ✅ 레시피 평점 표시 전용(부분 채움: 4.5 -> 4 full + 1 half)
   const renderRecipeRatingFlowers = (value: number) => {
     const rating = Number.isFinite(value) ? value : 0
@@ -335,7 +346,7 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
           })}
         </div>
 
-        <span className="text-sm text-[#800020] font-medium">{rating.toFixed(1)}</span>
+        {rating > 0 && <span className="text-sm text-[#800020] font-medium">{rating.toFixed(1)}</span>}
       </div>
     )
   }
@@ -406,16 +417,16 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <Clock className="h-4 w-4 text-[#800020]" />
-              <span>{recipe.duration}분</span>
+              <span>{formatCookTime(recipe.duration)}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Users className="h-4 w-4 text-[#800020]" />
               <span>{recipe.servings}인분</span>
             </div>
-            {recipe.calories && (
+            {(recipe.calories || recipe.calorie) && (
               <div className="flex items-center gap-1.5">
                 <Flame className="h-4 w-4 text-[#800020]" />
-                <span>{recipe.calories}kcal</span>
+                <span>{recipe.calories || recipe.calorie}kcal</span>
                 <Collapsible open={nutritionOpen} onOpenChange={setNutritionOpen}>
                   <CollapsibleTrigger asChild>
                     <button className="flex items-center gap-0.5 hover:text-foreground transition-colors ml-1">
@@ -475,7 +486,7 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
           </div>
 
           {/* ✅ 여기: 레시피 평점 표시 (부분 채움 반영) */}
-          {renderRecipeRatingFlowers(Number(recipeRating ?? 0))}
+          {renderRecipeRatingFlowers(Number(recipe.averageRating ?? 0))}
 
           {filteredTags.length > 0 && (
             <div className="flex flex-wrap gap-1">

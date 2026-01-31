@@ -5,6 +5,16 @@ const nextConfig = {
 
   async rewrites() {
     return [
+      // ✅ 레시피 API → 백엔드
+      {
+        source: "/api/recipes/:path*",
+        destination: "http://backend:8080/api/recipes/:path*",
+      },
+      {
+        source: "/api/recipes",
+        destination: "http://backend:8080/api/recipes",
+      },
+
       // ✅ 일반 API → 백엔드
       {
         source: "/api/v1/:path*",

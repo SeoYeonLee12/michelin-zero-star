@@ -255,8 +255,8 @@ export function StepCookMode({ steps, currentStepIndex, onStepChange, onComplete
   }
 
   const handleVoiceToggle = () => {
-  if (micPermission !== "granted") return
-  setIsListening((v) => !v)
+    if (micPermission !== "granted") return
+    setIsListening((v) => !v)
   }
 
   const handleAddTime = () => {

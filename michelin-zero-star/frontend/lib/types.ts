@@ -38,11 +38,13 @@ export interface Recipe {
   tags: string[]
   hashtags?: string[] // Added hashtags field for creator/channel info
   author?: string | Author // Support both string and object
-  rating?: number // Added rating field for michelin stars
-  duration: number // minutes from cookTime
+  rating?: number // Legacy field for michelin stars
+  averageRating?: number // Average rating from backend API
+  duration: number // minutes from cookTime (or seconds from API)
   difficulty: "초보" | "중급" | "상급" | string
   servings: number
-  calories?: number
+  calories?: number // Legacy field name
+  calorie?: number // Backend API field name
   nutrition?: NutritionInfo // Added nutrition field
   description?: string // Added description field for recipe intro
   steps: RecipeStep[]

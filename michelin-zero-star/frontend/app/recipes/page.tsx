@@ -107,7 +107,7 @@ export default function RecipesPage() {
           sort: sortParam, // Enum 문자열 그대로 전달 (LATEST, RATING, TIME)
           category: categoryParam || undefined,
           searchWord: searchWordParam || undefined,
-          page: pageParam - 1, // 백엔드는 0-base
+          page: pageParam - 1, // ✅ 백엔드는 0-based (Spring Pageable 기본값)
           size: ITEMS_PER_PAGE,
         })
 

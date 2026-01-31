@@ -79,19 +79,9 @@ export interface GetRecipeListParams {
 
 /**
  * 레시피 목록 조회 API
- * 백엔드 미구현으로 인해 Next.js Mock API(route.ts)를 호출합니다.
+ * 백엔드 API에 직접 연결
  */
-// lib/api/recipes.ts
-
-// ... (keep imports)
-
-// ... (keep interface definitions until getRecipeList)
-
-/**
- * 레시피 목록 조회 API
- * 백엔드 미구현으로 인해 Next.js Mock API(route.ts)를 호출합니다.
- */
-export async function getRecipeList(params: GetRecipeListParams) {
+export async function getRecipeList(params: GetRecipeListParams): Promise<RecipeListResponse> {
   const query = new URLSearchParams()
   query.append("recipeType", params.recipeType)
   query.append("sort", params.sort)
@@ -100,18 +90,9 @@ export async function getRecipeList(params: GetRecipeListParams) {
   if (params.page !== undefined) query.append("page", params.page.toString())
   if (params.size !== undefined) query.append("size", params.size.toString())
 
-  const response = await fetch(`/api/recipes?${query.toString()}`, {
+  return apiFetch<RecipeListResponse>(`/api/recipes?${query.toString()}`, {
     method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
   })
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch recipes: ${response.status}`)
-  }
-
-  return response.json() as Promise<RecipeListResponse>
 }
 
 /**
