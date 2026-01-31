@@ -18,6 +18,7 @@ public class MarketPostListResponse {
     private String timeAgo;
     private String status;
     private int chatCount;
+    private int likeCount;
 
     public MarketPostListResponse(MarketPost post) {
         this.id = post.getId();
@@ -26,6 +27,8 @@ public class MarketPostListResponse {
         this.location = post.getLocationText();
         this.status = post.getStatus().name();
         this.chatCount = post.getChatCount();
+        this.likeCount = post.getLikeCount();
+        this.likeCount = post.getLikeCount();
         this.timeAgo = calculateTimeAgo(post.getCreatedAt());
 
         this.thumbnailUrl = post.getImages().stream()

@@ -38,9 +38,11 @@ public class MarketLikeService {
 
         if (existingLike.isPresent()) {
             likeRepository.delete(existingLike.get());
+            post.decreaseLikeCount();
             return false;
         } else {
             likeRepository.save(MarketLike.builder().user(user).marketPost(post).build());
+            post.increaseLikeCount();
             return true;
         }
     }

@@ -11,4 +11,5 @@ public class MarketPostUpdateRequest {
     private String content;
     private int price;
     private String meetingPlace;
+    private String category;
 }

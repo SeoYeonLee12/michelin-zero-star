@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 public class UserUpdateRequestDto {
 
     private String nickname;
+    private String profileImageUrl;
     private String currentPassword;    // 현재 비밀번호
     private String newPassword;        // 바꿀 비밀번호
     private String newPasswordConfirm; // 바꿀 비밀번호 확인

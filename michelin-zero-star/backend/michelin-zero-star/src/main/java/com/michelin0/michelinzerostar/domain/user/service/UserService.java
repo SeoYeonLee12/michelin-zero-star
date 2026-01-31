@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final UserProfileRepository userProfileRepository; // 필드 추가
+    private final UserProfileRepository userProfileRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final RedisUtil redisUtil;
     private final PasswordEncoder passwordEncoder;
@@ -49,16 +49,16 @@ public class UserService {
                         .user(user)
                         .locationAddress(addressInfo.fullAddress())
                         .locationCode(addressInfo.code())
-                        .latitude(latitude)   // [중요] 생성 시 위도 저장
-                        .longitude(longitude) // [중요] 생성 시 경도 저장
-                        .isVerified(true)     // 생성 즉시 인증됨
+                        .latitude(latitude)
+                        .longitude(longitude)
+                        .isVerified(true)
                         .build());
 
-        // 정보 업데이트 (Dirty Checking)
+        // 정보 업데이트
         profile.updateLocation(addressInfo.fullAddress(), addressInfo.code(), latitude, longitude);
         userProfileRepository.save(profile);
 
-        return addressInfo.dongName(); // "둔산동" 반환
+        return addressInfo.dongName();
     }
 
     @Transactional
@@ -96,6 +96,7 @@ public class UserService {
 
         String newNickName = requestDto.getNickname();
 
+        // 닉네임 변경 검증 로직
         if (newNickName != null && !newNickName.isBlank()) {
             if (newNickName.equals(user.getNickname())) {
                 throw new GlobalException(AuthErrorCode.SAME_AS_OLD_NICKNAME);
@@ -105,8 +106,10 @@ public class UserService {
             }
         }
 
-        user.updateProfile(null, requestDto.getNickname(), null);
+        // 프로필 업데이트 (이미지 URL 전달)
+        user.updateProfile(null, requestDto.getNickname(), requestDto.getProfileImageUrl());
 
+        // 비밀번호 변경 로직 (로컬 로그인일 경우에만)
         if (provider == SocialProvider.LOCAL
                 && requestDto.getNewPassword() != null
                 && !requestDto.getNewPassword().isBlank()) {
@@ -143,6 +146,25 @@ public class UserService {
     public UserResponseDto getUser(String email, SocialProvider provider) {
         User user = userRepository.findByEmailAndSocialProvider(email, provider)
                 .orElseThrow(() -> new IllegalArgumentException("해당 유저가 없습니다."));
+
+        UserProfile profile = userProfileRepository.findById(user.getId())
+                .orElse(null);
+
+        if (profile != null) {
+            return UserResponseDto.builder()
+                    .id(user.getId())
+                    .email(user.getEmail())
+                    .name(user.getName())
+                    .nickname(user.getNickname())
+                    .profileImageUrl(user.getProfileImageUrl())
+                    .role(user.getRole())
+                    .totalStar(user.getTotalStar())
+                    .socialProvider(user.getSocialProvider())
+                    .location(profile.getLocationAddress())
+                    .isVerified(profile.isVerified())
+                    .build();
+        }
+
         return new UserResponseDto(user);
     }
 }

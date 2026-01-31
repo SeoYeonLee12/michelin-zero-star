@@ -3,6 +3,7 @@ package com.michelin0.michelinzerostar.domain.chat.controller;
 import com.michelin0.michelinzerostar.domain.auth.UserPrincipal;
 import com.michelin0.michelinzerostar.domain.chat.dto.ChatMessageRequest;
 import com.michelin0.michelinzerostar.domain.chat.dto.ChatMessageResponse;
+import com.michelin0.michelinzerostar.domain.chat.dto.ChatRoomCreateRequest;
 import com.michelin0.michelinzerostar.domain.chat.dto.ChatRoomListResponse;
 import com.michelin0.michelinzerostar.domain.chat.service.ChatService;
 import java.util.List;
@@ -26,13 +27,15 @@ public class ChatController {
     private final ChatService chatService;
 
     // [채팅방 생성]
-    // POST /api/v1/chat/rooms?postId=1
+    // POST /api/v1/chat/rooms
+    // Body: { "postId": 1 }
     @PostMapping("/rooms")
     public ResponseEntity<Long> createRoom(
             @AuthenticationPrincipal UserPrincipal user,
-            @RequestParam Long postId) {
+            @RequestBody ChatRoomCreateRequest request) {
 
-        Long roomId = chatService.createOrGetChatRoom(postId, user.getId());
+        // DTO에서 postId만 꺼내서 서비스로 전달
+        Long roomId = chatService.createOrGetChatRoom(request.getPostId(), user.getId());
         return ResponseEntity.ok(roomId);
     }
 
@@ -48,6 +51,8 @@ public class ChatController {
         return ResponseEntity.ok("메시지 전송 완료");
     }
 
+    // [메시지 내역 조회]
+    // GET /api/v1/chat/rooms/{roomId}/messages
     @GetMapping("/rooms/{roomId}/messages")
     public ResponseEntity<List<ChatMessageResponse>> getMessage(
             @AuthenticationPrincipal UserPrincipal user,
@@ -56,6 +61,8 @@ public class ChatController {
         return ResponseEntity.ok(messages);
     }
 
+    // [이미지 전송]
+    // POST /api/v1/chat/rooms/{roomId}/images
     @PostMapping("/rooms/{roomId}/images")
     public ResponseEntity<String> sendImage(
             @AuthenticationPrincipal UserPrincipal user,
@@ -66,6 +73,8 @@ public class ChatController {
         return ResponseEntity.ok("이미지 전송 완료");
     }
 
+    // [내 채팅방 목록 조회]
+    // GET /api/v1/chat/rooms
     @GetMapping("/rooms")
     public ResponseEntity<List<ChatRoomListResponse>> getChatRoomList(
             @AuthenticationPrincipal UserPrincipal user) {
