@@ -94,6 +94,7 @@ public class JwtTokenProvider {
                 .compact();
 
         String refreshToken = Jwts.builder()
+                .setSubject(subject) // ✅ 이메일(Subject) 추가 - reissue 시 필요!
                 .setExpiration(refreshTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
@@ -158,6 +159,7 @@ public class JwtTokenProvider {
         }
     }
 
+
     private Claims parseClaims(String accessToken) {
         try {
             return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(accessToken)
@@ -167,9 +169,18 @@ public class JwtTokenProvider {
         }
     }
 
-    public Long getExpiration(String accessToken) {
+    /**
+     * Refresh Token에서 이메일(Subject)을 추출하는 메서드
+     * Refresh Token은 auth 클레임이 없으므로 getAuthentication을 사용할 수 없음
+     */
+    public String getEmailFromRefreshToken(String refreshToken) {
+        Claims claims = parseClaims(refreshToken);
+        return claims.getSubject();
+    }
+
+    public Long getExpiration(String token) {
         Date expiration = Jwts.parserBuilder().setSigningKey(key).build()
-                .parseClaimsJws(accessToken).getBody().getExpiration();
+                .parseClaimsJws(token).getBody().getExpiration();
         long now = new Date().getTime();
         return (expiration.getTime() - now);
     }

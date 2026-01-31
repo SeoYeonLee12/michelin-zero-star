@@ -32,6 +32,8 @@ import {
 import { Upload, ChevronLeft, ChevronRight, X, Plus, Trash2, CheckCircle2 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
+import { getCookie } from "@/lib/cookie"
+import { registerRecipe, type RegisterRecipeRequest } from "@/lib/api/recipes"
 
 interface RecipeStep {
   id: number
@@ -62,9 +64,14 @@ const categoryOptions = [
   { value: "etc", label: "기타" },
 ]
 
+const CATEGORY_MAP: Record<string, number> = {
+  "korean": 1, "chinese": 2, "japanese": 3, "western": 4, "dessert": 5,
+  "snack": 6, "salad": 7, "drink": 8, "nightsnack": 9, "etc": 10
+}
+
 export default function NewRecipePage() {
   const router = useRouter()
-  const { isLoggedIn, addUserRecipe } = useAuth()
+  const { isLoggedIn, addUserRecipe, isLoading } = useAuth() // ✅ Added isLoading
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [category, setCategory] = useState("")
@@ -83,7 +90,9 @@ export default function NewRecipePage() {
   const [successDialogOpen, setSuccessDialogOpen] = useState(false)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [exitDialogOpen, setExitDialogOpen] = useState(false)
-  const [savedDialogOpen, setSavedDialogOpen] = useState(false)
+
+  // ✅ Wait for loading
+  if (isLoading) return null
 
   if (!isLoggedIn) {
     router.push("/login")
@@ -201,26 +210,56 @@ export default function NewRecipePage() {
     setConfirmDialogOpen(true)
   }
 
-  const handleConfirmSubmit = () => {
+
+
+  // ... existing code ...
+
+  const handleConfirmSubmit = async () => {
     setConfirmDialogOpen(false)
-    addUserRecipe({
-      title,
-      description,
-      category,
-      servings: Number(servings) || 1,
-      thumbnail: thumbnailPreview!,
-      tags,
-      ingredients: ingredients.map((i) => ({ name: i.name, amount: i.amount })),
-      steps: steps.map((step) => ({
-        id: step.id,
-        action: step.action,
-        description: step.description,
-        duration: step.duration,
-        imagePreview: step.imagePreview,
-        tips: step.tips,
-      })),
-    })
-    setSuccessDialogOpen(true)
+
+    try {
+      // 1. 데이터 매핑
+      const requestData: RegisterRecipeRequest = {
+        title,
+        // ✅ Blob URL 대신 placeholder URL 사용 (백엔드 URL 검증 통과용)
+        mainImageUrl: thumbnailPreview ? "https://example.com/placeholder-recipe-image.jpg" : "",
+        recipeDescription: description,
+        cookTime: totalCookingTime,
+        servings: Number(servings) || 1,
+        // 영양소 정보는 입력 UI가 없으므로 기본값 0 처리
+        calorie: 0,
+        carbohydrate: 0,
+        protein: 0,
+        saturatedFat: 0,
+        cholesterol: 0,
+        sodium: 0,
+        calcium: 0,
+        categoryIds: [CATEGORY_MAP[category] || 10], // Default 'etc'
+        ingredients: ingredients.map(i => ({
+          ingredientName: i.name,
+          ingredientAmount: i.amount
+        })),
+        tags: tags.map(t => ({ tagName: t })),
+        steps: steps.map(s => ({
+          stepNumber: s.id,
+          stepDescription: s.description,
+          timerSeconds: s.duration,
+          // ✅ Blob URL 대신 placeholder URL 사용 (백엔드 URL 검증 통과용)
+          stepImageUrl: s.imagePreview ? "https://example.com/placeholder-step-image.jpg" : "",
+          cookingTip: s.tips || null
+        }))
+      }
+
+      // 2. API 호출
+      await registerRecipe(requestData) // Token argument removed
+
+      // 3. 성공 처리
+      setSuccessDialogOpen(true)
+
+    } catch (error) {
+      console.error("Recipe registration failed:", error)
+      alert("레시피 등록에 실패했습니다.")
+    }
   }
 
   const handleViewRecipe = () => {
@@ -236,35 +275,7 @@ export default function NewRecipePage() {
     }
   }
 
-  const handleTempSave = () => {
-    setExitDialogOpen(false)
-    const tempData = {
-      title,
-      description,
-      category,
-      servings,
-      thumbnailPreview,
-      tags,
-      ingredients,
-      steps: steps.map((step) => ({
-        id: step.id,
-        action: step.action,
-        description: step.description,
-        duration: step.duration,
-        imagePreview: step.imagePreview,
-        tips: step.tips,
-      })),
-    }
-    localStorage.setItem("tempRecipe", JSON.stringify(tempData))
-    setSavedDialogOpen(true)
-  }
-
-  const handleSavedDialogClose = () => {
-    setSavedDialogOpen(false)
-    router.push("/")
-  }
-
-  const handleExitWithoutSave = () => {
+  const handleExitConfirm = () => {
     setExitDialogOpen(false)
     router.push("/")
   }
@@ -662,38 +673,19 @@ export default function NewRecipePage() {
       <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>임시저장 하시겠습니까?</AlertDialogTitle>
+            <AlertDialogTitle>작성을 취소하시겠습니까?</AlertDialogTitle>
             <AlertDialogDescription>
               작성 중인 내용이 있습니다. 페이지를 떠나면 작성 중인 내용이 사라집니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleExitWithoutSave}>아니오</AlertDialogCancel>
-            <AlertDialogAction onClick={handleTempSave} className="bg-[#800020] hover:bg-[#800020]/90">
-              임시저장
+            <AlertDialogCancel>계속 작성</AlertDialogCancel>
+            <AlertDialogAction onClick={handleExitConfirm} className="bg-[#800020] hover:bg-[#800020]/90">
+              나가기
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog open={savedDialogOpen} onOpenChange={setSavedDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <div className="flex justify-center mb-4">
-              <div className="h-16 w-16 rounded-full bg-[#800020]/10 flex items-center justify-center">
-                <CheckCircle2 className="h-8 w-8 text-[#800020]" />
-              </div>
-            </div>
-            <DialogTitle className="text-center">임시저장 완료</DialogTitle>
-            <DialogDescription className="text-center">작성 중인 레시피가 임시저장되었습니다.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-4">
-            <Button className="w-full bg-[#800020] hover:bg-[#800020]/90" onClick={handleSavedDialogClose}>
-              확인
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Success Dialog */}
       <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>

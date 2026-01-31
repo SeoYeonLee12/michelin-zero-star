@@ -8,13 +8,13 @@ import { RecipeDetailView } from "@/components/cook-sync/recipe-detail-view"
 import { StepCookMode } from "@/components/cook-sync/step-cook-mode"
 import { CompleteCookDialog } from "@/components/cook-sync/complete-cook-dialog"
 import { Button } from "@/components/ui/button"
-//  실제 API 함수를 가져오기
-import { leftoverRecipes } from "@/lib/dummy-data" 
-import { getRecipeDetail, BackendRecipeResponse } from "@/lib/api/recipes" 
+import { leftoverRecipes } from "@/lib/dummy-data"
+import { getRecipeDetail, BackendRecipeResponse, getCookingModeDetails, CookingModeResponse, completeCooking } from "@/lib/api/recipes"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import type { Recipe } from "@/lib/types"
 import { useAuth } from "@/lib/auth-context"
 import { NewRecipeContent } from "@/components/cook-sync/new-recipe-content"
+import { getCookie } from "@/lib/cookie"
 
 type ViewState = "detail" | "cooking"
 
@@ -22,11 +22,13 @@ export default function RecipeDetailPage() {
   const params = useParams()
   const router = useRouter()
   const recipeId = params.id as string
-  const { userRecipes, user, completedRecipes } = useAuth()
+  const { userRecipes, user, completedRecipes, isLoading: isAuthLoading } = useAuth()
 
   // [추가] API 연동을 위한 상태 관리
   const [recipe, setRecipe] = React.useState<Recipe | null>(null)
+  const [cookingData, setCookingData] = React.useState<CookingModeResponse | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
+  const [isCookingLoading, setIsCookingLoading] = React.useState(false)
   const [viewState, setViewState] = React.useState<ViewState>("detail")
   const [currentStepIndex, setCurrentStepIndex] = React.useState(0)
   const [showCompleteDialog, setShowCompleteDialog] = React.useState(false)
@@ -43,33 +45,51 @@ export default function RecipeDetailPage() {
       difficulty: "중급", // 백엔드 명세에 없는 경우 기본값
       servings: data.servings,
       calories: data.calorie || 0,
+      nutrition: {
+        carbohydrate: data.carbohydrate,
+        protein: data.protein,
+        fat: data.saturatedFat,
+        sodium: data.sodium,
+      },
       description: data.description,
+      ingredients: data.ingredients.map(i => ({
+        name: i.ingredient_name,
+        amount: i.ingredient_amount
+      })),
       steps: data.steps.map((step) => ({
         id: step.step_number,
         stepNumber: step.step_number,
-        action: step.step_description.slice(0, 15) + "...", // 요약 필드가 없을 때 대비
+        action: `Step ${step.step_number}`,
         description: step.step_description,
-        ingredients: [], // 필요 시 data.ingredients 매핑 로직 추가 가능
+        ingredients: [],
         tools: [],
         duration: step.timer_seconds,
         imageUrl: step.step_imageUrl || "/placeholder.svg",
         tips: step.cooking_tip || undefined,
       })),
+      isLiked: data.isScrapped,
+      isMine: data.isMine,
+      createdAt: data.createdAt,
     }
   }
 
   // [수정] useMemo 대신 useEffect를 사용하여 API 데이터를 fetch
   React.useEffect(() => {
     async function loadRecipe() {
-      if (recipeId === "new") {
+      if (!recipeId || recipeId === "new") {
         setIsLoading(false)
+        return
+      }
+
+      // ✅ 인증 초기화가 완료될 때까지 대기
+      if (isAuthLoading) {
         return
       }
 
       try {
         setIsLoading(true)
-        // 실제 API 호출 (authContext에 토큰이 완성되면 두 번째 인자로 전달)
         const data = await getRecipeDetail(recipeId)
+        console.log("Loaded Recipe Data:", data) // [Debug] Check image URLs
         setRecipe(mapBackendToFrontend(data))
       } catch (error) {
         console.error("레시피를 불러오는데 실패했습니다:", error)
@@ -80,7 +100,7 @@ export default function RecipeDetailPage() {
     }
 
     loadRecipe()
-  }, [recipeId])
+  }, [recipeId, isAuthLoading])
 
   if (recipeId === "new") {
     return <NewRecipeContent />
@@ -96,11 +116,31 @@ export default function RecipeDetailPage() {
     )
   }
 
-  const handleStartCooking = () => {
-    setViewState("cooking")
+  const handleStartCooking = async () => {
+    try {
+      setIsCookingLoading(true)
+      const data = await getCookingModeDetails(recipeId)
+      setCookingData(data)
+      setViewState("cooking")
+    } catch (error) {
+      console.error("Failed to start cooking mode:", error)
+      alert("요리 모드 시작에 실패했습니다.")
+    } finally {
+      setIsCookingLoading(false)
+    }
   }
 
-  const handleCompleteCooking = () => {
+  const handleCompleteCooking = async () => {
+    try {
+      const response = await completeCooking(recipeId)
+      console.log("Cooking completed:", response)
+      if (response.isAwardedCookingCompleteReward) {
+        alert("요리 완료 보상을 획득했습니다!")
+      }
+    } catch (error) {
+      console.error("Failed to complete cooking:", error)
+      // 계속 진행 (Dialog 표시)
+    }
     setShowCompleteDialog(true)
   }
 
@@ -139,7 +179,7 @@ export default function RecipeDetailPage() {
 
       <main className="flex-1">
         <div className="container mx-auto max-w-6xl px-4 py-8">
-          {/* Recipe Detail View */}
+          {/* View State: Detail */}
           {viewState === "detail" && (
             <motion.div
               initial={{ opacity: 0, y: 40 }}
@@ -154,20 +194,45 @@ export default function RecipeDetailPage() {
             </motion.div>
           )}
 
-          {/* Cooking Mode View */}
-          {viewState === "cooking" && (
+          {/* View State: Loading Cooking Data */}
+          {isCookingLoading && (
+            <div className="flex flex-col items-center justify-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-[#800020]" />
+              <p className="mt-4 text-muted-foreground">요리 모드 데이터를 준비 중입니다...</p>
+            </div>
+          )}
+
+          {/* View State: Cooking Mode */}
+          {viewState === "cooking" && !isCookingLoading && cookingData && (
             <motion.div
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, type: "spring", stiffness: 100, damping: 15 }}
               className="space-y-6"
             >
+              <div className="flex items-center gap-2 mb-4">
+                <Button variant="ghost" size="sm" onClick={handleBack}>
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  돌아가기
+                </Button>
+              </div>
+
               <StepCookMode
-                steps={recipe.steps}
+                steps={cookingData.steps.map(step => ({
+                  id: step.recipeStepId,
+                  stepNumber: step.stepNumber,
+                  action: `Step ${step.stepNumber}`,
+                  description: step.stepDescription,
+                  ingredients: [], // API doesn't provide step-specific ingredients
+                  tools: [],      // API doesn't provide tools
+                  duration: step.timerSeconds,
+                  imageUrl: step.stepImageUrl,
+                  tips: step.cookingTip || undefined,
+                }))}
                 currentStepIndex={currentStepIndex}
                 onStepChange={setCurrentStepIndex}
                 onComplete={handleCompleteCooking}
-                recipeName={recipe.name}
+                recipeName={cookingData.title}
               />
             </motion.div>
           )}

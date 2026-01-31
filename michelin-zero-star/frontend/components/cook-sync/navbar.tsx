@@ -213,10 +213,22 @@ export function Navbar({ onLogoClick }: NavbarProps) {
             <>
               <Popover open={dmOpen} onOpenChange={setDmOpen}>
                 <PopoverTrigger asChild>
-                  <Button
+                  {/* <Button
                     variant="ghost"
                     size="icon"
                     className="hidden lg:flex text-muted-foreground hover:text-foreground hover:bg-accent relative h-9 w-9"
+                  >
+                    <Send className="h-5 w-5" />
+                    {unreadDmCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-red-500 text-[10px] text-white flex items-center justify-center font-medium">
+                        {unreadDmCount}
+                      </span>
+                    )}
+                  </Button> */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="hidden lg:flex text-muted-foreground hover:text-foreground hover:bg-transparent relative h-9 w-9"
                   >
                     <Send className="h-5 w-5" />
                     {unreadDmCount > 0 && (
@@ -264,15 +276,21 @@ export function Navbar({ onLogoClick }: NavbarProps) {
                       ))
                     )}
                   </div>
-                  <div className="p-2 border-t">
+                  {/* <div className="p-2 border-t">
                     <Button variant="ghost" size="sm" className="w-full text-[#800020]" asChild>
+                      <Link href="/messages">모든 채팅 보기</Link>
+                    </Button>
+                  </div> */}
+                  <div className="p-2 border-t">
+                    <Button variant="ghost" size="sm" className="w-full text-[#800020] hover:bg-transparent hover:text-[#800020]
+                        focus-visible:ring-0 focus-visible:ring-offset-0" asChild>
                       <Link href="/messages">모든 채팅 보기</Link>
                     </Button>
                   </div>
                 </PopoverContent>
               </Popover>
 
-              <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
+              {/* <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="ghost"
@@ -334,7 +352,7 @@ export function Navbar({ onLogoClick }: NavbarProps) {
                     </Button>
                   </div>
                 </PopoverContent>
-              </Popover>
+              </Popover> */}
             </>
           )}
 
@@ -375,7 +393,14 @@ export function Navbar({ onLogoClick }: NavbarProps) {
             </DropdownMenu>
           ) : (
             <div className="flex items-center gap-2">
-              <Button variant="ghost" asChild className="hidden sm:inline-flex">
+              {/* <Button variant="ghost" asChild className="hidden sm:inline-flex">
+                <Link href="/login">로그인</Link>
+              </Button> */}
+              <Button
+                variant="ghost"
+                asChild
+                className="hidden sm:inline-flex hover:bg-transparent focus:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+              >
                 <Link href="/login">로그인</Link>
               </Button>
               <Button asChild className="bg-[#800020] hover:bg-[#800020]/90">

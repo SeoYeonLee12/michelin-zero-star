@@ -78,13 +78,29 @@ public class AuthService {
             throw new RuntimeException("Refresh Token이 유효하지 않습니다.");
         }
 
+        // ✅ Refresh Token에서 이메일 추출 (auth 클레임이 없으므로 getAuthentication 사용 불가)
+        String email = jwtTokenProvider.getEmailFromRefreshToken(refreshToken);
+
         // Redis에서 저장된 토큰 가져오기
-        Authentication authentication = jwtTokenProvider.getAuthentication(refreshToken);
-        String redisRefreshToken = redisUtil.getRefreshToken(authentication.getName());
+        String redisRefreshToken = redisUtil.getRefreshToken(email);
 
         if (redisRefreshToken == null || !refreshToken.equals(redisRefreshToken)) {
             throw new RuntimeException("토큰 정보가 일치하지 않습니다.");
         }
+
+        // ✅ DB에서 사용자 정보 조회 후 Authentication 생성
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+        // ✅ UserRole에서 권한 생성
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(
+                        email,
+                        null,
+                        java.util.Collections.singletonList(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority(user.getRole().getKey())
+                        )
+                );
 
         // Refresh Token 남은 시간 체크
         Long remainingTime = jwtTokenProvider.getExpiration(refreshToken);
