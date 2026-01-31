@@ -7,4 +7,6 @@ import org.springframework.stereotype.Repository;
 public interface RecipeTagRepository extends JpaRepository<RecipeTag, Long> {
 
     void removeAllBy(Long recipeId);
+
+    void deleteByRecipe(Recipe recipe);
 }

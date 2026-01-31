@@ -35,10 +35,10 @@ public class RecipeUpdate {
         Recipe searchedRecipe = recipeRepository.getById(recipeId);
         searchedRecipe.updateRecipe(updatedRecipe);
 
-        recipeIngredientRepository.deleteAllBy(recipeId);
-        recipeStepRepository.removeAllBy(recipeId);
-        recipeTagRepository.removeAllBy(recipeId);
-        recipeCategoryRepository.removeAllBy(recipeId);
+        recipeIngredientRepository.deleteByRecipe(searchedRecipe);
+        recipeStepRepository.deleteAByRecipe(searchedRecipe);
+        recipeTagRepository.deleteByRecipe(searchedRecipe);
+        recipeCategoryRepository.deleteByRecipe(searchedRecipe);
 
         searchedRecipe.registerIngredients(ingredients);
         searchedRecipe.registerSteps(steps);
