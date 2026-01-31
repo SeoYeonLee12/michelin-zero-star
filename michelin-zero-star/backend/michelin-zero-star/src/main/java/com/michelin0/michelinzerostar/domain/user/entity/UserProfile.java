@@ -1,5 +1,6 @@
 package com.michelin0.michelinzerostar.domain.user.entity;
 
+import com.michelin0.michelinzerostar.global.domain.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -21,7 +22,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-public class UserProfile {
+public class UserProfile extends BaseTimeEntity {
 
     @Id
     @Column(name = "users_id")
@@ -47,8 +48,6 @@ public class UserProfile {
     @Column(precision = 11, scale = 8)
     private BigDecimal longitude;
 
-
-    @Builder
     public void updateLocation(String locationAddress, String locationCode, BigDecimal latitude,
             BigDecimal longitude) {
         this.locationAddress = locationAddress;

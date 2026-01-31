@@ -28,6 +28,7 @@ import {
   ThumbsUp,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
+import { getPostList, deletePost, updatePost } from "@/lib/api/market" // Import APIs
 import Link from "next/link"
 import Image from "next/image"
 
@@ -59,13 +60,14 @@ export default function MyPage() {
   const {
     user,
     isLoggedIn,
+    isLoading, // ✅ Added
     likedRecipes,
     toggleLikeRecipe,
     userRecipes,
-    userPosts,
+    // userPosts, // Removed from context
     deleteUserRecipe,
-    deleteUserPost,
-    updateUserPost,
+    // deleteUserPost, // Removed from context
+    // updateUserPost, // Removed from context
     likedPosts,
   } = useAuth()
 
@@ -77,9 +79,40 @@ export default function MyPage() {
   const [selectedPostId, setSelectedPostId] = React.useState<string | null>(null)
   const [animatedStars, setAnimatedStars] = React.useState(0)
 
+  // Real Data State
+  const [myPosts, setMyPosts] = React.useState<any[]>([])
+  const [isLoadingPosts, setIsLoadingPosts] = React.useState(false)
+
   React.useEffect(() => {
-    if (!isLoggedIn) router.push("/login")
-  }, [isLoggedIn, router])
+    // ✅ Wait for loading to finish before redirecting
+    if (!isLoading && !isLoggedIn) {
+      router.push("/login")
+    }
+  }, [isLoading, isLoggedIn, router])
+
+  // Fetch My Posts
+  React.useEffect(() => {
+    async function fetchMyPosts() {
+      if (!user || !user.id) return
+      setIsLoadingPosts(true)
+      try {
+        // const allPosts = await getPostList()
+        // // Filter by writerId === user.id (Ensure type compatibility)
+        // const filtered = allPosts.filter(p => String(p.writerId) === String(user.id))
+        // setMyPosts(filtered)
+        setMyPosts([]) // Backend support removed
+      } catch (e) {
+        console.error("Failed to fetch my posts", e)
+      } finally {
+        setIsLoadingPosts(false)
+      }
+    }
+
+    if (activeTab === "myPosts") {
+      fetchMyPosts()
+    }
+  }, [activeTab, user])
+
 
   React.useEffect(() => {
     if (isLoggedIn && user?.stars !== undefined) {
@@ -103,6 +136,7 @@ export default function MyPage() {
     }
   }, [isLoggedIn, user?.stars])
 
+  if (isLoading) return null // ✅ Loading state
   if (!isLoggedIn) return null
 
   const totalStars = user?.stars || 0
@@ -115,15 +149,27 @@ export default function MyPage() {
     setSelectedRecipeId(null)
   }
 
-  const handleDeletePost = () => {
+  const handleDeletePost = async () => {
     if (!selectedPostId) return
-    deleteUserPost(selectedPostId)
+    // Call API
+    try {
+      await deletePost(selectedPostId)
+      setMyPosts(prev => prev.filter(p => String(p.id) !== selectedPostId)) // Optimistic update
+      alert("게시글이 삭제되었습니다.")
+    } catch (e) {
+      console.error("Failed to delete post", e)
+      alert("삭제 실패")
+    }
     setDeletePostDialogOpen(false)
     setSelectedPostId(null)
   }
 
-  const handleTogglePostStatus = (postId: string, currentStatus: string) => {
-    updateUserPost(postId, { status: currentStatus === "available" ? "completed" : "available" })
+  const handleTogglePostStatus = async (postId: string, currentStatus: string) => {
+    // API 미지원으로 인한 UI 전용 처리 (혹은 추후 구현)
+    // alert("상태 변경 기능을 확인해주세요.")
+    // UI 낙관적 업데이트
+    // setMyPosts(prev => prev.map(p => p.id === Number(postId) ? { ...p, status: currentStatus === "available" ? "completed" : "available" } : p))
+    alert("상태 변경 기능은 상세 페이지를 통해 확인해주세요. (현재 API 제한)")
   }
 
   const tabInfo = {
@@ -188,11 +234,8 @@ export default function MyPage() {
                         {user?.nickname?.charAt(0) || "U"}
                       </AvatarFallback>
                     </Avatar>
-                    {/* <Button size="icon" variant="secondary" className="absolute bottom-0 right-0 h-8 w-8 rounded-full shadow-md border-white border-2">
-                      <Camera className="h-4 w-4" />
-                    </Button> */}
                   </div>
-                  
+
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-2">
                       <h1 className="text-2xl font-bold text-foreground truncate">{user?.nickname || "사용자"}</h1>
@@ -227,18 +270,18 @@ export default function MyPage() {
                       <CollapsibleContent className="absolute z-50 mt-2 w-64 bg-white border rounded-lg shadow-xl p-4">
                         <div className="space-y-3 text-sm">
                           <div className="p-2 bg-muted rounded-lg">
-                            <p className="font-medium mb-1">별 획득 방법</p>
+                            <p className="font-medium mb-1">스타 획득 방법</p>
                             <ul className="space-y-0.5 text-muted-foreground text-xs">
-                              <li>• 요리 완료: 1개</li>
-                              <li>• 레시피 등록: 2개</li>
-                              <li>• 나눔 완료: 1개</li>
+                              <li>• 요리 완료: 0.5개</li>
+                              <li>• 레시피 등록: 1개</li>
+                              {/* <li>• 나눔 완료: 1개</li> */}
                             </ul>
                           </div>
                           <div className="p-2 bg-muted rounded-lg">
                             <p className="font-medium mb-1">일일 제한</p>
                             <p className="text-muted-foreground text-xs">하루 최대 3개까지 획득 가능</p>
                           </div>
-                      </div>
+                        </div>
                       </CollapsibleContent>
                     </Collapsible>
                   </div>
@@ -250,7 +293,7 @@ export default function MyPage() {
 
                 <div className="relative w-full">
                   <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                    <div 
+                    <div
                       className="h-full bg-[#800020] rounded-full transition-all duration-1000 ease-out"
                       style={{ width: `${Math.min((animatedStars / 100) * 100, 100)}%` }}
                     />
@@ -266,13 +309,13 @@ export default function MyPage() {
 
         {/* ✅ Tabs 레이아웃 시작: aside와 content를 모두 감쌈 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="flex flex-col md:flex-row gap-8 items-start relative mt-4">
-            
+          <div className="flex flex-col md:flex-row gap-8 items-start relative mt-8">
+
             {/* [좌측 사이드바] 스크롤 시 상단 고정 */}
             <aside className="hidden md:block w-1/5 sticky top-24 shrink-0">
               <div className="flex flex-col space-y-1 bg-gray-50/50 p-2 rounded-2xl border border-gray-100">
                 {/* <p className="text-[11px] font-bold text-gray-400 px-3 py-2 uppercase tracking-tight">마이 페이지 카테고리</p> */}
-                
+
                 {[
                   { id: "saved", label: "저장한 레시피", icon: Bookmark },
                   { id: "myRecipes", label: "내 레시피", icon: ChefHat },
@@ -284,8 +327,8 @@ export default function MyPage() {
                     onClick={() => setActiveTab(item.id)}
                     className={`
                       flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all
-                      ${activeTab === item.id 
-                        ? "bg-white text-[#800020] shadow-sm border border-gray-100 font-bold" 
+                      ${activeTab === item.id
+                        ? "bg-white text-[#800020] shadow-sm border border-gray-100 font-bold"
                         : "text-muted-foreground hover:bg-white/50 hover:text-foreground"
                       }
                     `}
@@ -354,31 +397,33 @@ export default function MyPage() {
                 <div className="flex justify-end mb-2">
                   <Button variant="link" className="text-[#800020]" onClick={() => router.push("/community/new")}>새 글 작성</Button>
                 </div>
-                {userPosts.length === 0 ? (
+                {isLoadingPosts ? (
+                  <div className="p-12 text-center text-muted-foreground">로딩 중...</div>
+                ) : myPosts.length === 0 ? (
                   <Card><CardContent className="p-8 text-center">
                     <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
                     <p className="text-muted-foreground">작성한 나눔글이 없습니다.</p>
                   </CardContent></Card>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {userPosts.map((post) => (
+                    {myPosts.map((post) => (
                       <div key={post.id} className="cursor-pointer group" onClick={() => router.push(`/community/${post.id}`)}>
                         <div className="relative aspect-[4/3] overflow-hidden bg-muted rounded-lg mb-2">
-                          <Image src={post.image || "/placeholder.svg"} alt={post.title} fill className="object-cover transition-transform group-hover:scale-105" />
-                          {post.status === "completed" && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><span className="text-white text-sm">거래 완료</span></div>}
+                          <Image src={post.thumbnailUrl || "/placeholder.svg"} alt={post.title} fill className="object-cover transition-transform group-hover:scale-105" />
+                          {post.status === "COMPLETED" && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><span className="text-white text-sm">거래 완료</span></div>}
                           <div className="absolute top-2 right-2">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild><Button size="icon" variant="secondary" className="h-7 w-7 rounded-full bg-white/80" onClick={(e) => e.stopPropagation()}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleTogglePostStatus(post.id, post.status || "available"); }}><CheckCircle className="h-4 w-4 mr-2" />상태 변경</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => router.push(`/community/edit/${post.id}`)}><Edit className="h-4 w-4 mr-2" />수정</DropdownMenuItem>
-                                <DropdownMenuItem className="text-destructive" onClick={() => { setSelectedPostId(post.id); setDeletePostDialogOpen(true); }}><Trash2 className="h-4 w-4 mr-2" />삭제</DropdownMenuItem>
+                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleTogglePostStatus(String(post.id), post.status || "available"); }}><CheckCircle className="h-4 w-4 mr-2" />상태 변경</DropdownMenuItem>
+                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/community/edit/${post.id}`) }}><Edit className="h-4 w-4 mr-2" />수정</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); setSelectedPostId(String(post.id)); setDeletePostDialogOpen(true); }}><Trash2 className="h-4 w-4 mr-2" />삭제</DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
                         </div>
                         <h3 className="font-medium text-sm line-clamp-2">{post.title}</h3>
-                        <p className="font-bold text-[#800020]">{post.price}</p>
+                        <p className="font-bold text-[#800020]">{post.price ? Number(post.price).toLocaleString() : 0}원</p>
                       </div>
                     ))}
                   </div>
@@ -418,7 +463,7 @@ export default function MyPage() {
             <DialogFooter><Button variant="outline" onClick={() => setDeleteRecipeDialogOpen(false)}>아니요</Button><Button variant="destructive" onClick={handleDeleteRecipe}>삭제</Button></DialogFooter>
           </DialogContent>
         </Dialog>
-        
+
         <Dialog open={deletePostDialogOpen} onOpenChange={setDeletePostDialogOpen}>
           <DialogContent>
             <DialogHeader><DialogTitle>게시글 삭제</DialogTitle><DialogDescription>정말 삭제하시겠습니까?</DialogDescription></DialogHeader>

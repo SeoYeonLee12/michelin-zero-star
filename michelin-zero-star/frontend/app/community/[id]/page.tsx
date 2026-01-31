@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Navbar } from "@/components/cook-sync/navbar"
 import { ScrollToTop } from "@/components/cook-sync/scroll-to-top"
@@ -17,6 +17,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { getPostDetail, deletePost } from "@/lib/api/market"
 import {
   ArrowLeft,
   Heart,
@@ -114,39 +115,48 @@ export default function CommunityDetailPage() {
   const router = useRouter()
   const params = useParams()
   const postId = params.id as string
-  const { isLoggedIn, userPosts, user, likedPosts, toggleLikePost, updateUserPost } = useAuth()
+  const { isLoggedIn, user, toggleLikePost } = useAuth()
+  // const { isLoggedIn, userPosts, user, likedPosts, toggleLikePost, updateUserPost } = useAuth() // AuthContext의 userPosts 사용 중단
+  // likedPosts는 AuthContext에서 가져오되, 상세 조회 시 API에서 like 여부를 알 수 있다면 좋음.
+  // 현재 API에는 'owner' 필드가 있고, 'isLiked'는 없음. likedPosts를 통해 확인.
 
+  const [post, setPost] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [statusDialogOpen, setStatusDialogOpen] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<"available" | "completed">("available")
 
-  // Check if this is a user-created post
-  const userPost = userPosts.find((p) => p.id === postId)
-  const isMyPost = !!userPost
-
-  const post = userPost
-    ? {
-        id: userPost.id,
-        user: {
-          id: user?.id || "current-user",
-          name: user?.name || "나",
-          avatar: user?.profileImage || "/placeholder.svg",
-          location: user?.location || "대전",
-          starLevel: 0,
-        },
-        title: userPost.title,
-        description: userPost.description,
-        price: userPost.price,
-        images: [userPost.image],
-        place: (userPost as any).place || "장소 미정",
-        timeAgo: "방금 전",
-        likes: (userPost as any).likes || 0,
-        chatCount: 0,
-        status: userPost.status as "available" | "completed",
+  useEffect(() => {
+    async function fetchPost() {
+      try {
+        const data = await getPostDetail(postId)
+        setPost(data)
+      } catch (error) {
+        console.error("Failed to fetch post:", error)
+      } finally {
+        setLoading(false)
       }
-    : mockPosts[postId]
+    }
+    fetchPost()
+  }, [postId])
 
+  // const isLiked = likedPosts.some((p) => p.id === postId) // AuthContext 사용
+  // API 응답에 liked 여부가 없다면 기존 로직 유지
+  const { likedPosts } = useAuth()
   const isLiked = likedPosts.some((p) => p.id === postId)
+
+  const isMyPost = post?.owner || false
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Navbar />
+        <main className="flex-1 container mx-auto max-w-4xl px-4 py-8 flex justify-center items-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </main>
+      </div>
+    )
+  }
 
   if (!post) {
     return (
@@ -169,7 +179,19 @@ export default function CommunityDetailPage() {
       router.push("/login")
       return
     }
-    toggleLikePost(e, post)
+    // API 데이터와 AuthContext 포맷 맞추기 (임시)
+    const postForContext = {
+      id: String(post.id),
+      title: post.title,
+      description: post.content,
+      price: post.price.toLocaleString(),
+      image: post.imageUrls[0],
+      place: post.meetingPlace,
+      likes: 0,
+      createdAt: post.createdAt,
+      status: post.status as "available" | "completed",
+    }
+    toggleLikePost(e, postForContext as any)
   }
 
   const handleChat = () => {
@@ -177,31 +199,48 @@ export default function CommunityDetailPage() {
       router.push("/login")
       return
     }
-    // router.push(`/messages/${post.user.id}`)
-    // router.push(`/messages/${post.user.id}?name=${encodeURIComponent(post.user.name)}`)
-    // router.push(`/messages/${post.user.id}?name=${encodeURIComponent(post.user.name)}&avatar=${encodeURIComponent(post.user.avatar)}`)
-    router.push(`/messages/${post.user.id}?name=${encodeURIComponent(post.user.name)}&avatar=${encodeURIComponent(post.user.avatar)}&from=post`)
+    router.push(`/messages/${post.writerId}?name=${encodeURIComponent(post.writerNickname || "이웃")}`)
   }
 
   const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % post.images.length)
+    setCurrentImageIndex((prev) => (prev + 1) % post.imageUrls.length)
   }
 
   const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + post.images.length) % post.images.length)
+    setCurrentImageIndex((prev) => (prev - 1 + post.imageUrls.length) % post.imageUrls.length)
   }
 
-  const handleStatusChange = (newStatus: "available" | "completed") => {
+  const handleStatusChange = async (newStatus: "available" | "completed") => {
     setPendingStatus(newStatus)
     setStatusDialogOpen(true)
   }
 
-  const confirmStatusChange = () => {
-    updateUserPost(postId, { status: pendingStatus })
+  const confirmStatusChange = async () => {
+    // API 필요 (updatePost로 status 변경 가능한지 확인 필요, 현재 DTO에는 status 없음)
+    // 현재 제공된 API spec에는 updatePost DTO에 status가 없음.
+    // 따라서 이 기능은 잠시 보류하거나 updatePost에 status 추가 요청 필요.
+    // -> 일단 UI에서만 변경하는 척 하거나, updatePost에 status 필드가 있다면 보냄.
+    // 명세상 DTO: title, content, price, meetingPlace.
+    // Status 변경 API가 별도로 없으므로, '수정' 페이지에서만 가능한가?
+    // 일단 API 호출은 생략하고 UI만 닫음 (또는 updatePost 시도)
     setStatusDialogOpen(false)
+    alert("상태 변경 기능을 확인해주세요.")
   }
 
-  const likeCount = post.likes + (isLiked ? 1 : 0)
+  const handleDelete = async () => {
+    if (confirm("정말로 이 게시글을 삭제하시겠습니까?")) {
+      try {
+        await deletePost(post.id)
+        alert("게시글이 삭제되었습니다.")
+        router.push("/community")
+      } catch (e) {
+        console.error("Delete failed", e)
+        alert("삭제 실패")
+      }
+    }
+  }
+
+  const likeCount = (post.likes || 0) + (isLiked ? 1 : 0) // API에 likes가 없으면 0 처리
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -218,7 +257,7 @@ export default function CommunityDetailPage() {
           <div className="space-y-4">
             <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted">
               <Image
-                src={post.images[currentImageIndex] || "/placeholder.svg"}
+                src={post.imageUrls?.[currentImageIndex] || "/placeholder.svg"}
                 alt={post.title}
                 fill
                 className="object-cover"
@@ -228,7 +267,7 @@ export default function CommunityDetailPage() {
                   <Badge className="bg-gray-600 text-white text-lg px-4 py-2">거래 완료</Badge>
                 </div>
               )}
-              {post.images.length > 1 && (
+              {post.imageUrls?.length > 1 && (
                 <>
                   <button
                     onClick={prevImage}
@@ -243,7 +282,7 @@ export default function CommunityDetailPage() {
                     <ChevronRight className="h-6 w-6" />
                   </button>
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                    {post.images.map((_, idx) => (
+                    {post.imageUrls.map((_: any, idx: number) => (
                       <div
                         key={idx}
                         className={cn(
@@ -278,26 +317,28 @@ export default function CommunityDetailPage() {
               <h1 className="text-2xl font-bold mb-2">{post.title}</h1>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
-                <span>{post.timeAgo}</span>
+                {/* timeAgo는 Detail Response에 없으므로 createdAt 가공 필요하거나 API 추가 필요. 일단 createdAt 표시 */}
+                <span>{new Date(post.createdAt).toLocaleDateString()}</span>
               </div>
             </div>
 
             <div>
-              <p className="text-2xl font-bold text-[#800020]">{post.price}</p>
+              <p className="text-2xl font-bold text-[#800020]">{post.price.toLocaleString()}원</p>
             </div>
 
             <div className="flex items-center gap-2 text-muted-foreground">
               <MapPin className="h-4 w-4" />
-              <span className="font-medium">거래 장소: {post.place}</span>
+              <span className="font-medium">거래 장소: {post.meetingPlace || post.location}</span>
             </div>
 
-            <div className="whitespace-pre-line text-muted-foreground">{post.description}</div>
+            <div className="whitespace-pre-line text-muted-foreground">{post.content}</div>
 
             {isMyPost && (
               <div className="p-4 bg-[#800020]/5 rounded-xl border border-[#800020]/20 space-y-3">
                 <p className="text-sm font-medium text-[#800020]">내 게시글 관리</p>
                 <div className="flex gap-2">
-                  <Button
+                  {/* Status Change - API 미지원이므로 비활성화 혹은 TODO */}
+                  {/* <Button
                     variant={post.status === "completed" ? "default" : "outline"}
                     size="sm"
                     onClick={() => handleStatusChange(post.status === "completed" ? "available" : "completed")}
@@ -305,7 +346,8 @@ export default function CommunityDetailPage() {
                   >
                     <CheckCircle className="h-4 w-4" />
                     {post.status === "completed" ? "거래완료 취소" : "거래완료로 변경"}
-                  </Button>
+                  </Button> */}
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -313,29 +355,35 @@ export default function CommunityDetailPage() {
                     className="flex-1 gap-2"
                   >
                     <Pencil className="h-4 w-4" />
-                    내용 수정
+                    수정
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleDelete}
+                    className="flex-1 gap-2"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    삭제
                   </Button>
                 </div>
               </div>
             )}
 
-            {/* User Profile - removed chat button */}
+            {/* User Profile */}
             <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-xl">
               <Avatar className="h-12 w-12">
-                <AvatarImage src={post.user.avatar || "/placeholder.svg"} />
-                <AvatarFallback>{post.user.name[0]}</AvatarFallback>
+                <AvatarImage src={"/placeholder.svg"} /> {/* 작성자 이미지 API에 없음 (writerAvatar 필요? writerNickname만 있음) */}
+                <AvatarFallback>{post.writerNickname?.[0]}</AvatarFallback>
               </Avatar>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="font-semibold">{post.user.name}</p>
-                  <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">
-                    <img src="/michelin-star.png" alt="미슐랭" className="h-3 w-3 mr-1" />
-                    {post.user.starLevel}개
-                  </Badge>
+                  <p className="font-semibold">{post.writerNickname}</p>
+                  {/* Star Level 정보 API에 없음 */}
                 </div>
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
                   <MapPin className="h-3 w-3" />
-                  {post.user.location}
+                  {post.location}
                 </p>
               </div>
             </div>
@@ -367,27 +415,7 @@ export default function CommunityDetailPage() {
           </div>
         </div>
       </main>
-
-      <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>거래 상태 변경</DialogTitle>
-            <DialogDescription>
-              {pendingStatus === "completed"
-                ? "이 게시글을 거래완료로 변경하시겠습니까?"
-                : "거래완료를 취소하시겠습니까?"}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setStatusDialogOpen(false)}>
-              아니요
-            </Button>
-            <Button onClick={confirmStatusChange} className="bg-[#800020] hover:bg-[#800020]/90">
-              예
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Dialog for Status kept but commented out logic called */}
     </div>
   )
 }

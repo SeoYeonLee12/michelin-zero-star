@@ -1,14 +1,15 @@
 "use client"
 
 import * as React from "react"
-import { mockVerifyUserLocation } from "./mock-api"
 import type { LocationRequestDto } from "./types"
-import { getMe } from "./api/user"
-import { login as loginAPI, signup as signupAPI } from "./api/auth"
+import { getMe, updateProfile as updateProfileAPI, withdrawUser } from "./api/user"
+import { login as loginAPI, signup as signupAPI, logout as logoutAPI } from "./api/auth"
 import { verifyLocation } from "./api/user"
+import { setCookie, getCookie, removeCookie } from "./cookie"
+import { setGlobalAccessToken, getGlobalAccessToken } from "./api/client" // ✅ Import
+import { refreshAccessToken } from "./api/auth" // ✅ Import
 
-
-// ✅ 개발 환경에서 mock 사용 여부 (필요 시 false로 변경하여 실제 API 테스트)
+// ✅ 개발 환경에서 mock 사용 여부
 const USE_MOCK_API = false
 const FIXED_LATITUDE = 36.3549777
 const FIXED_LONGITUDE = 127.2983403
@@ -77,7 +78,6 @@ interface UserRecipe {
   id: string
   title: string
   description: string
-  category: string
   servings: number
   thumbnail: string
   tags: string[]
@@ -111,12 +111,13 @@ interface UserPost {
 type LikedPost = UserPost & { savedAt: string }
 
 interface AuthContextType {
+  isLoading: boolean // ✅ Added
   user: User | null
   isLoggedIn: boolean
   login: (email: string, password: string) => Promise<void>
   signup: (data: { name: string; nickname: string; email: string; password: string }) => Promise<void>
   logout: () => void
-  updateProfile: (data: Partial<User>) => void
+  updateProfile: (data: Partial<User> & { currentPassword?: string; newPassword?: string; newPasswordConfirm?: string }) => Promise<void>
   updateLocation: (latitude: number, longitude: number) => Promise<string>
   likedRecipes: LikedRecipe[]
   toggleLikeRecipe: (recipe: LikedRecipe) => void
@@ -143,13 +144,16 @@ interface AuthContextType {
   reviewedRecipes: Set<string>
   markRecipeAsReviewed: (recipeId: string) => void
   hasUserReviewedRecipe: (recipeId: string) => boolean
+  withdraw: () => Promise<void>
 }
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  console.log("[AuthProvider] render") // ✅ 추가
+  console.log("[AuthProvider] render")
+  const [isLoading, setIsLoading] = React.useState(true) // ✅ Added
   const [user, setUser] = React.useState<User | null>(null)
+
   const [likedRecipes, setLikedRecipes] = React.useState<LikedRecipe[]>([])
   const [conversations, setConversations] = React.useState<Conversation[]>([])
   const [messages, setMessages] = React.useState<Message[]>([])
@@ -159,48 +163,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [completedRecipes, setCompletedRecipes] = React.useState<Set<string>>(new Set())
   const [reviewedRecipes, setReviewedRecipes] = React.useState<Set<string>>(new Set())
 
-  // Initial load from storage
+  // ✅ Prevent double-execution in Strict Mode (Token Rotation Safety)
+  const isAuthInitialized = React.useRef(false)
+
+  // Initial load from storage & Silent Refresh
   React.useEffect(() => {
-    console.log("[AuthProvider] useEffect start") // ✅ 추가
+    console.log("[AuthProvider] useEffect start")
+
+    // 1. LocalStorage에서 사용자 정보(껍데기) 복구 (Synchronous)
     const savedUserRaw = localStorage.getItem("cooksync_user")
     const savedUser = safeJsonParse<User | null>(savedUserRaw, null)
-    const isValidSavedUser = savedUser && typeof savedUser.id === "string" && savedUser.id.length > 0
+    if (savedUser) {
+      setUser(savedUser)
+    }
 
-    if (isValidSavedUser) setUser(savedUser)
+    const initAuth = async () => {
+      // 0. Cleanup Legacy Data (User confusion prevention)
+      localStorage.removeItem("cooksync_access_token")
 
-    // ✅ 추가: user 없고 토큰만 있으면 users/me로 복구
-    if (!savedUser) {
-      const token = localStorage.getItem("cooksync_access_token")
-      if (token) {
-        getMe()
-          .then((me) => {
-            const recoveredUser: User = {
-              id: String(me.id),
-              name: me.name ?? "",
-              nickname: me.nickname ?? "",
-              email: me.email ?? "",
-              profileImage: me.profileImage,
-              level: me.level ?? "",
-              bio: me.bio ?? "",
-              location: me.location,
-              latitude: me.latitude,
-              longitude: me.longitude,
-              locationCode: me.locationCode,
-              stars: me.stars ?? 0,
-              todayStars: me.todayStars ?? 0,
-              lastStarDate: me.lastStarDate ?? new Date().toISOString().split("T")[0],
-            }
+      // 2. Silent Refresh 시도 (쿠키에 있는 리프레시 토큰으로 액세스 토큰 발급)
+      try {
+        console.log("[AuthProvider] Attempting Silent Login...")
+        const refreshRes = await refreshAccessToken() // ✅ Refreshed Token
 
-            setUser(recoveredUser)
-            localStorage.setItem("cooksync_user", JSON.stringify(recoveredUser))
-          })
-          .catch(() => {
-            // 토큰 만료/무효면 정리
-            localStorage.removeItem("cooksync_access_token")
-            localStorage.removeItem("cooksync_refresh_token")
-            localStorage.removeItem("cooksync_user")
-          })
+        // 성공 시: 메모리에 액세스 토큰 설정
+        setGlobalAccessToken(refreshRes.accessToken)
+        console.log("[AuthProvider] Silent Login Success")
+        // 3. 최신 유저 정보 동기화 하하하
+        // 3. 최신 유저 정보 동기화 하하하
+        const me = await getMe()
+        const recoveredUser: User = {
+          id: String(me.id),
+          name: me.name ?? "",
+          nickname: me.nickname ?? "",
+          email: me.email ?? (savedUser?.email ?? ""),
+          profileImage: me.profileImage,
+          level: me.level ?? "",
+          bio: me.bio ?? "",
+          location: me.location,
+          latitude: me.latitude,
+          longitude: me.longitude,
+          locationCode: me.locationCode,
+          stars: me.stars ?? 0,
+          todayStars: me.todayStars ?? 0,
+          lastStarDate: me.lastStarDate ?? new Date().toISOString().split("T")[0],
+        }
+        setUser(recoveredUser)
+        localStorage.setItem("cooksync_user", JSON.stringify(recoveredUser))
+
+      } catch (error) {
+        console.warn("[AuthProvider] Silent Login Failed (No valid session):", error)
+        // 세션 만료됨 -> 로그아웃 처리
+        setUser(null)
+        setGlobalAccessToken(null)
+        localStorage.removeItem("cooksync_user")
+        // 쿠키는 JS에서 삭제 불가(HttpOnly)하므로 놔둠 (서버가 401 줄 것임)
+      } finally {
+        setIsLoading(false) // ✅ Loading Finished
       }
+    }
+
+    // ✅ Run only once
+    if (!isAuthInitialized.current) {
+      isAuthInitialized.current = true
+      initAuth()
     }
 
     const savedLikedRecipes = safeJsonParse<LikedRecipe[]>(localStorage.getItem("cooksync_liked_recipes"), [])
@@ -278,10 +304,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // --- Auth Actions ---
   const login = async (email: string, password: string) => {
+    // 1. 로그인 요청
     const tokenRes = await loginAPI({ email, password })
 
-    localStorage.setItem("cooksync_access_token", tokenRes.accessToken)
-    localStorage.setItem("cooksync_refresh_token", tokenRes.refreshToken)
+    // 2. 액세스 토큰을 메모리에 저장 (쿠키 저장 X)
+    setGlobalAccessToken(tokenRes.accessToken)
+
+    // 참고: 리프레시 토큰은 백엔드가 Set-Cookie 헤더로(HttpOnly) 설정해주어야 함.
 
     const me = await getMe()
 
@@ -327,25 +356,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const logout = () => {
-    setUser(null)
-    setCompletedRecipes(new Set())
-    setReviewedRecipes(new Set())
-    localStorage.removeItem("cooksync_user")
+  const logout = async () => {
+    try {
+      await logoutAPI() // 서버 쿠키 삭제 요청
+    } catch (error) {
+      console.error("로그아웃 실패 (토큰 만료 가능성):", error)
+    } finally {
+      setUser(null)
+      setGlobalAccessToken(null) // 메모리 토큰 삭제
+      setCompletedRecipes(new Set())
+      setReviewedRecipes(new Set())
+      localStorage.removeItem("cooksync_user")
+      // 쿠키 삭제는 서버 응답에 맡김 (HttpOnly)
+    }
   }
 
-  const updateProfile = (data: Partial<User>) => {
+  const updateProfile = async (data: Partial<User> & { currentPassword?: string; newPassword?: string; newPasswordConfirm?: string }) => {
     if (user) {
-      const updatedUser = { ...user, ...data }
-      setUser(updatedUser)
-      localStorage.setItem("cooksync_user", JSON.stringify(updatedUser))
+      try {
+        await updateProfileAPI({
+          nickname: data.nickname,
+          currentPassword: data.currentPassword,
+          newPassword: data.newPassword,
+          newPasswordConfirm: data.newPasswordConfirm
+        })
+        const { currentPassword, newPassword, newPasswordConfirm, ...safeData } = data
+        const updatedUser = { ...user, ...safeData }
+        setUser(updatedUser)
+        localStorage.setItem("cooksync_user", JSON.stringify(updatedUser))
+
+      } catch (error) {
+        console.error("프로필 수정 실패:", error)
+        throw error
+      }
     }
   }
 
   const updateLocation = async (latitude: number, longitude: number): Promise<string> => {
     if (!user) throw new Error("사용자 정보가 없습니다.")
 
-    const token = localStorage.getItem("cooksync_access_token")
+    // ✅ 변경: 쿠키 대신 메모리 토큰 확인 (혹은 isLoggedIn 확인)
+    const token = getGlobalAccessToken()
     if (!token) throw new Error("토큰이 없습니다. 다시 로그인 해주세요.")
 
     const fixedLocationData: LocationRequestDto = {
@@ -353,12 +404,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       longitude: FIXED_LONGITUDE,
     }
 
-    // ✅ 진짜 API 호출
     const res = await verifyLocation(fixedLocationData)
 
-    // 응답이 string일 수도/객체일 수도 있으니 안전 처리
-    const locationAddress =
-      typeof res === "string" ? res : res.locationAddress ?? res.message ?? "위치 인증 완료"
+    let locationAddress = typeof res === "string" ? res : res.locationAddress ?? res.message ?? "위치 인증 완료"
+    const match = locationAddress.match(/'([^']+)'/)
+    if (match && match[1]) {
+      locationAddress = match[1]
+    }
+
     const locationCode = typeof res === "string" ? "" : res.locationCode ?? ""
 
     const updatedUser = {
@@ -542,15 +595,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const hasUserReviewedRecipe = (recipeId: string) => reviewedRecipes.has(recipeId)
 
+  const withdraw = async () => {
+    try {
+      await withdrawUser()
+      logout()
+      alert("회원 탈퇴가 완료되었습니다.")
+    } catch (error) {
+      console.error("회원 탈퇴 실패:", error)
+      throw error
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
+        isLoading, // ✅ Added
         user, isLoggedIn: !!user, login, signup, logout, updateProfile, updateLocation,
         likedRecipes, toggleLikeRecipe, isRecipeLiked, conversations, sendMessage, getMessages,
         deleteConversation, userRecipes, addUserRecipe, updateUserRecipe, deleteUserRecipe,
         userPosts, addUserPost, updateUserPost, deleteUserPost, likedPosts, toggleLikePost,
         isPostLiked, earnStars, getStarLevel, completedRecipes, markRecipeAsCompleted,
-        reviewedRecipes, markRecipeAsReviewed, hasUserReviewedRecipe,
+        reviewedRecipes, markRecipeAsReviewed, hasUserReviewedRecipe, withdraw,
       }}
     >
       {children}

@@ -9,42 +9,204 @@ export interface BackendRecipeResponse {
   description: string
   cookTime: number
   servings: number
-  calorie?: number
+  scrapCount: number
+  reviewCount: number
+  averageRating: number
+  recipeType: string
+  calorie: number
+  carbohydrate: number
+  protein: number
+  saturatedFat: number
+  cholesterol: number
+  sodium: number
+  calcium: number
+  createdAt: string
+  updatedAt: string
+  nickname: string
+  isScrapped: boolean
+  isMine: boolean
   categoryNames: string[]
-  tags: { tag_name: string }[]
-  ingredients: { 
-    ingredient_name: string; 
-    ingredient_amount: string 
+  tags: {
+    tag_name: string
+  }[]
+  ingredients: {
+    ingredient_name: string
+    ingredient_amount: string
   }[]
   steps: {
     step_number: number
     step_description: string
     timer_seconds: number
-    step_imageUrl: string
+    step_imageUrl: string | null
     cooking_tip: string | null
   }[]
+}
+
+export interface RecipeListItem {
+  recipeId: number
+  title: string
+  mainImageUrl: string
+  averageRating: number
+  isScrapped: boolean
+  nickName: string
+  isMine: boolean
+  tags: { tag_name: string }[]
+}
+
+export interface RecipeListResponse {
+  recipes: RecipeListItem[]
+  pageInfo: {
+    currentPage: number
+    size: number
+    totalElements: number
+    totalPages: number
+    hasNext: boolean
+    hasPrevious: boolean
+  }
+}
+
+export type RecipeType = "USER" | "CHEF"
+export type SortType = "LATEST" | "RATING" | "TIME"
+
+export interface GetRecipeListParams {
+  recipeType: RecipeType
+  sort: SortType
+  category?: string
+  searchWord?: string
+  page?: number
+  size?: number
+}
+
+/**
+ * 레시피 목록 조회 API
+ * 백엔드 API에 직접 연결
+ */
+export async function getRecipeList(params: GetRecipeListParams): Promise<RecipeListResponse> {
+  const query = new URLSearchParams()
+  query.append("recipeType", params.recipeType)
+  query.append("sort", params.sort)
+  if (params.category) query.append("category", params.category)
+  if (params.searchWord) query.append("searchWord", params.searchWord)
+  if (params.page !== undefined) query.append("page", params.page.toString())
+  if (params.size !== undefined) query.append("size", params.size.toString())
+
+  return apiFetch<RecipeListResponse>(`/api/recipes?${query.toString()}`, {
+    method: "GET",
+  })
 }
 
 /**
  * 레시피 단일 조회 API
  * @param recipeId 레시피 ID (문자열 또는 숫자)
- * @param token 선택적 인증 토큰 (팀원이 작업 중인 auth 로직과 연동 예정)
  */
-export async function getRecipeDetail(recipeId: string, token?: string) {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  }
-
-  // [핵심 수정] 토큰이 실제로 존재하고 유효한 문자열일 때만 헤더에 추가
-  // 이렇게 하면 비로그인 상태에서 'undefined' 같은 문자열이 서버로 전송되는 것을 방지합니다.
-  if (token && token.trim() !== "" && token !== "undefined") {
-    headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`
-  }
-
-  // API 엔드포인트 호출
-  // client.ts의 apiFetch를 사용하므로 공통 에러 처리가 적용됩니다.
+export async function getRecipeDetail(recipeId: string) {
+  // client.ts의 apiFetch가 자동으로 메모리 토큰을 사용하므로 별도 토큰 전달 불필요
   return apiFetch<BackendRecipeResponse>(`/api/recipes/${recipeId}`, {
     method: "GET",
-    headers,
+  })
+}
+
+export interface RegisterRecipeRequest {
+  title: string
+  mainImageUrl: string
+  recipeDescription: string
+  cookTime: number
+  servings: number
+  calorie: number
+  carbohydrate: number
+  protein: number
+  saturatedFat: number
+  cholesterol: number
+  sodium: number
+  calcium: number
+  categoryIds: number[]
+  ingredients: {
+    ingredientName: string
+    ingredientAmount: string
+  }[]
+  tags: {
+    tagName: string
+  }[]
+  steps: {
+    stepNumber: number
+    stepDescription: string
+    timerSeconds: number
+    stepImageUrl: string
+    cookingTip: string | null
+  }[]
+}
+
+export interface RegisterRecipeResponse {
+  recipeId: number
+  isAwardedRecipeRegisterReward: boolean
+}
+
+/**
+ * 레시피 등록 API
+ * @param data 등록할 레시피 정보
+ */
+export async function registerRecipe(data: RegisterRecipeRequest) {
+  return apiFetch<RegisterRecipeResponse>("/api/recipes", {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+}
+
+/**
+ * 레시피 수정 API ("그대로" 요청 바디 사용, ID만 URL 파라미터)
+ */
+export async function updateRecipe(recipeId: string, data: RegisterRecipeRequest) {
+  return apiFetch<RegisterRecipeResponse>(`/api/recipes/${recipeId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  })
+}
+
+/**
+ * 레시피 삭제 API
+ */
+export async function deleteRecipe(recipeId: string) {
+  return apiFetch<void>(`/api/recipes/${recipeId}`, {
+    method: "DELETE",
+  })
+}
+
+export interface CookingModeStep {
+  recipeStepId: number
+  stepNumber: number
+  stepDescription: string
+  stepImageUrl: string
+  timerSeconds: number
+  cookingTip: string | null
+}
+
+export interface CookingModeResponse {
+  recipeId: number
+  title: string
+  totalStep: number
+  steps: CookingModeStep[]
+}
+
+/**
+ * 요리 모드 데이터 조회 API
+ */
+export async function getCookingModeDetails(recipeId: string) {
+  return apiFetch<CookingModeResponse>(`/api/recipes/${recipeId}/cooking`, {
+    method: "GET",
+  })
+}
+
+export interface CookingCompleteResponse {
+  cookingLogId: number
+  isAwardedCookingCompleteReward: boolean
+}
+
+/**
+ * 요리 완료 API
+ */
+export async function completeCooking(recipeId: string) {
+  return apiFetch<CookingCompleteResponse>("/api/cooking/complete", {
+    method: "POST",
+    body: JSON.stringify({ recipeId: Number(recipeId) }),
   })
 }

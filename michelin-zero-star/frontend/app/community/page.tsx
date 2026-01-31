@@ -16,61 +16,11 @@ import { useAuth } from "@/lib/auth-context"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 
+import { useEffect } from "react"
+import { getNearbyPosts, getPostList } from "@/lib/api/market"
 
-const initialShares = [
-  {
-    id: "1",
-    user: { id: "user1", name: "김대전", avatar: "/korean-woman-avatar.jpg", location: "대전 서구 둔산동" },
-    title: "삼성 2in1 스탠드 에어컨 AF16J75...",
-    description: "대형마트에서 양배추 샀는데 혼자 다 못 먹을 것 같아요. 반 통 1000원에 나눕니다!",
-    price: "250,000원",
-    images: ["/half-cabbage.jpg"],
-    place: "둔산동",
-    timeAgo: "4일 전",
-    likes: 5,
-    chatCount: 3,
-    status: "available" as "available" | "completed",
-  },
-  {
-    id: "2",
-    user: { id: "user2", name: "박요리", avatar: "/korean-man-avatar.jpg", location: "대전 유성구 봉명동" },
-    title: "LG 휘센 스탠드 에어컨 LP-206CQ",
-    description: "계란 30개 한 판 사서 10개씩 나눠요. 신선한 당일 구매 제품입니다.",
-    price: "100,000원",
-    images: ["/eggs-carton.png"],
-    place: "둔산동",
-    timeAgo: "1일 전",
-    likes: 12,
-    chatCount: 5,
-    status: "available" as "available" | "completed",
-  },
-  {
-    id: "3",
-    user: { id: "user3", name: "이맛집", avatar: "/young-korean-woman-avatar.jpg", location: "대전 중구 대흥동" },
-    title: "휘센 에어컨두개세트",
-    description: "꿀고구마 박스로 사면 싼데 혼자 다 못 먹어서... 같이 나와서 사실 분 구해요!",
-    price: "220,000원",
-    images: ["/roasted-sweet-potatoes.png"],
-    place: "둔산동",
-    timeAgo: "11일 전",
-    likes: 8,
-    chatCount: 2,
-    status: "completed" as "available" | "completed",
-  },
-  {
-    id: "4",
-    user: { id: "user4", name: "최요리", avatar: "/korean-man-avatar.jpg", location: "대전 서구 둔산동" },
-    title: "(예약금5만)(백화점구매) 삼성 인버...",
-    description: "삼성 인버터 에어컨입니다.",
-    price: "180,000원",
-    images: ["/half-cabbage.jpg"],
-    place: "둔산동",
-    timeAgo: "23시간 전",
-    likes: 3,
-    chatCount: 1,
-    status: "available" as "available" | "completed",
-  },
-]
+const initialShares: any[] = [] // 더미 데이터 제거 (타입 유지를 위해 빈 배열)
+
 
 const ITEMS_PER_PAGE = 10
 
@@ -101,29 +51,58 @@ export default function CommunityPage() {
     )
   }
 
+  // API 연동: 게시글 목록 상태
+  const [posts, setPosts] = useState<any[]>([])
+  const [viewMode, setViewMode] = useState<"nearby" | "all">("nearby")
+
+  useEffect(() => {
+    async function fetchPosts() {
+      try {
+        let data;
+        if (viewMode === "nearby") {
+          // 주변 5km 게시글 조회
+          data = await getNearbyPosts(5)
+        } else {
+          // 전체 게시글 조회
+          data = await getPostList()
+        }
+        setPosts(data)
+      } catch (error) {
+        console.error("Failed to fetch posts:", error)
+      }
+    }
+    if (isLoggedIn && user?.location) {
+      fetchPosts()
+    }
+  }, [isLoggedIn, user?.location, viewMode])
+
+
+
+  // userLocation 등 기존 로직 유지
   const userLocation = user?.location ? user.location.split(" ").slice(-1)[0] : "우리 동네"
 
-  const userPostsForDisplay = userPosts.map((post) => ({
-    id: post.id,
+  // API 데이터를 화면 포맷에 맞게 변환
+  const allShares = posts.map((post) => ({
+    id: String(post.id),
     user: {
-      id: user?.id || "current-user",
-      name: user?.name || "나",
-      avatar: user?.profileImage || "/placeholder.svg",
-      location: user?.location || "대전",
+      id: "unknown",
+      name: "이웃",
+      avatar: "/placeholder.svg",
+      location: post.location,
     },
     title: post.title,
-    description: post.description,
-    price: post.price,
-    images: [post.image],
-    place: (post as any).place || "장소 미정",
-    timeAgo: "방금 전",
-    likes: (post as any).likes || 0,
-    chatCount: 0,
-    status: post.status as "available" | "completed",
-    isMyPost: true,
+    description: "",
+    price: post.price.toLocaleString() + "원",
+    images: [post.thumbnailUrl],
+    image: post.thumbnailUrl, // UserPost 타입 코환용
+    createdAt: new Date().toISOString(), // UserPost 타입 호환용 (API에 시간 정보가 구체적이지 않으면 현재시간 or 임의값)
+    place: post.location,
+    timeAgo: post.timeAgo,
+    likes: 0,
+    chatCount: post.chatCount,
+    status: (post.status === "SELLING" ? "available" : "completed") as "available" | "completed",
+    isMyPost: false,
   }))
-
-  const allShares = [...userPostsForDisplay, ...initialShares]
 
   const filteredShares = allShares.filter((share) => {
     const matchesSearch =
@@ -184,7 +163,26 @@ export default function CommunityPage() {
       <main className="flex-1 container mx-auto max-w-7xl px-4 py-8">
         {/* Header (텍스트 제거, 레이아웃 유지용 spacer) */}
         <div className="flex items-center justify-between mb-6">
-          <div className="min-h-[9px]" />
+          <div className="flex items-center bg-muted rounded-lg p-1">
+            <button
+              onClick={() => setViewMode("nearby")}
+              className={cn(
+                "px-4 py-1.5 text-sm font-medium rounded-md transition-all",
+                viewMode === "nearby" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              우리 동네
+            </button>
+            <button
+              onClick={() => setViewMode("all")}
+              className={cn(
+                "px-4 py-1.5 text-sm font-medium rounded-md transition-all",
+                viewMode === "all" ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              전체 보기
+            </button>
+          </div>
         </div>
 
         {/* Search row + Create button (center-fixed, 700px) */}

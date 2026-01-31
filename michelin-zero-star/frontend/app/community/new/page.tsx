@@ -27,6 +27,8 @@ import {
 import { ArrowLeft, Upload, X, MapPin, Receipt } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import Image from "next/image"
+import { createPost } from "@/lib/api/market"
+import { compressImage } from "@/lib/image-utils"
 
 export default function CommunityNewPage() {
   const router = useRouter()
@@ -40,6 +42,7 @@ export default function CommunityNewPage() {
     place: "",
   })
   const [images, setImages] = useState<string[]>([])
+  const [files, setFiles] = useState<File[]>([]) // ✅ API 전송용 File 객체 저장
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showExitDialog, setShowExitDialog] = useState(false)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
@@ -65,23 +68,36 @@ export default function CommunityNewPage() {
   }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files) return
+    const fileList = e.target.files
+    if (!fileList) return
 
     const remainingSlots = 5 - images.length
-    const filesToProcess = Array.from(files).slice(0, remainingSlots)
+    const filesToProcess = Array.from(fileList).slice(0, remainingSlots)
 
-    filesToProcess.forEach((file) => {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImages((prev) => [...prev, reader.result as string])
+    filesToProcess.forEach(async (file) => {
+      // 1. 이미지 압축
+      try {
+        const compressedFile = await compressImage(file)
+
+        // 2. 미리보기용 base64
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setImages((prev) => [...prev, reader.result as string])
+        }
+        reader.readAsDataURL(compressedFile)
+
+        // 3. 전송용 File 객체
+        setFiles((prev) => [...prev, compressedFile])
+      } catch (e) {
+        console.error("Image compression failed", e)
+        alert("이미지 처리 중 오류가 발생했습니다.")
       }
-      reader.readAsDataURL(file)
     })
   }
 
   const removeImage = (index: number) => {
     setImages((prev) => prev.filter((_, i) => i !== index))
+    setFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleSubmit = () => {
@@ -92,16 +108,26 @@ export default function CommunityNewPage() {
     setShowConfirmDialog(true)
   }
 
-  const confirmSubmit = () => {
-    addUserPost({
-      title: formData.title,
-      description: formData.description,
-      price: formData.price || "가격 협의",
-      image: images[0] || "/placeholder.svg",
-      place: formData.place || "장소 미정",
-    })
-    setShowConfirmDialog(false)
-    router.push("/community")
+  const confirmSubmit = async () => {
+    try {
+      await createPost(
+        {
+          title: formData.title,
+          content: formData.description,
+          price: Number(formData.price.replace(/,/g, "")) || 0, // 쉼표 제거 및 숫자 변환
+          meetingPlace: formData.place,
+          category: "SHARE", // 카테고리 (일단 SHARE 로 고정)
+        },
+        files,
+      )
+      // 성공 시 이동 (원래는 API 성공 후 리다이렉트가 더 안전하지만, UX상 즉시 이동 처리)
+      router.push("/community")
+    } catch (error) {
+      console.error("게시글 등록 실패:", error)
+      alert("게시글 등록에 실패했습니다.")
+    } finally {
+      setShowConfirmDialog(false)
+    }
   }
 
   const handleCancel = () => {

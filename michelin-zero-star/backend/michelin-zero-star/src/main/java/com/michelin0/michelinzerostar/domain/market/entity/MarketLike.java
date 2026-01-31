@@ -24,7 +24,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @Getter
 @Table(name = "market_likes",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_market_like_user_post", columnNames = {"user_id",
+                @UniqueConstraint(name = "uk_market_like_user_post", columnNames = {"users_id",
                         "post_id"})
         })
 @EntityListeners(AuditingEntityListener.class)

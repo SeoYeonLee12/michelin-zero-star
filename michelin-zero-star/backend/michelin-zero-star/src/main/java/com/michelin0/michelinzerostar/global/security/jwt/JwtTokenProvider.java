@@ -49,7 +49,7 @@ public class JwtTokenProvider {
         return generateToken(email, role, provider);
     }
 
-    // 일반 로그인용
+    // 일반 로그인용 (초기 로그인 시)
     public TokenDto createToken(Authentication authentication) {
         String authorities = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
@@ -57,6 +57,29 @@ public class JwtTokenProvider {
         return generateToken(authentication.getName(), authorities, "LOCAL");
     }
 
+    /**
+     * Access Token만 갱신하는 메서드
+     * Refresh Token Rotation 문제를 해결하기 위해, Refresh Token 유효기간이 충분할 경우
+     * Redis를 갱신하지 않고 Access Token만 새로 발급
+     */
+    public String createAccessToken(Authentication authentication) {
+        String authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.joining(","));
+
+        long now = (new Date()).getTime();
+        Date accessTokenExpiresIn = new Date(now + accessTokenValidityInMilliseconds);
+
+        return Jwts.builder()
+                .setSubject(authentication.getName())
+                .claim("auth", authorities)
+                .claim("provider", "LOCAL")
+                .setExpiration(accessTokenExpiresIn)
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    // 내부적으로 토큰 생성 및 Redis 저장을 담당하는 메서드
     private TokenDto generateToken(String subject, String authorities, String provider) {
         long now = (new Date()).getTime();
         Date accessTokenExpiresIn = new Date(now + accessTokenValidityInMilliseconds);
@@ -71,10 +94,12 @@ public class JwtTokenProvider {
                 .compact();
 
         String refreshToken = Jwts.builder()
+                .setSubject(subject) // ✅ 이메일(Subject) 추가 - reissue 시 필요!
                 .setExpiration(refreshTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
 
+        // Refresh Token은 Redis에 저장
         redisUtil.setRefreshToken(subject, refreshToken, refreshTokenValidityInMilliseconds);
 
         return TokenDto.builder()
@@ -134,6 +159,7 @@ public class JwtTokenProvider {
         }
     }
 
+
     private Claims parseClaims(String accessToken) {
         try {
             return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(accessToken)
@@ -143,9 +169,18 @@ public class JwtTokenProvider {
         }
     }
 
-    public Long getExpiration(String accessToken) {
+    /**
+     * Refresh Token에서 이메일(Subject)을 추출하는 메서드
+     * Refresh Token은 auth 클레임이 없으므로 getAuthentication을 사용할 수 없음
+     */
+    public String getEmailFromRefreshToken(String refreshToken) {
+        Claims claims = parseClaims(refreshToken);
+        return claims.getSubject();
+    }
+
+    public Long getExpiration(String token) {
         Date expiration = Jwts.parserBuilder().setSigningKey(key).build()
-                .parseClaimsJws(accessToken).getBody().getExpiration();
+                .parseClaimsJws(token).getBody().getExpiration();
         long now = new Date().getTime();
         return (expiration.getTime() - now);
     }

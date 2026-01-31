@@ -1,5 +1,8 @@
 package com.michelin0.michelinzerostar.domain.user.controller;
 
+import com.michelin0.michelinzerostar.domain.auth.UserPrincipal;
+import com.michelin0.michelinzerostar.domain.market.dto.response.MarketPostListResponse;
+import com.michelin0.michelinzerostar.domain.market.service.MarketLikeService;
 import com.michelin0.michelinzerostar.domain.user.dto.UserResponseDto;
 import com.michelin0.michelinzerostar.domain.user.dto.UserUpdateRequestDto;
 import com.michelin0.michelinzerostar.domain.user.entity.SocialProvider;
@@ -7,6 +10,7 @@ import com.michelin0.michelinzerostar.domain.user.service.UserService;
 import com.michelin0.michelinzerostar.global.security.jwt.JwtTokenProvider;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
+import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserService userService;
+    private final MarketLikeService marketLikeService; // ★ 추가됨
     private final JwtTokenProvider jwtTokenProvider;
 
     // 회원 탈퇴
@@ -73,7 +78,17 @@ public class UserController {
         return ResponseEntity.ok(responseDto);
     }
 
-    // 위치
+    // ★ [추가] 관심있는 나눔(찜한 게시글) 조회
+    @GetMapping("/me/likes")
+    public ResponseEntity<List<MarketPostListResponse>> getMyLikedPosts(
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        // UserPrincipal에서 ID를 꺼내 서비스로 전달
+        List<MarketPostListResponse> likedPosts = marketLikeService.getMyLikedPosts(userPrincipal.getId());
+        return ResponseEntity.ok(likedPosts);
+    }
+
+    // 위치 인증
     @PostMapping("/location")
     public ResponseEntity<String> verifyLocation(
             @AuthenticationPrincipal UserDetails userDetails,
