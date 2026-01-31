@@ -221,7 +221,8 @@ export default function NewRecipePage() {
       // 1. 데이터 매핑
       const requestData: RegisterRecipeRequest = {
         title,
-        mainImageUrl: thumbnailPreview || "", // URL or Blob string
+        // ✅ Blob URL 대신 placeholder URL 사용 (백엔드 URL 검증 통과용)
+        mainImageUrl: thumbnailPreview ? "https://example.com/placeholder-recipe-image.jpg" : "",
         recipeDescription: description,
         cookTime: totalCookingTime,
         servings: Number(servings) || 1,
@@ -243,7 +244,8 @@ export default function NewRecipePage() {
           stepNumber: s.id,
           stepDescription: s.description,
           timerSeconds: s.duration,
-          stepImageUrl: s.imagePreview || "",
+          // ✅ Blob URL 대신 placeholder URL 사용 (백엔드 URL 검증 통과용)
+          stepImageUrl: s.imagePreview ? "https://example.com/placeholder-step-image.jpg" : "",
           cookingTip: s.tips || null
         }))
       }

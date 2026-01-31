@@ -8,7 +8,7 @@ import { motion } from "framer-motion"
 interface AccessDeniedProps {
   type: "login" | "location"
 }
-// 커밋을 위한 주석
+// 커밋을 위한 
 export function AccessDenied({ type }: AccessDeniedProps) {
   const router = useRouter()
 
