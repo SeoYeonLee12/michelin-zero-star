@@ -28,6 +28,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-h2console'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
     compileOnly 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     testRuntimeOnly 'com.h2database:h2'
@@ -63,6 +64,7 @@ dependencies {
     annotationProcessor "io.github.openfeign.querydsl:querydsl-apt:6.10.1:jpa"
     annotationProcessor "jakarta.persistence:jakarta.persistence-api"
     annotationProcessor "jakarta.annotation:jakarta.annotation-api"
+
 }
 
 tasks.named('test') {
