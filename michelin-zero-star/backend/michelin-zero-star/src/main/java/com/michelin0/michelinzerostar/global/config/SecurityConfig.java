@@ -68,7 +68,7 @@ public class SecurityConfig {
         ObjectMapper objectMapper = new ObjectMapper();
 
         http
-                // ★ 1. CORS 설정 추가 (가장 중요!)
+                // CORS 설정 추가 (가장 중요!)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
                 .csrf(AbstractHttpConfigurer::disable)

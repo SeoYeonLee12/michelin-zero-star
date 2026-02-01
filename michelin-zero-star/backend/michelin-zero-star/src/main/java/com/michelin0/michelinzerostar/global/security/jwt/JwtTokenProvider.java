@@ -94,7 +94,7 @@ public class JwtTokenProvider {
                 .compact();
 
         String refreshToken = Jwts.builder()
-                .setSubject(subject) // ✅ 이메일(Subject) 추가 - reissue 시 필요!
+                .setSubject(subject)
                 .setExpiration(refreshTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
