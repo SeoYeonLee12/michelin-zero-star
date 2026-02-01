@@ -8,22 +8,26 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Getter
 @Builder
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 public class UserResponseDto {
-
     private Long id;
     private String email;
     private String name;
     private String nickname;
     private String profileImageUrl;
     private UserRole role;
+
     private Double totalStar;
+
     private SocialProvider socialProvider;
     private String location;
     private boolean isVerified;
+    private List<String> categories;
 
     public UserResponseDto(User user) {
         this.id = user.getId();
@@ -34,7 +38,5 @@ public class UserResponseDto {
         this.role = user.getRole();
         this.totalStar = user.getTotalStar();
         this.socialProvider = user.getSocialProvider();
-        this.isVerified = false;
-        this.location = null;
     }
 }

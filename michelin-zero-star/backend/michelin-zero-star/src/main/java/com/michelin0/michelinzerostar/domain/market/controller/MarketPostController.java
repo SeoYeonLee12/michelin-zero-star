@@ -7,6 +7,7 @@ import com.michelin0.michelinzerostar.domain.market.dto.request.MarketPostUpdate
 import com.michelin0.michelinzerostar.domain.market.dto.response.MarketPostDetailResponse;
 import com.michelin0.michelinzerostar.domain.market.dto.response.MarketPostListResponse;
 import com.michelin0.michelinzerostar.domain.market.service.MarketPostService;
+import jakarta.validation.Valid; // ★ Import 필수
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -25,7 +26,7 @@ public class MarketPostController {
     // 게시글 등록
     @PostMapping(value = "/posts", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<String> createPost(
-            @RequestPart(value = "post") MarketPostCreateRequest request,
+            @RequestPart(value = "post") @Valid MarketPostCreateRequest request,
             @RequestPart(value = "images", required = false) List<MultipartFile> images,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
@@ -64,7 +65,7 @@ public class MarketPostController {
     @PutMapping("/posts/{postId}")
     public ResponseEntity<String> updatePost(
             @PathVariable Long postId,
-            @RequestBody MarketPostUpdateRequest request,
+            @RequestBody @Valid MarketPostUpdateRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
         marketPostService.updatePost(postId, userPrincipal.getId(), request);
