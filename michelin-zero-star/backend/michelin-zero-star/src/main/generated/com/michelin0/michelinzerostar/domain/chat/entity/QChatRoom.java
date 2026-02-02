@@ -29,18 +29,28 @@ public class QChatRoom extends EntityPathBase<ChatRoom> {
 
     public final com.michelin0.michelinzerostar.domain.user.entity.QUser buyer;
 
+    public final DateTimePath<java.time.LocalDateTime> buyerJoinedAt = createDateTime("buyerJoinedAt", java.time.LocalDateTime.class);
+
     //inherited
     public final DateTimePath<java.time.LocalDateTime> createdAt = _super.createdAt;
 
     public final NumberPath<Long> id = createNumber("id", Long.class);
 
+    public final BooleanPath isBuyerLeft = createBoolean("isBuyerLeft");
+
+    public final BooleanPath isSellerLeft = createBoolean("isSellerLeft");
+
     public final StringPath lastMessage = createString("lastMessage");
 
     public final DateTimePath<java.time.LocalDateTime> lastMessageAt = createDateTime("lastMessageAt", java.time.LocalDateTime.class);
 
+    public final ListPath<ChatMessage, QChatMessage> messages = this.<ChatMessage, QChatMessage>createList("messages", ChatMessage.class, QChatMessage.class, PathInits.DIRECT2);
+
     public final com.michelin0.michelinzerostar.domain.market.entity.QMarketPost post;
 
     public final com.michelin0.michelinzerostar.domain.user.entity.QUser seller;
+
+    public final DateTimePath<java.time.LocalDateTime> sellerJoinedAt = createDateTime("sellerJoinedAt", java.time.LocalDateTime.class);
 
     //inherited
     public final DateTimePath<java.time.LocalDateTime> updatedAt = _super.updatedAt;

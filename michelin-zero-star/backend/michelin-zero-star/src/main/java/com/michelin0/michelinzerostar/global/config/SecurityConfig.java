@@ -45,8 +45,9 @@ public class SecurityConfig {
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(
-                customUserDetailsService);
+        // [수정됨] 생성자 주입 대신 Setter 메서드 사용
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(customUserDetailsService); // 여기서 주입
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
@@ -68,7 +69,7 @@ public class SecurityConfig {
         ObjectMapper objectMapper = new ObjectMapper();
 
         http
-                // CORS 설정 추가 (가장 중요!)
+                // CORS 설정 추가
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
                 .csrf(AbstractHttpConfigurer::disable)
@@ -86,11 +87,12 @@ public class SecurityConfig {
                         // GET 요청만 허용
                         .requestMatchers(HttpMethod.GET, "/api/recipes/**").permitAll()
 
-                        // 로그인, 회원가입, 재발급 등 허용
+                        // 로그인, 회원가입, 재발급, 웹소켓 연결허용
                         .requestMatchers(
                                 "/",
                                 "/error",
-                                "/api/v1/auth/**", // ★ reissue 포함됨 (중요)
+                                "/api/v1/auth/**",
+                                "/ws-stomp/**", // 웹소켓 핸드셰이크 허용
                                 "/api-docs/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
@@ -141,13 +143,23 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+
+        // 로컬 개발용: 모든 출처 허용
+        configuration.setAllowedOriginPatterns(Collections.singletonList("*"));
+
+        // 허용할 HTTP 메서드 설정
+        configuration.setAllowedMethods(
+                Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+
+        // 허용할 헤더 설정
         configuration.setAllowedHeaders(Collections.singletonList("*"));
 
         // 쿠키(Credential) 전송 허용
         configuration.setAllowCredentials(true);
+
+        // 브라우저가 읽을 수 있게 허용할 헤더 (토큰 등)
         configuration.setExposedHeaders(Arrays.asList("Authorization", "Set-Cookie"));
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
