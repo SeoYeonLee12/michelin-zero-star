@@ -207,8 +207,12 @@ CREATE TABLE market_posts
     location_code   VARCHAR(50)    NOT NULL,
     meeting_place   VARCHAR(255)   NOT NULL,
     category        VARCHAR(50) NULL,
+
     chat_count      INT            NOT NULL DEFAULT 0,
-    like_count      INT            NOT NULL DEFAULT 0, -- ★ [수정됨] 좋아요 수 컬럼 추가
+
+    -- ★ [추가됨] 좋아요 개수 컬럼
+    like_count      INT            NOT NULL DEFAULT 0,
+
     latitude        DECIMAL(10, 8) NOT NULL,
     longitude       DECIMAL(11, 8) NOT NULL,
     created_at      TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -237,7 +241,9 @@ CREATE TABLE market_likes
     updated_at      TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_ml_user FOREIGN KEY (users_id) REFERENCES users (users_id),
     CONSTRAINT fk_ml_post FOREIGN KEY (post_id) REFERENCES market_posts (market_posts_id),
-    CONSTRAINT uk_market_like_user_post UNIQUE (users_id, post_id) -- ★ [수정됨] 중복 좋아요 방지
+
+    -- ★ [추가됨] 한 유저가 같은 게시글에 좋아요를 중복으로 누를 수 없도록 방지
+    CONSTRAINT uk_market_likes_user_post UNIQUE (users_id, post_id)
 ) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE market_comments
@@ -287,7 +293,10 @@ CREATE TABLE ai_chat_message
 (
     ai_chat_message_id  BIGINT AUTO_INCREMENT PRIMARY KEY,
     users_id            BIGINT    NOT NULL,
-    recipes_id          BIGINT NULL, -- ★ [수정됨] 레시피 삭제 시 NULL 설정을 위해 NULL 허용
+
+    -- ★ [수정됨] ON DELETE SET NULL이 동작하려면 컬럼이 NULL 허용이어야 함
+    recipes_id          BIGINT NULL,
+
     sender_type         ENUM('USER', 'AI') NOT NULL,
     content             TEXT      NOT NULL,
     recommended_recipes JSON NULL,

@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import java.io.File;
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
@@ -14,8 +15,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // 브라우저에서 http://서버주소/images/abc.jpg 로 요청하면 실제 로컬 경로의 파일(uploadDir)을 보여줌
+        // 절대 경로를 URL 형식으로 안전하게 변환
+        String path = new File(uploadDir).getAbsolutePath();
+
+        // 브라우저에서 /images/파일명 으로 요청하면 로컬 업로드 경로의 파일을 보여줌
         registry.addResourceHandler("/images/**")
-                .addResourceLocations("file:///" + uploadDir + "/"); // 윈도우는 file:/// 필수
+                .addResourceLocations("file:///" + path + "/"); // 윈도우/리눅스 호환을 위해 절대경로 사용
     }
 }

@@ -5,22 +5,17 @@ spring:
   profiles:
     active: local
 
-  # 파일 업로드 용량 제한
   servlet:
     multipart:
       max-file-size: 10MB
-      max-request-size: 10MB
+      max-request-size: 50MB
 
-  # [중요] DB 설정 (도커와 로컬 자동 호환)
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    # 도커 내부에서는 DB_HOST(michelin-db-local)와 DB_PORT(3306)를 사용
-    # 로컬(IntelliJ)에서는 기본값 localhost와 3307을 사용
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3307}/${DB_NAME:michelin-zero-star}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: ${DB_USERNAME:michelin-user}
     password: ${DB_PASSWORD:123}
 
-  # Redis 설정
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -35,40 +30,32 @@ spring:
         format_sql: true
         use_sql_comments: true
         highlight_sql: true
+        default_batch_fetch_size: 100
 
   security:
     oauth2:
       client:
         registration:
           google:
-            client-id: "936715334318-ppcucbgp16jj63dpkqck3ar5q37kmutf.apps.googleusercontent.com"
-            client-secret: "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"
-            scope:
-              - email
-              - profile
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope: [email, profile]
           kakao:
-            client-id: "a1f418f12dfefbde9916ccaa1897631a"
-            client-secret: "exrONHZU97uqu4jCENKEQr4uobZ7xJld"
+            client-id: ${KAKAO_CLIENT_ID}
+            client-secret: ${KAKAO_CLIENT_SECRET}
             client-authentication-method: client_secret_post
             authorization-grant-type: authorization_code
-            redirect-uri: "http://localhost:8080/login/oauth2/code/kakao"
-            scope:
-              - profile_nickname
-              - profile_image
-              - account_email
+            redirect-uri: "{baseUrl}/login/oauth2/code/kakao"
+            scope: [profile_nickname, profile_image, account_email]
             client-name: Kakao
           naver:
-            client-id: "ZeFhdC2mJztKbiGSHFbj"
-            client-secret: "rENAQLyW2G"
+            client-id: ${NAVER_CLIENT_ID}
+            client-secret: ${NAVER_CLIENT_SECRET}
             client-authentication-method: client_secret_post
             authorization-grant-type: authorization_code
-            redirect-uri: "http://localhost:8080/login/oauth2/code/naver"
-            scope:
-              - name
-              - email
-              - profile_image
+            redirect-uri: "{baseUrl}/login/oauth2/code/naver"
+            scope: [name, email, profile_image]
             client-name: Naver
-
         provider:
           kakao:
             authorization-uri: https://kauth.kakao.com/oauth/authorize
@@ -82,26 +69,13 @@ spring:
             user-name-attribute: response
 
 jwt:
-  secret: "djNyeVMzY3IzdEszeUYwck1pY2hlbGluWmVyMFN0YXJQcjBqM2N0TXVzdEJlTDBuZ0Vub3VnaFRvUEBzc3=="
+  secret: ${JWT_SECRET:djNyeVMzY3IzdEszeUYwck1pY2hlbGluWmVyMFN0YXJQcjBqM2N0TXVzdEJlTDBuZ0Vub3VnaFRvUEBzc3==}
   access-token-validity-in-seconds: 1800
   refresh-token-validity-in-seconds: 1209600
 
-springdoc:
-  api-docs:
-    path: /api-docs
-  swagger-ui:
-    groups-order: DESC
-    tags-sorter: alpha
-    operations-sorter: method
-    disable-swagger-default-url: true
-  show-actuator: true
-  default-consumes-media-type: application/json
-  default-produces-media-type: application/json
-  paths-to-match:
-    - /api/v1/**
-
+# Kakao Map API 등을 위한 키 설정
 kakao:
-  rest-api-key: "a1f418f12dfefbde9916ccaa1897631a"
+  rest-api-key: ${KAKAO_REST_API_KEY}
 
 file:
   upload-dir: ${FILE_UPLOAD_DIR:C:\Users\SSAFY\Desktop\image}

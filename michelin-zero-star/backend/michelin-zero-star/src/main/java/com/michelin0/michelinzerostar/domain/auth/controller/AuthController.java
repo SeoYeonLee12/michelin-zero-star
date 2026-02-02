@@ -5,19 +5,19 @@ import com.michelin0.michelinzerostar.domain.auth.dto.LoginRequestDto;
 import com.michelin0.michelinzerostar.domain.auth.dto.LoginResponseDto;
 import com.michelin0.michelinzerostar.domain.auth.service.AuthService;
 import com.michelin0.michelinzerostar.global.security.jwt.TokenDto;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CookieValue;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
@@ -32,63 +32,63 @@ public class AuthController {
         return ResponseEntity.ok("회원가입 성공");
     }
 
-    // 로그인
+    // 로그인 (쿠키 발급)
     @PostMapping("/login")
-    public ResponseEntity<LoginResponseDto> login(
-            @RequestBody @Valid LoginRequestDto requestDto,
-            HttpServletResponse response
-    ) {
+    public ResponseEntity<LoginResponseDto> login(@RequestBody @Valid LoginRequestDto requestDto, HttpServletResponse response) {
         TokenDto tokenDto = authService.login(requestDto);
 
-        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", tokenDto.getRefreshToken())
-                .httpOnly(true)
-                .secure(false)
-                .path("/")
-                .maxAge(7 * 24 * 60 * 60)
-                .sameSite("Lax")
-                .build();
-
-        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
+        // Refresh Token을 HttpOnly 쿠키로 설정
+        setRefreshTokenCookie(response, tokenDto.getRefreshToken());
 
         return ResponseEntity.ok(new LoginResponseDto(tokenDto.getAccessToken()));
     }
 
-    // 토큰 재발급
+    // 토큰 재발급 (Silent Refresh)
     @PostMapping("/reissue")
     public ResponseEntity<?> reissue(
             @CookieValue(name = "refreshToken", required = false) String refreshToken,
             HttpServletResponse response
     ) {
         if (refreshToken == null) {
-            return ResponseEntity.status(401).body("Refresh Token이 없습니다. 다시 로그인해주세요.");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Refresh Token 쿠키가 없습니다.");
         }
 
-        TokenDto tokenDto = authService.reissue(refreshToken);
+        try {
+            TokenDto tokenDto = authService.reissue(refreshToken);
 
-        if (tokenDto.getRefreshToken() != null) {
-            ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", tokenDto.getRefreshToken())
-                    .httpOnly(true)
-                    .secure(false)
+            // 성공 시: 리프레시 토큰 갱신 (Rotation)
+            if (tokenDto.getRefreshToken() != null) {
+                setRefreshTokenCookie(response, tokenDto.getRefreshToken());
+            }
+
+            return ResponseEntity.ok(new LoginResponseDto(tokenDto.getAccessToken()));
+
+        } catch (RuntimeException e) {
+            log.warn("토큰 재발급 실패: {}", e.getMessage());
+
+            // 쿠키 삭제 (잘못된 토큰 제거)
+            ResponseCookie deleteCookie = ResponseCookie.from("refreshToken", "")
+                    .maxAge(0)
                     .path("/")
-                    .maxAge(7 * 24 * 60 * 60)
-                    .sameSite("Lax")
                     .build();
-            response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
-        }
+            response.addHeader(HttpHeaders.SET_COOKIE, deleteCookie.toString());
 
-        return ResponseEntity.ok(new LoginResponseDto(tokenDto.getAccessToken()));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("토큰이 유효하지 않습니다: " + e.getMessage());
+        }
     }
 
     // 로그아웃
     @PostMapping("/logout")
     public ResponseEntity<String> logout(
-            @RequestHeader("Authorization") String accessToken,
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String accessToken,
             HttpServletResponse response
     ) {
         String resolvedToken = resolveToken(accessToken);
+        if (resolvedToken != null) {
+            authService.logout(resolvedToken);
+        }
 
-        authService.logout(resolvedToken);
-
+        // 쿠키 삭제
         ResponseCookie cookie = ResponseCookie.from("refreshToken", "")
                 .maxAge(0)
                 .path("/")
@@ -96,6 +96,17 @@ public class AuthController {
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
         return ResponseEntity.ok("로그아웃 되었습니다.");
+    }
+
+    private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", refreshToken)
+                .maxAge(7 * 24 * 60 * 60) // 7일
+                .path("/")
+                .secure(false) // 로컬: false, 배포: true
+                .sameSite("Lax")
+                .httpOnly(true)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     private String resolveToken(String token) {

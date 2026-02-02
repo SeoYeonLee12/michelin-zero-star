@@ -1,11 +1,15 @@
 package com.michelin0.michelinzerostar.domain.user.service;
 
 import com.michelin0.michelinzerostar.domain.auth.service.AuthService;
+import com.michelin0.michelinzerostar.domain.category.domain.Category;
+import com.michelin0.michelinzerostar.domain.category.domain.CategoryRepository;
 import com.michelin0.michelinzerostar.domain.user.dto.UserResponseDto;
 import com.michelin0.michelinzerostar.domain.user.dto.UserUpdateRequestDto;
 import com.michelin0.michelinzerostar.domain.user.entity.SocialProvider;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
+import com.michelin0.michelinzerostar.domain.user.entity.UserFavoriteCategory;
 import com.michelin0.michelinzerostar.domain.user.entity.UserProfile;
+import com.michelin0.michelinzerostar.domain.user.repository.UserFavoriteCategoryRepository;
 import com.michelin0.michelinzerostar.domain.user.repository.UserProfileRepository;
 import com.michelin0.michelinzerostar.domain.user.repository.UserRepository;
 import com.michelin0.michelinzerostar.global.exception.errorcode.AuthErrorCode;
@@ -14,6 +18,8 @@ import com.michelin0.michelinzerostar.global.redis.RedisUtil;
 import com.michelin0.michelinzerostar.global.security.jwt.JwtTokenProvider;
 import com.michelin0.michelinzerostar.global.util.KakaoMapService;
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,7 +33,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final UserProfileRepository userProfileRepository; // 필드 추가
+    private final UserProfileRepository userProfileRepository;
+    private final UserFavoriteCategoryRepository userFavoriteCategoryRepository;
+    private final CategoryRepository categoryRepository;
+
     private final JwtTokenProvider jwtTokenProvider;
     private final RedisUtil redisUtil;
     private final PasswordEncoder passwordEncoder;
@@ -39,31 +48,26 @@ public class UserService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("유저를 찾을 수 없습니다."));
 
-        // 카카오 API로 좌표 -> 주소 변환
-        KakaoMapService.AddressInfo addressInfo = kakaoMapService.getAddressFromCoords(latitude,
-                longitude);
+        KakaoMapService.AddressInfo addressInfo = kakaoMapService.getAddressFromCoords(latitude, longitude);
 
-        // 프로필 찾기 (없으면 생성)
         UserProfile profile = userProfileRepository.findById(user.getId())
                 .orElseGet(() -> UserProfile.builder()
                         .user(user)
                         .locationAddress(addressInfo.fullAddress())
                         .locationCode(addressInfo.code())
-                        .latitude(latitude)   // [중요] 생성 시 위도 저장
-                        .longitude(longitude) // [중요] 생성 시 경도 저장
-                        .isVerified(true)     // 생성 즉시 인증됨
+                        .latitude(latitude)
+                        .longitude(longitude)
+                        .isVerified(true)
                         .build());
 
-        // 정보 업데이트 (Dirty Checking)
         profile.updateLocation(addressInfo.fullAddress(), addressInfo.code(), latitude, longitude);
         userProfileRepository.save(profile);
 
-        return addressInfo.dongName(); // "둔산동" 반환
+        return addressInfo.dongName();
     }
 
     @Transactional
     public void deleteUser(String accessToken, String email, SocialProvider provider) {
-
         User user = userRepository.findByEmailAndSocialProvider(email, provider)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
 
@@ -90,7 +94,6 @@ public class UserService {
 
     @Transactional
     public void updateUser(String email, SocialProvider provider, UserUpdateRequestDto requestDto) {
-
         User user = userRepository.findByEmailAndSocialProvider(email, provider)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
 
@@ -105,32 +108,41 @@ public class UserService {
             }
         }
 
-        user.updateProfile(null, requestDto.getNickname(), null);
+        user.updateProfile(null, requestDto.getNickname(), requestDto.getProfileImageUrl());
+
+        if (requestDto.getCategories() != null) {
+            userFavoriteCategoryRepository.deleteByUserId(user.getId());
+
+            for (String categoryName : requestDto.getCategories()) {
+                Category category = categoryRepository.findByCategoryName(categoryName)
+                        .orElseThrow(() -> new IllegalArgumentException("해당 카테고리를 찾을 수 없습니다: " + categoryName));
+
+                UserFavoriteCategory userFavoriteCategory = UserFavoriteCategory.builder()
+                        .user(user)
+                        .category(category)
+                        .build();
+
+                userFavoriteCategoryRepository.save(userFavoriteCategory);
+            }
+        }
 
         if (provider == SocialProvider.LOCAL
                 && requestDto.getNewPassword() != null
                 && !requestDto.getNewPassword().isBlank()) {
 
-            if (requestDto.getCurrentPassword() == null || requestDto.getCurrentPassword()
-                    .isBlank()) {
+            if (requestDto.getCurrentPassword() == null || requestDto.getCurrentPassword().isBlank()) {
                 throw new RuntimeException("현재 비밀번호를 입력해주세요.");
             }
-            if (requestDto.getNewPasswordConfirm() == null || requestDto.getNewPasswordConfirm()
-                    .isBlank()) {
+            if (requestDto.getNewPasswordConfirm() == null || requestDto.getNewPasswordConfirm().isBlank()) {
                 throw new RuntimeException("새 비밀번호 확인을 입력해주세요.");
             }
-
-            if (user.getPassword() != null && !passwordEncoder.matches(
-                    requestDto.getCurrentPassword(), user.getPassword())) {
+            if (user.getPassword() != null && !passwordEncoder.matches(requestDto.getCurrentPassword(), user.getPassword())) {
                 throw new RuntimeException("현재 비밀번호가 일치하지 않습니다.");
             }
-
             if (!requestDto.getNewPassword().equals(requestDto.getNewPasswordConfirm())) {
                 throw new RuntimeException("새 비밀번호가 일치하지 않습니다.");
             }
-
-            if (user.getPassword() != null && passwordEncoder.matches(
-                    requestDto.getNewPassword(), user.getPassword())) {
+            if (user.getPassword() != null && passwordEncoder.matches(requestDto.getNewPassword(), user.getPassword())) {
                 throw new GlobalException(AuthErrorCode.SAME_AS_OLD_PASSWORD);
             }
 
@@ -143,6 +155,42 @@ public class UserService {
     public UserResponseDto getUser(String email, SocialProvider provider) {
         User user = userRepository.findByEmailAndSocialProvider(email, provider)
                 .orElseThrow(() -> new IllegalArgumentException("해당 유저가 없습니다."));
-        return new UserResponseDto(user);
+
+        UserProfile profile = userProfileRepository.findById(user.getId())
+                .orElse(null);
+
+        List<UserFavoriteCategory> favoriteCategories = userFavoriteCategoryRepository.findAllByUserId(user.getId());
+
+        List<String> categoryNames = favoriteCategories.stream()
+                .map(favorite -> favorite.getCategory().getCategoryName())
+                .collect(Collectors.toList());
+
+        if (profile != null) {
+            return UserResponseDto.builder()
+                    .id(user.getId())
+                    .email(user.getEmail())
+                    .name(user.getName())
+                    .nickname(user.getNickname())
+                    .profileImageUrl(user.getProfileImageUrl())
+                    .role(user.getRole())
+                    .totalStar(user.getTotalStar())
+                    .socialProvider(user.getSocialProvider())
+                    .location(profile.getLocationAddress())
+                    .isVerified(profile.isVerified())
+                    .categories(categoryNames)
+                    .build();
+        }
+
+        return UserResponseDto.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .name(user.getName())
+                .nickname(user.getNickname())
+                .profileImageUrl(user.getProfileImageUrl())
+                .role(user.getRole())
+                .totalStar(user.getTotalStar())
+                .socialProvider(user.getSocialProvider())
+                .categories(categoryNames)
+                .build();
     }
 }
