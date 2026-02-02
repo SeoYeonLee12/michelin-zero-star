@@ -36,6 +36,7 @@ export interface Recipe {
   name: string
   thumbnail: string
   tags: string[]
+  image?: string | null
   hashtags?: string[] // Added hashtags field for creator/channel info
   author?: string | Author // Support both string and object
   rating?: number // Legacy field for michelin stars
