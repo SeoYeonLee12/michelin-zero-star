@@ -91,7 +91,8 @@ public class SecurityConfig {
                                 "/",
                                 "/error",
                                 "/api/v1/auth/**",
-                                "/ws-stomp/**", // 웹소켓 핸드셰이크
+                                "/v1/auth/**",
+                                "/ws-stomp/**",
                                 "/api-docs/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
@@ -142,12 +143,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 명시적인 도메인 허용
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:3000",
-                "http://localhost:8080",
-                "http://i14b208.p.ssafy.io"
-        ));
+        configuration.addAllowedOriginPattern("*");
 
         // 허용할 HTTP 메서드 설정
         configuration.setAllowedMethods(
