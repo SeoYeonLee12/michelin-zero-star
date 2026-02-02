@@ -8,8 +8,6 @@ public record ChatSaveMessageRequest(
         String content,
         @NotNull(message = "레시피를 입력해주세요.")
         Long recipeId,
-        @NotNull(message = "현재 유저 아이디를 입력해주세요.")
-        Long userId,
         @NotNull(message = "현재 유저가 보고있는 단계를 입력하세요.")
         Integer currentStepNumber
 ) {
