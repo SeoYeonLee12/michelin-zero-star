@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class ChatRedisService {
+public class RedisChataService {
 
     private final RedisTemplate<String, Object> redisTemplate;
 

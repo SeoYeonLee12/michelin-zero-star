@@ -14,7 +14,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -45,15 +44,18 @@ public class AiChatMessage extends BaseDomain {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
-    @Column(name = "recommended_recipes", columnDefinition = "JSON")
-    private String recommendedRecipes;
-
-    public AiChatMessage(User user, Recipe recipe, SenderType senderType, String content,
-            String recommendedRecipes) {
+    private AiChatMessage(User user, Recipe recipe, SenderType senderType, String content) {
         this.user = user;
         this.recipe = recipe;
         this.senderType = senderType;
         this.content = content;
-        this.recommendedRecipes = Objects.requireNonNullElse(recommendedRecipes, "{}");
+    }
+
+    public static AiChatMessage createUserMessage(User user, Recipe recipe, String content) {
+        return new AiChatMessage(user, recipe, SenderType.USER, content);
+    }
+
+    public static AiChatMessage createAIMessage(User user, Recipe recipe, String content) {
+        return new AiChatMessage(user, recipe, SenderType.AI, content);
     }
 }
