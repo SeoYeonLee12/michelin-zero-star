@@ -6,7 +6,7 @@ import com.michelin0.michelinzerostar.domain.market.dto.response.MarketPostDetai
 import com.michelin0.michelinzerostar.domain.market.dto.response.MarketPostListResponse;
 import com.michelin0.michelinzerostar.domain.market.entity.MarketPost;
 import com.michelin0.michelinzerostar.domain.market.entity.MarketPostImage;
-import com.michelin0.michelinzerostar.domain.market.entity.PostStatus; // Enum import 확인
+import com.michelin0.michelinzerostar.domain.market.entity.PostStatus;
 import com.michelin0.michelinzerostar.domain.market.repository.MarketPostRepository;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.domain.user.entity.UserProfile;
@@ -24,6 +24,8 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -64,40 +66,9 @@ public class MarketPostService {
                 .longitude(profile.getLongitude())
                 .build();
 
-        if (images != null && !images.isEmpty()) {
-            File dir = new File(uploadDir);
-            if (!dir.exists()) {
-                boolean mkdirs = dir.mkdirs();
-                if (!mkdirs) log.error("디렉토리 생성 실패: {}", uploadDir);
-            }
-
-            for (int i = 0; i < images.size(); i++) {
-                MultipartFile file = images.get(i);
-                if (file.isEmpty()) continue;
-
-                String originalFilename = file.getOriginalFilename();
-                String ext = extractExt(originalFilename);
-                validateExtension(ext);
-
-                String storeFileName = UUID.randomUUID() + "." + ext;
-                String fullPath = Paths.get(uploadDir, storeFileName).toString();
-
-                try {
-                    file.transferTo(new File(fullPath));
-                    MarketPostImage image = MarketPostImage.builder()
-                            .imageUrl("/images/" + storeFileName)
-                            .orderIndex(i)
-                            .build();
-                    post.addImage(image);
-                } catch (IOException e) {
-                    log.error("이미지 저장 중 오류 발생: {}", e.getMessage());
-                    throw new RuntimeException("이미지 저장 중 오류가 발생했습니다.", e);
-                }
-            }
-        }
+        uploadImages(post, images);
 
         marketPostRepository.save(post);
-        log.info("게시글 등록 완료: ID={}, Title={}", post.getId(), post.getTitle());
     }
 
     // 게시글 상세 조회
@@ -120,6 +91,15 @@ public class MarketPostService {
         return marketPostRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(MarketPostListResponse::new)
                 .collect(Collectors.toList());
+    }
+
+    // 내가 쓴 게시물 조회
+    public Page<MarketPostListResponse> getMyPosts(Long userId, Pageable pageable) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new GlobalException(UserErrorCode.USER_NOT_FOUND));
+
+        return marketPostRepository.findAllByWriterOrderByCreatedAtDesc(user, pageable)
+                .map(MarketPostListResponse::new);
     }
 
     // 내 근처 게시글 조회
@@ -146,15 +126,23 @@ public class MarketPostService {
 
     // 게시글 내용 수정
     @Transactional
-    public void updatePost(Long postId, Long userId, MarketPostUpdateRequest request) {
+    public void updatePost(Long postId, Long userId, MarketPostUpdateRequest request, List<MultipartFile> newImages) {
         MarketPost post = marketPostRepository.findById(postId)
                 .orElseThrow(() -> new GlobalException(MarketErrorCode.POST_NOT_FOUND));
 
         validateWriter(post, userId);
 
-        post.update(request.getTitle(), request.getContent(), request.getPrice(), request.getMeetingPlace(), request.getCategory());    }
+        // 텍스트 정보 업데이트
+        post.update(request.getTitle(), request.getContent(), request.getPrice(), request.getMeetingPlace());
 
-    // 게시글 상태 수정 (판매중, 예약중, 거래완료)
+        // 이미지 수정 로직 (새 이미지가 있을 경우만 기존 삭제 후 교체)
+        if (newImages != null && !newImages.isEmpty()) {
+            deletePostImages(post); // 기존 이미지 삭제
+            uploadImages(post, newImages); // 새 이미지 업로드
+        }
+    }
+
+    // 게시글 상태 수정
     @Transactional
     public void updatePostStatus(Long postId, Long userId, String statusStr) {
         MarketPost post = marketPostRepository.findById(postId)
@@ -166,7 +154,6 @@ public class MarketPostService {
             PostStatus newStatus = PostStatus.valueOf(statusStr.toUpperCase());
             post.updateStatus(newStatus);
         } catch (IllegalArgumentException e) {
-            // 적절한 에러 코드로 변경 가능 (예: INVALID_INPUT_VALUE)
             throw new IllegalArgumentException("유효하지 않은 상태 값입니다. (SELLING, RESERVED, SOLD)");
         }
     }
@@ -183,7 +170,7 @@ public class MarketPostService {
             throw new GlobalException(MarketErrorCode.ALREADY_DELETED_POST);
         }
 
-        marketPostRepository.delete(post); // Soft Delete
+        marketPostRepository.delete(post);
     }
 
     // 내가 찜한 게시글 목록 조회
@@ -191,10 +178,7 @@ public class MarketPostService {
         if (!userRepository.existsById(userId)) {
             throw new GlobalException(UserErrorCode.USER_NOT_FOUND);
         }
-
-        List<MarketPost> likedPosts = marketPostRepository.findLikedPostsByUserId(userId);
-
-        return likedPosts.stream()
+        return marketPostRepository.findLikedPostsByUserId(userId).stream()
                 .map(MarketPostListResponse::new)
                 .collect(Collectors.toList());
     }
@@ -206,6 +190,54 @@ public class MarketPostService {
         }
     }
 
+    // 이미지 업로드 공통 로직
+    private void uploadImages(MarketPost post, List<MultipartFile> images) {
+        if (images == null || images.isEmpty()) return;
+
+        File dir = new File(uploadDir);
+        if (!dir.exists()) dir.mkdirs();
+
+        for (int i = 0; i < images.size(); i++) {
+            MultipartFile file = images.get(i);
+            if (file.isEmpty()) continue;
+
+            String originalFilename = file.getOriginalFilename();
+            String ext = extractExt(originalFilename);
+            validateExtension(ext);
+
+            String storeFileName = UUID.randomUUID() + "." + ext;
+            String fullPath = Paths.get(uploadDir, storeFileName).toString();
+
+            try {
+                file.transferTo(new File(fullPath));
+                MarketPostImage image = MarketPostImage.builder()
+                        .imageUrl("/images/" + storeFileName)
+                        .orderIndex(i)
+                        .build();
+                post.addImage(image);
+            } catch (IOException e) {
+                log.error("이미지 저장 중 오류 발생: {}", e.getMessage());
+                throw new RuntimeException("이미지 저장 중 오류가 발생했습니다.", e);
+            }
+        }
+    }
+
+    // 기존 이미지 삭제 로직
+    private void deletePostImages(MarketPost post) {
+        for (MarketPostImage img : post.getImages()) {
+            try {
+                String fileName = img.getImageUrl().replace("/images/", "");
+                File file = new File(Paths.get(uploadDir, fileName).toString());
+                if (file.exists()) {
+                    file.delete();
+                }
+            } catch (Exception e) {
+                log.warn("이미지 파일 삭제 실패: {}", img.getImageUrl());
+            }
+        }
+        post.getImages().clear();
+    }
+
     private String extractExt(String originalFilename) {
         int pos = originalFilename.lastIndexOf(".");
         if (pos == -1) return "";
@@ -213,7 +245,7 @@ public class MarketPostService {
     }
 
     private void validateExtension(String ext) {
-        String[] allowedExts = {"jpg", "jpeg"};
+        String[] allowedExts = {"jpg", "jpeg", "png"};
         if (!Arrays.asList(allowedExts).contains(ext)) {
             throw new RuntimeException("허용되지 않는 파일 형식입니다: " + ext);
         }

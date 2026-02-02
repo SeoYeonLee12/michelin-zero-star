@@ -42,8 +42,9 @@ public class ChatService {
 
     // 방 생성 (구매자 입장)
     public Long createOrGetChatRoom(Long postId, Long buyerId) {
+        // 이미 존재하는 방인지 확인 (있으면 가져오고, 없으면 새로 만듦)
         ChatRoom chatRoom = chatRoomRepository.findByPostIdAndBuyerId(postId, buyerId)
-                .orElseGet(() -> createChatRoom(postId, buyerId));
+                .orElseGet(() -> createChatRoom(postId, buyerId)); // 없으면 createChatRoom 호출
 
         // 구매자가 나간 상태라면 복귀 (초대)
         if (chatRoom.isBuyerLeft()) {
@@ -53,9 +54,13 @@ public class ChatService {
         return chatRoom.getId();
     }
 
+    // 채팅방 생성
     private ChatRoom createChatRoom(Long postId, Long buyerId) {
         MarketPost post = marketPostRepository.findById(postId)
                 .orElseThrow(() -> new RuntimeException("게시글 없음"));
+
+        post.increaseChatCount();
+
         User buyer = userRepository.findById(buyerId)
                 .orElseThrow(() -> new GlobalException(UserErrorCode.USER_NOT_FOUND));
 
