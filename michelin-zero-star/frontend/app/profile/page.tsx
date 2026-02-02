@@ -12,25 +12,25 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/auth-context"
-import { Camera, ArrowLeft, Eye, EyeOff, Check, X, MapPin, Loader2, Trash2 } from "lucide-react"
+import { Camera, ArrowLeft, Eye, EyeOff, Check, X, MapPin, Loader2 } from "lucide-react"
 import Link from "next/link"
 
 const categoryOptions = [
-  { value: "1", label: "밥" },
-  { value: "2", label: "반찬" },
-  { value: "3", label: "국물" },
-  { value: "4", label: "면" },
-  { value: "5", label: "디저트" },
-  { value: "6", label: "분식" },
-  { value: "7", label: "샐러드" },
-  { value: "8", label: "음료" },
-  { value: "9", label: "기타" },
-  { value: "10", label: "야식&술안주" },
+  { value: "korean", label: "한식" },
+  { value: "chinese", label: "중식" },
+  { value: "japanese", label: "일식" },
+  { value: "western", label: "양식" },
+  { value: "dessert", label: "디저트" },
+  { value: "snack", label: "분식" },
+  { value: "salad", label: "샐러드" },
+  { value: "drink", label: "음료" },
 ]
+
+const mockNicknames = ["민지", "요리왕", "쉐프김", "맛집탐방"]
 
 export default function ProfileEditPage() {
   const router = useRouter()
-  const { user, isLoggedIn, updateProfile, updateLocation, withdraw, isLoading: isAuthLoading } = useAuth() // ✅ Added
+  const { user, isLoggedIn, isLoading: isAuthLoading, updateProfile, updateLocation } = useAuth()
 
   const [isLoading, setIsLoading] = React.useState(false)
   const [isGettingLocation, setIsGettingLocation] = React.useState(false)
@@ -39,16 +39,16 @@ export default function ProfileEditPage() {
   const [locationDialogOpen, setLocationDialogOpen] = React.useState(false)
   const [pendingLocation, setPendingLocation] = React.useState("")
   const [pendingCoordinates, setPendingCoordinates] = React.useState<{ latitude: number; longitude: number } | null>(null)
+  const [nicknameError, setNicknameError] = React.useState("")
   const fileInputRef = React.useRef<HTMLInputElement>(null)
-  // ... ref fix not needed if not crashing ...
-
   const [profileImagePreview, setProfileImagePreview] = React.useState<string | null>(null)
 
   const [formData, setFormData] = React.useState({
     name: user?.name || "",
     nickname: user?.nickname || "",
     email: user?.email || "",
-    location: "",
+    bio: user?.bio || "",
+    location: user?.location || "",
     categories: [] as string[],
   })
 
@@ -59,11 +59,10 @@ export default function ProfileEditPage() {
   })
 
   React.useEffect(() => {
-    // ✅ Wait for loading
-    if (!isAuthLoading && !isLoggedIn) {
+    if (!isLoggedIn) {
       router.push("/login")
     }
-  }, [isAuthLoading, isLoggedIn, router])
+  }, [isLoggedIn, router])
 
   React.useEffect(() => {
     if (user) {
@@ -72,7 +71,8 @@ export default function ProfileEditPage() {
         name: user.name,
         nickname: user.nickname || "",
         email: user.email,
-        categories: [],
+        bio: user.bio || "",
+        location: user.location || "",
       }))
       if (user.profileImage) {
         setProfileImagePreview(user.profileImage)
@@ -91,9 +91,12 @@ export default function ProfileEditPage() {
     }
   }
 
+  // Nickname validation removed (no backend support)
+
   const handleNicknameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     setFormData({ ...formData, nickname: value })
+    // Nickname validation removed
   }
 
   const handleGetLocation = () => {
@@ -169,7 +172,7 @@ export default function ProfileEditPage() {
       console.log("✅ 위치 저장 완료")
     } catch (error) {
       console.error("위치 저장 오류:", error)
-      // alert("위치 저장에 실패했습니다.")
+      alert("위치 저장에 실패했습니다.")
     } finally {
       setIsGettingLocation(false)
     }
@@ -185,45 +188,36 @@ export default function ProfileEditPage() {
   }
 
   const handleSaveProfile = async () => {
-    // 비밀번호 변경 시도 시 유효성 검사
-    if (passwordData.newPassword || passwordData.currentPassword) {
-      if (!passwordData.currentPassword) {
-        alert("현재 비밀번호를 입력해주세요.")
-        return
-      }
-      if (passwordData.newPassword !== passwordData.confirmPassword) {
-        alert("새 비밀번호가 일치하지 않습니다.")
-        return
-      }
+    if (nicknameError) {
+      alert("닉네임을 확인해주세요.")
+      return
     }
-
     setIsLoading(true)
+    await new Promise((resolve) => setTimeout(resolve, 500))
 
-    // 닉네임이 변경되지 않았으면 undefined로 설정하여 서버 전송 제외
-    const nicknameToUpdate = formData.nickname === user?.nickname ? undefined : formData.nickname
+    updateProfile({
+      // name(실명)은 변경 불가: payload에서 제외
+      nickname: formData.nickname,
+      bio: formData.bio,
+      location: formData.location,
+      profileImage: profileImagePreview || undefined,
+    })
 
-    try {
-      await updateProfile({
-        nickname: nicknameToUpdate,
-        // bio 제거됨
-        location: formData.location,
-        profileImage: profileImagePreview || undefined,
-        currentPassword: passwordData.currentPassword || undefined,
-        newPassword: passwordData.newPassword || undefined,
-        newPasswordConfirm: passwordData.confirmPassword || undefined,
-        // categories 제거됨 (API 미지원)
-      })
-      alert("프로필이 성공적으로 수정되었습니다.")
-      router.push("/mypage")
-    } catch (error: any) {
-      const msg = error.message || "프로필 수정에 실패했습니다."
-      alert(msg)
-    } finally {
-      setIsLoading(false)
-    }
+    setIsLoading(false)
+    router.push("/mypage")
   }
 
-
+  const handleChangePassword = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert("새 비밀번호가 일치하지 않습니다.")
+      return
+    }
+    setIsLoading(true)
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" })
+    setIsLoading(false)
+    alert("비밀번호가 변경되었습니다.")
+  }
 
   const passwordRequirements = [
     { label: "8자 이상", met: passwordData.newPassword.length >= 8 },
@@ -231,20 +225,8 @@ export default function ProfileEditPage() {
     { label: "숫자 포함", met: /\d/.test(passwordData.newPassword) },
   ]
 
-  if (isAuthLoading) return null // ✅ Loading
-
   if (!isLoggedIn) {
     return null
-  }
-
-  const handleWithdraw = async () => {
-    if (window.confirm("정말로 탈퇴하시겠습니까? 탈퇴 후에는 계정을 복구할 수 없습니다.")) {
-      try {
-        await withdraw()
-      } catch (error) {
-        // 이미 AuthContext에서 alert 처리됨
-      }
-    }
   }
 
   return (
@@ -335,7 +317,9 @@ export default function ProfileEditPage() {
                 <p className="text-xs text-muted-foreground">이메일은 변경할 수 없습니다</p>
               </div>
 
+
               {/* 자기소개 삭제됨 */}
+
 
               {/* Preferred Categories moved here (bottom of Basic Info) */}
               <div className="space-y-2">
@@ -372,20 +356,6 @@ export default function ProfileEditPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-2">
-                {/* <Input
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  placeholder="예: 대전 서구 둔산동"
-                  className="flex-1"
-                /> */}
-
-                {/* <Input
-                  value={formData.location}
-                  readOnly
-                  disabled
-                  placeholder="현재 위치 버튼을 눌러 위치를 인증해주세요"
-                  className="flex-1 bg-muted cursor-not-allowed"
-                /> */}
                 <Input
                   value={isGettingLocation ? "" : formData.location}
                   readOnly
@@ -404,22 +374,18 @@ export default function ProfileEditPage() {
                 </Button>
               </div>
 
-              {/* <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 위치 정보는 주변 재료 나눔 게시글을 찾는 데 사용됩니다.
                 {isGettingLocation && " GPS로 위치를 탐색 중입니다..."}
-              </p> */}
-              {/* <p className="text-xs text-muted-foreground">
-                현재 위치 버튼을 눌러 동네 인증을 해주세요. 위치 정보는 주변 재료 나눔 게시글을 찾는 데 사용됩니다. */}
-              {/* {isGettingLocation && " 위치를 탐색 중입니다..."} */}
-              {/* </p> */}
+              </p>
             </CardContent>
           </Card>
 
-          {/* Password Change Information */}
+          {/* Password Change */}
           <Card>
             <CardHeader>
               <CardTitle>비밀번호 변경</CardTitle>
-              <CardDescription>비밀번호를 변경하려면 아래 정보를 입력하고 저장 버튼을 누르세요.</CardDescription>
+              <CardDescription>계정 보안을 위해 정기적으로 비밀번호를 변경하세요</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -494,27 +460,17 @@ export default function ProfileEditPage() {
                   <p className="text-xs text-destructive">비밀번호가 일치하지 않습니다</p>
                 )}
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Account Withdrawal */}
-          <Card className="border-destructive/50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-destructive">
-                <Trash2 className="h-5 w-5" />
-                회원 탈퇴
-              </CardTitle>
-              <CardDescription>
-                탈퇴 시 작성한 레시피와 게시글은 삭제되지 않을 수 있습니다.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
               <Button
-                variant="destructive"
-                onClick={handleWithdraw}
-                className="w-full sm:w-auto"
+                onClick={handleChangePassword}
+                variant="outline"
+                disabled={
+                  !passwordData.currentPassword ||
+                  !passwordData.newPassword ||
+                  passwordData.newPassword !== passwordData.confirmPassword
+                }
               >
-                회원 탈퇴하기
+                비밀번호 변경
               </Button>
             </CardContent>
           </Card>
@@ -526,7 +482,7 @@ export default function ProfileEditPage() {
             </Button>
             <Button
               onClick={handleSaveProfile}
-              disabled={isLoading}
+              disabled={isLoading || !!nicknameError}
               className="bg-[#800020] hover:bg-[#800020]/90"
             >
               {isLoading ? "저장 중..." : "변경사항 저장"}

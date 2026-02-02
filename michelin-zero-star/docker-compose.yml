@@ -138,6 +138,8 @@ services:
     environment:
       - ES_URL=http://elasticsearch:9200
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SPEECH_KEY=${SPEECH_KEY}
+      - SPEECH_REGION=${SPEECH_REGION}
       - PYTHONUNBUFFERED=1
       - PROJECT_NAME="Michelin Zero Star AI"
     volumes:
