@@ -15,6 +15,10 @@ from fastapi import FastAPI
 from app.core.config import settings
 from app.core.database import es_client
 from app.api import rag_router
+from app.api.speech_router import router as speech_router
+from app.api.chat_router import router as chat_router
+from fastapi.middleware.cors import CORSMiddleware
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,6 +34,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan) # Fast API 애플리케이션 생성
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 @app.get("/")
 def health_check():
     return {"status": "ok", "message": "AI Server is running"}
@@ -37,3 +49,5 @@ def health_check():
 # 라우터 등록
 # URL Prefix: /api/chat -> 최종 주소: /api/chat/search
 app.include_router(rag_router.router, prefix="/api/chat", tags=["Chatbot"])
+app.include_router(speech_router)
+app.include_router(chat_router)

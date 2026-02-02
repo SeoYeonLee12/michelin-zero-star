@@ -374,12 +374,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateProfile = async (data: Partial<User> & { currentPassword?: string; newPassword?: string; newPasswordConfirm?: string }) => {
     if (user) {
       try {
-        await updateProfileAPI({
-          nickname: data.nickname,
-          currentPassword: data.currentPassword,
-          newPassword: data.newPassword,
-          newPasswordConfirm: data.newPasswordConfirm
-        })
+        // Only send fields that actually changed
+        const updatePayload: any = {}
+        if (data.nickname && data.nickname !== user.nickname) {
+          updatePayload.nickname = data.nickname
+        }
+        if (data.currentPassword) updatePayload.currentPassword = data.currentPassword
+        if (data.newPassword) updatePayload.newPassword = data.newPassword
+        if (data.newPasswordConfirm) updatePayload.newPasswordConfirm = data.newPasswordConfirm
+
+        await updateProfileAPI(updatePayload)
         const { currentPassword, newPassword, newPasswordConfirm, ...safeData } = data
         const updatedUser = { ...user, ...safeData }
         setUser(updatedUser)

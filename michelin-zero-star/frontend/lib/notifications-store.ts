@@ -130,10 +130,17 @@ function ensureInit() {
   }
 }
 
-export function subscribeNotifications(listener: () => void) {
-  ensureInit()
-  listeners.add(listener)
-  return () => listeners.delete(listener)
+// export function subscribeNotifications(listener: () => void) {
+//   ensureInit()
+//   listeners.add(listener)
+//   return () => listeners.delete(listener)
+// }
+
+export function subscribeNotifications(cb: () => void) {
+  listeners.add(cb)
+  return () => {
+    listeners.delete(cb)
+  }
 }
 
 export function getNotificationsSnapshot(): NotificationItem[] {
