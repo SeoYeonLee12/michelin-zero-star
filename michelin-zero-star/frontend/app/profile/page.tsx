@@ -16,14 +16,16 @@ import { Camera, ArrowLeft, Eye, EyeOff, Check, X, MapPin, Loader2 } from "lucid
 import Link from "next/link"
 
 const categoryOptions = [
-  { value: "korean", label: "한식" },
-  { value: "chinese", label: "중식" },
-  { value: "japanese", label: "일식" },
-  { value: "western", label: "양식" },
-  { value: "dessert", label: "디저트" },
-  { value: "snack", label: "분식" },
-  { value: "salad", label: "샐러드" },
-  { value: "drink", label: "음료" },
+  { value: "밥", label: "밥" },
+  { value: "반찬", label: "반찬" },
+  { value: "국물", label: "국물" },
+  { value: "면", label: "면" },
+  { value: "디저트", label: "디저트" },
+  { value: "분식", label: "분식" },
+  { value: "샐러드", label: "샐러드" },
+  { value: "음료", label: "음료" },
+  { value: "야식&술안주", label: "야식&술안주" },
+  { value: "기타", label: "기타" },
 ]
 
 const mockNicknames = ["민지", "요리왕", "쉐프김", "맛집탐방"]
@@ -201,6 +203,7 @@ export default function ProfileEditPage() {
       bio: formData.bio,
       location: formData.location,
       profileImage: profileImagePreview || undefined,
+      categories: formData.categories,  // ✅ 카테고리 추가
     })
 
     setIsLoading(false)

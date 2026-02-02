@@ -31,27 +31,7 @@ export default function CommunityPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [hideCompleted, setHideCompleted] = useState(false)
 
-  // 로그인 체크
-  if (!isLoggedIn) {
-    return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <Navbar />
-        <AccessDenied type="login" />
-      </div>
-    )
-  }
-
-  // 동네 인증 체크
-  if (!user?.location) {
-    return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <Navbar />
-        <AccessDenied type="location" />
-      </div>
-    )
-  }
-
-  // API 연동: 게시글 목록 상태
+  // ✅ Hook을 early return 이전에 호출
   const [posts, setPosts] = useState<any[]>([])
   const [viewMode, setViewMode] = useState<"nearby" | "all">("nearby")
 
@@ -75,6 +55,26 @@ export default function CommunityPage() {
       fetchPosts()
     }
   }, [isLoggedIn, user?.location, viewMode])
+
+  // 로그인 체크
+  if (!isLoggedIn) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Navbar />
+        <AccessDenied type="login" />
+      </div>
+    )
+  }
+
+  // 동네 인증 체크
+  if (!user?.location) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Navbar />
+        <AccessDenied type="location" />
+      </div>
+    )
+  }
 
 
 

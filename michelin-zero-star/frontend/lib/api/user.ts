@@ -43,6 +43,7 @@ export function verifyLocation(body: VerifyLocationRequest) {
 // ✅ 추가: 유저 정보 수정 Request DTO
 export type UpdateProfileRequest = {
   nickname?: string
+  categories?: string[]  // ✅ 추가
   currentPassword?: string
   newPassword?: string
   newPasswordConfirm?: string

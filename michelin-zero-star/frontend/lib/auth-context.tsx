@@ -43,6 +43,7 @@ interface User {
   stars: number
   todayStars: number
   lastStarDate: string
+  categories?: string[]  // ✅ 추가
 }
 
 interface LikedRecipe {
@@ -378,6 +379,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const updatePayload: any = {}
         if (data.nickname && data.nickname !== user.nickname) {
           updatePayload.nickname = data.nickname
+        }
+        if (data.categories !== undefined) {  // ✅ 카테고리 추가
+          updatePayload.categories = data.categories
         }
         if (data.currentPassword) updatePayload.currentPassword = data.currentPassword
         if (data.newPassword) updatePayload.newPassword = data.newPassword

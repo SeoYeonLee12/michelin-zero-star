@@ -81,6 +81,7 @@ export type MarketPostUpdateRequest = {
     content: string
     price: number
     meetingPlace: string
+    category?: string  // ✅ 백엔드 필수 검증 통과용
 }
 
 export async function updatePost(postId: string, data: MarketPostUpdateRequest): Promise<string> {

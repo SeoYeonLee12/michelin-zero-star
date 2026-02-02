@@ -109,7 +109,8 @@ export default function EditPostPage() {
         title: formData.title,
         content: formData.description,
         price: parseInt(formData.price.replace(/[^0-9]/g, "")) || 0,
-        meetingPlace: formData.place
+        meetingPlace: formData.place,
+        category: "SHARE"  // ✅ 백엔드 필수 검증 통과용
       })
       alert("게시글이 수정되었습니다.")
       router.push(`/community/${postId}`)
