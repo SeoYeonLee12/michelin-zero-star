@@ -20,6 +20,9 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -68,10 +71,6 @@ public class ChatService {
         return chatRoomRepository.save(chatRoom);
     }
 
-    public void markAsRead(Long roomId, Long userId) {
-        chatMessageRepository.bulkUpdateReadStatus(roomId, userId);
-    }
-
     // 메시지 저장 (상대방 자동 소환 로직)
     public ChatMessageResponse saveMessage(Long roomId, Long senderId, String content) {
         ChatRoom chatRoom = chatRoomRepository.findById(roomId)
@@ -79,6 +78,7 @@ public class ChatService {
         User sender = userRepository.findById(senderId)
                 .orElseThrow(() -> new GlobalException(UserErrorCode.USER_NOT_FOUND));
 
+        // 상대방이 나갔으면 다시 들어오게 처리 (JoinedAt 갱신)
         checkAndRejoinPartner(chatRoom, senderId);
 
         ChatMessage message = ChatMessage.builder()
@@ -108,21 +108,20 @@ public class ChatService {
             throw new RuntimeException("접근 권한이 없습니다.");
         }
 
-        chatMessageRepository.bulkUpdateReadStatus(roomId, userId);
+        // 조회 시 읽음 처리도 같이 수행
+        markAsRead(roomId, userId);
 
         return chatMessageRepository.findByChatRoomIdAndCreatedAtAfterOrderByCreatedAt(roomId,
                         myJoinedAt)
                 .stream().map(ChatMessageResponse::new).collect(Collectors.toList());
     }
 
-    // 이미지 전송
     public void sendImage(Long roomId, Long senderId, MultipartFile file) {
         ChatRoom chatRoom = chatRoomRepository.findById(roomId)
                 .orElseThrow(() -> new RuntimeException("채팅방 없음"));
         User sender = userRepository.findById(senderId)
                 .orElseThrow(() -> new GlobalException(UserErrorCode.USER_NOT_FOUND));
 
-        // 이미지 보낼 때도 상대방 소환
         checkAndRejoinPartner(chatRoom, senderId);
 
         if (file.isEmpty()) {
@@ -152,6 +151,16 @@ public class ChatService {
         } catch (IOException e) {
             throw new RuntimeException("파일 저장 실패");
         }
+    }
+
+    // 읽음 처리 메서드
+    @Retryable(
+            retryFor = {CannotAcquireLockException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000)
+    )
+    public void markAsRead(Long roomId, Long userId) {
+        chatMessageRepository.bulkUpdateReadStatus(roomId, userId);
     }
 
     // 채팅방 목록 조회
@@ -196,13 +205,11 @@ public class ChatService {
     // 상대방 복귀 로직
     private void checkAndRejoinPartner(ChatRoom chatRoom, Long senderId) {
         if (chatRoom.getSeller().getId().equals(senderId)) {
-            // 내가 판매자 -> 구매자가 나갔으면 복귀
             if (chatRoom.isBuyerLeft()) {
                 chatRoom.setBuyerLeft(false);
                 chatRoom.setBuyerJoinedAt(LocalDateTime.now());
             }
         } else {
-            // 내가 구매자 -> 판매자가 나갔으면 복귀
             if (chatRoom.isSellerLeft()) {
                 chatRoom.setSellerLeft(false);
                 chatRoom.setSellerJoinedAt(LocalDateTime.now());
