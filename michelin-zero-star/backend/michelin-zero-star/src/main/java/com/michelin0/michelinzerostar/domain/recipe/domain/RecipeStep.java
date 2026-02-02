@@ -4,6 +4,7 @@ import com.michelin0.michelinzerostar.global.exception.errorcode.RecipeErrorCode
 import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -25,7 +26,7 @@ public class RecipeStep {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long recipeStepId;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "recipes_id", nullable = false)
     private Recipe recipe;
 
