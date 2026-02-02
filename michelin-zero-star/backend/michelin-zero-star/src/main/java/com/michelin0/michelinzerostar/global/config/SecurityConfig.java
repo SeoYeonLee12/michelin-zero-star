@@ -45,9 +45,8 @@ public class SecurityConfig {
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
-        // [수정됨] 생성자 주입 대신 Setter 메서드 사용
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(customUserDetailsService); // 여기서 주입
+        authProvider.setUserDetailsService(customUserDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
@@ -69,7 +68,7 @@ public class SecurityConfig {
         ObjectMapper objectMapper = new ObjectMapper();
 
         http
-                // CORS 설정 추가
+                // CORS 설정 적용
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
                 .csrf(AbstractHttpConfigurer::disable)
@@ -84,20 +83,19 @@ public class SecurityConfig {
                         .requestMatchers("/css/**", "/images/**", "/js/**", "/favicon.*",
                                 "/*/icon-*").permitAll()
 
-                        // GET 요청만 허용
+                        // GET 요청만 허용 (레시피 조회 등)
                         .requestMatchers(HttpMethod.GET, "/api/recipes/**").permitAll()
 
-                        // 로그인, 회원가입, 재발급, 웹소켓 연결허용
+                        // 로그인, 회원가입, 재발급, 웹소켓 연결 허용
                         .requestMatchers(
                                 "/",
                                 "/error",
                                 "/api/v1/auth/**",
-                                "/ws-stomp/**", // 웹소켓 핸드셰이크 허용
+                                "/ws-stomp/**", // 웹소켓 핸드셰이크
                                 "/api-docs/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/h2-console/**",
-                                // 웹소켓 연결 허용
                                 "/ws/connect/**"
                         ).permitAll()
 
@@ -144,8 +142,12 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 로컬 개발용: 모든 출처 허용
-        configuration.setAllowedOriginPatterns(Collections.singletonList("*"));
+        // 명시적인 도메인 허용
+        configuration.setAllowedOrigins(Arrays.asList(
+                "http://localhost:3000",
+                "http://localhost:8080",
+                "http://i14b208.p.ssafy.io"
+        ));
 
         // 허용할 HTTP 메서드 설정
         configuration.setAllowedMethods(

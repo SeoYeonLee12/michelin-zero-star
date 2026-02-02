@@ -43,7 +43,7 @@ public class ChatController {
         ChatMessageResponse response = chatService.saveMessage(request.getRoomId(), user.getId(),
                 request.getContent());
 
-        // 구독자들에게 메시지 발송
+        // 구독자들에게 메시지 발송http://localhost:8080/api/v1/chat/rooms/3/messages
         messagingTemplate.convertAndSend("/sub/chat/room/" + request.getRoomId(), response);
     }
 

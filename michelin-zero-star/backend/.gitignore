@@ -1,4 +1,9 @@
+# IntelliJ 설정 파일
 .idea/
 
-# env file
-../.env
+# 환경 변수 파일 (프로젝트 내부에 있을 경우)
+.env
+
+# 빌드 산출물 (모든 out 폴더 무시)
+**/out/
+backend/out/
