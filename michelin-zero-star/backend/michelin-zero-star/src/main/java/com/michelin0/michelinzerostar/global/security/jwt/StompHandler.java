@@ -9,6 +9,9 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
+import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.security.access.AccessDeniedException; // ★ 추가된 Import
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -21,23 +24,28 @@ public class StompHandler implements ChannelInterceptor {
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
-        StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+        StompHeaderAccessor accessor =
+                MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-        // 클라이언트가 'CONNECT' 명령을 보낼 때 토큰 검증 수행
-        if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-            String token = accessor.getFirstNativeHeader("Authorization");
+        // CONNECT 명령일 때만 토큰 검증 및 인증 정보 저장
+        if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
 
-            if (token != null && token.startsWith("Bearer ")) {
-                token = token.substring(7);
+            String authorizationHeader = accessor.getFirstNativeHeader("Authorization");
+            String token = null;
+
+            if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+                token = authorizationHeader.substring(7);
             }
 
-            // 토큰이 없거나 유효하지 않으면 연결 거부 (예외 발생)
-            if (token == null || !jwtTokenProvider.validateToken(token)) {
-                log.error("유효하지 않은 웹소켓 토큰입니다.");
-                throw new RuntimeException("Invalid WebSocket Token");
+            // 토큰 유효성 검증
+            if (token != null && jwtTokenProvider.validateToken(token)) {
+                Authentication authentication = jwtTokenProvider.getAuthentication(token);
+                accessor.setUser(authentication); // 인증 객체 저장
+                log.info("WS CONNECT: 유저 인증 성공 - {}", authentication.getName());
+            } else {
+                log.error("WS CONNECT: 유저 인증 실패 (유효하지 않은 토큰)");
+                throw new AccessDeniedException("유효하지 않은 토큰입니다.");
             }
-
-            log.info("웹소켓 연결 승인: {}", jwtTokenProvider.getEmailFromRefreshToken(token));
         }
         return message;
     }

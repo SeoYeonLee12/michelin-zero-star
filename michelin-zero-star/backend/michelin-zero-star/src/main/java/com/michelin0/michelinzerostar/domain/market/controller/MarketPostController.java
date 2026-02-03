@@ -44,7 +44,7 @@ public class MarketPostController {
         return ResponseEntity.ok(marketPostService.findAllPosts());
     }
 
-    // 내가 쓴 게시물 조회
+    // ★ [내가 쓴 게시물 조회] API
     @GetMapping("/posts/me")
     public ResponseEntity<Page<MarketPostListResponse>> getMyPosts(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -79,8 +79,8 @@ public class MarketPostController {
     @PutMapping(value = "/posts/{postId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<String> updatePost(
             @PathVariable Long postId,
-            @RequestPart(value = "post") @Valid MarketPostUpdateRequest request, // @RequestPart 사용
-            @RequestPart(value = "images", required = false) List<MultipartFile> images, // 이미지 추가
+            @RequestPart(value = "post") @Valid MarketPostUpdateRequest request,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
         marketPostService.updatePost(postId, userPrincipal.getId(), request, images);

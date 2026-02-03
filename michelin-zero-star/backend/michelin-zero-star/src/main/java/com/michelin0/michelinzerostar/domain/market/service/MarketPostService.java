@@ -42,6 +42,7 @@ public class MarketPostService {
     @Value("${file.upload-dir}")
     private String uploadDir;
 
+    // 게시글 생성
     @Transactional
     public void createPost(Long userId, MarketPostCreateRequest request, List<MultipartFile> images) {
         User writer = userRepository.findById(userId)
@@ -66,7 +67,7 @@ public class MarketPostService {
                 .longitude(profile.getLongitude())
                 .build();
 
-        uploadImages(post, images);
+        uploadImages(post, images); // 이미지 업로드
 
         marketPostRepository.save(post);
     }
@@ -132,10 +133,8 @@ public class MarketPostService {
 
         validateWriter(post, userId);
 
-        // 텍스트 정보 업데이트
         post.update(request.getTitle(), request.getContent(), request.getPrice(), request.getMeetingPlace());
 
-        // 이미지 수정 로직 (새 이미지가 있을 경우만 기존 삭제 후 교체)
         if (newImages != null && !newImages.isEmpty()) {
             deletePostImages(post); // 기존 이미지 삭제
             uploadImages(post, newImages); // 새 이미지 업로드
@@ -183,6 +182,7 @@ public class MarketPostService {
                 .collect(Collectors.toList());
     }
 
+    // 권한 검증
     private void validateWriter(MarketPost post, Long userId) {
         if (!post.getWriter().getId().equals(userId)) {
             log.warn("권한 없는 수정 시도: PostID={}, LoginUserID={}", post.getId(), userId);
@@ -190,7 +190,7 @@ public class MarketPostService {
         }
     }
 
-    // 이미지 업로드 공통 로직
+    // 내부 이미지 업로드 로직
     private void uploadImages(MarketPost post, List<MultipartFile> images) {
         if (images == null || images.isEmpty()) return;
 
