@@ -3,6 +3,16 @@ const nextConfig = {
   typescript: { ignoreBuildErrors: true },
   images: { unoptimized: true },
 
+  // ✅ Docker 환경에서 파일 변경 감지를 위한 Webpack Polling 설정
+  // (Turbopack 대신 Webpack을 사용하도록 유도하며, 메모리 사용량을 조절)
+  webpack: (config) => {
+    config.watchOptions = {
+      poll: 1000, // 1초마다 폴링 (CPU/메모리 절약)
+      aggregateTimeout: 300, // 변경 감지 후 300ms 대기 후 빌드
+    }
+    return config
+  },
+
   async rewrites() {
     return [
       // ✅ 레시피 API → 백엔드

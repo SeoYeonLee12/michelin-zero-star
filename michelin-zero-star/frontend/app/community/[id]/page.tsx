@@ -145,7 +145,8 @@ export default function CommunityDetailPage() {
   const { likedPosts } = useAuth()
   const isLiked = likedPosts.some((p) => p.id === postId)
 
-  const isMyPost = post?.isOwner || false
+  // 백엔드 API 응답 필드: owner (boolean)
+  const isMyPost = post?.owner || post?.isOwner || false
 
   if (loading) {
     return (
@@ -194,10 +195,17 @@ export default function CommunityDetailPage() {
         price: post.price.toLocaleString(),
         image: post.imageUrls[0],
         place: post.meetingPlace,
-        likes: 0,
+        likes: post.likeCount || 0,
         createdAt: post.createdAt,
         status: post.status as "available" | "completed",
       } as any)
+
+      // ✅ 로컬 상태 업데이트 (좋아요 수 즉시 반영)
+      setPost((prev: any) => ({
+        ...prev,
+        likeCount: (prev.likeCount || 0) + (isLiked ? -1 : 1),
+      }))
+
     } catch (error) {
       console.error("좋아요 처리 실패:", error)
       alert("좋아요 처리에 실패했습니다.")

@@ -4,7 +4,7 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Navbar } from "@/components/cook-sync/navbar"
 import { ScrollToTop } from "@/components/cook-sync/scroll-to-top"
@@ -119,10 +119,13 @@ export default function CommunityNewPage() {
     }
   }
 
-  if (!isLoggedIn) {
-    router.push("/login")
-    return null
-  }
+  // ✅ 로그인 체크를 useEffect로 이동 (렌더 중 router.push 방지)
+  useEffect(() => {
+    if (!isLoggedIn) {
+      router.push("/login")
+    }
+  }, [isLoggedIn, router])
+
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
