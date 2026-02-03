@@ -128,7 +128,7 @@ export async function deletePost(postId: string): Promise<string> {
 /**
  * 게시글 상태 변경 (거래중 ↔ 거래완료)
  */
-export async function updatePostStatus(postId: string, status: "ACTIVE" | "COMPLETED"): Promise<string> {
+export async function updatePostStatus(postId: string, status: "SELLING" | "RESERVED" | "SOLD"): Promise<string> {
     return apiFetch<string>(`/api/v1/market/posts/${postId}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status }),

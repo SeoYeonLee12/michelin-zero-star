@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Plus, Search, ChevronLeft, ChevronRight, Heart } from "lucide-react"
+import { Plus, Search, ChevronLeft, ChevronRight, Heart, CheckCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
@@ -100,7 +100,7 @@ export default function CommunityPage() {
     timeAgo: post.timeAgo,
     likes: 0,
     chatCount: post.chatCount,
-    status: (post.status === "SELLING" ? "available" : "completed") as "available" | "completed",
+    status: (post.status === "SOLD" || post.status === "COMPLETED" ? "completed" : "available") as "available" | "completed",
     isMyPost: false,
   }))
 
@@ -245,8 +245,9 @@ export default function CommunityPage() {
                   className="object-cover transition-transform group-hover:scale-105"
                 />
                 {share.status === "completed" && (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">거래 완료</span>
+                  <div className="absolute inset-0 bg-black/60 z-10 flex flex-col items-center justify-center text-white">
+                    <CheckCircle className="w-8 h-8 mb-2" />
+                    <span className="text-lg font-bold">거래 완료</span>
                   </div>
                 )}
               </div>

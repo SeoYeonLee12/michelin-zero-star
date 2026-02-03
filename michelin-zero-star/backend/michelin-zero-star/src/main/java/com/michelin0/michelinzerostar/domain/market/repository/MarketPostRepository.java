@@ -19,6 +19,9 @@ public interface MarketPostRepository extends JpaRepository<MarketPost, Long> {
     // 내가 쓴 글 조회
     Page<MarketPost> findAllByWriterOrderByCreatedAtDesc(User writer, Pageable pageable);
 
+    // 내가 쓴 글 조회 (ID로 조회)
+    Page<MarketPost> findAllByWriterId(Long writerId, Pageable pageable);
+
     // 상세 조회 (작성자 정보 Fetch Join)
     @Query("SELECT p FROM MarketPost p JOIN FETCH p.writer WHERE p.id = :id")
     Optional<MarketPost> findByIdWithWriter(@Param("id") Long id);

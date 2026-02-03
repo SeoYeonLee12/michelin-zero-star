@@ -124,7 +124,7 @@ export default function CommunityDetailPage() {
   const [loading, setLoading] = useState(true)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [statusDialogOpen, setStatusDialogOpen] = useState(false)
-  const [pendingStatus, setPendingStatus] = useState<"available" | "completed">("available")
+  const [pendingStatus, setPendingStatus] = useState<"SELLING" | "SOLD">("SELLING")
 
   useEffect(() => {
     async function fetchPost() {
@@ -140,12 +140,9 @@ export default function CommunityDetailPage() {
     fetchPost()
   }, [postId])
 
-  // const isLiked = likedPosts.some((p) => p.id === postId) // AuthContext 사용
-  // API 응답에 liked 여부가 없다면 기존 로직 유지
   const { likedPosts } = useAuth()
   const isLiked = likedPosts.some((p) => p.id === postId)
 
-  // 백엔드 API 응답 필드: owner (boolean)
   const isMyPost = post?.owner || post?.isOwner || false
 
   if (loading) {
@@ -184,10 +181,8 @@ export default function CommunityDetailPage() {
     }
 
     try {
-      // 백엔드는 POST로 토글 (좋아요↔취소)
       await toggleLike(String(post.id))
 
-      // AuthContext와 동기화
       toggleLikePost(e, {
         id: String(post.id),
         title: post.title,
@@ -200,7 +195,6 @@ export default function CommunityDetailPage() {
         status: post.status as "available" | "completed",
       } as any)
 
-      // ✅ 로컬 상태 업데이트 (좋아요 수 즉시 반영)
       setPost((prev: any) => ({
         ...prev,
         likeCount: (prev.likeCount || 0) + (isLiked ? -1 : 1),
@@ -228,15 +222,19 @@ export default function CommunityDetailPage() {
     setCurrentImageIndex((prev) => (prev - 1 + post.imageUrls.length) % post.imageUrls.length)
   }
 
-  const handleStatusChange = async (newStatus: "available" | "completed") => {
+  const handleStatusChange = async (newStatus: "SELLING" | "SOLD") => {
     setPendingStatus(newStatus)
     setStatusDialogOpen(true)
   }
 
   const confirmStatusChange = async () => {
     try {
-      await updatePostStatus(String(post.id), pendingStatus === "completed" ? "COMPLETED" : "ACTIVE")
-      // 페이지 새로고침하여 변경된 상태 반영
+      if (pendingStatus === "SOLD") {
+        await updatePostStatus(String(post.id), "SOLD")
+      } else {
+        await updatePostStatus(String(post.id), "SELLING")
+      }
+      // 상태 변경 후 페이지 새로고침 (또는 로컬 상태 업데이트)
       window.location.reload()
     } catch (error) {
       console.error("상태 변경 실패:", error)
@@ -281,26 +279,27 @@ export default function CommunityDetailPage() {
                 fill
                 className="object-cover"
               />
-              {post.status === "completed" && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                  <Badge className="bg-gray-600 text-white text-lg px-4 py-2">거래 완료</Badge>
+              {post.status === "SOLD" && (
+                <div className="absolute inset-0 bg-black/60 z-10 flex flex-col items-center justify-center text-white">
+                  <CheckCircle className="w-16 h-16 mb-3" />
+                  <span className="text-2xl font-bold">거래 완료</span>
                 </div>
               )}
               {post.imageUrls?.length > 1 && (
                 <>
                   <button
                     onClick={prevImage}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 z-20"
                   >
                     <ChevronLeft className="h-6 w-6" />
                   </button>
                   <button
                     onClick={nextImage}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 z-20"
                   >
                     <ChevronRight className="h-6 w-6" />
                   </button>
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
                     {post.imageUrls.map((_: any, idx: number) => (
                       <div
                         key={idx}
@@ -314,7 +313,7 @@ export default function CommunityDetailPage() {
                 </>
               )}
               {/* Heart and comments moved to bottom right of image */}
-              <div className="absolute bottom-4 right-4 flex items-center gap-3 bg-black/50 rounded-full px-3 py-1.5">
+              <div className="absolute bottom-4 right-4 flex items-center gap-3 bg-black/50 rounded-full px-3 py-1.5 z-20">
                 <button
                   className={cn("flex items-center gap-1 text-white transition-colors", isLiked && "text-red-400")}
                   onClick={handleLike}
@@ -359,13 +358,13 @@ export default function CommunityDetailPage() {
                 <p className="text-sm font-medium text-[#800020]">내 게시글 관리</p>
                 <div className="flex gap-2">
                   <Button
-                    variant={post.status === "COMPLETED" ? "default" : "outline"}
+                    variant={post.status === "SOLD" ? "default" : "outline"}
                     size="sm"
-                    onClick={() => handleStatusChange(post.status === "COMPLETED" ? "available" : "completed")}
-                    className={cn("flex-1 gap-2", post.status === "COMPLETED" && "bg-gray-600 hover:bg-gray-700")}
+                    onClick={() => handleStatusChange(post.status === "SOLD" ? "SELLING" : "SOLD")}
+                    className={cn("flex-1 gap-2", post.status === "SOLD" && "bg-gray-600 hover:bg-gray-700")}
                   >
                     <CheckCircle className="h-4 w-4" />
-                    {post.status === "COMPLETED" ? "거래완료 취소" : "거래완료로 변경"}
+                    {post.status === "SOLD" ? "거래완료 취소" : "거래완료로 변경"}
                   </Button>
 
                   <Button
@@ -435,7 +434,26 @@ export default function CommunityDetailPage() {
           </div>
         </div>
       </main>
-      {/* Dialog for Status kept but commented out logic called */}
-    </div>
+      <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>판매 상태 변경</DialogTitle>
+            <DialogDescription>
+              {pendingStatus === "SOLD"
+                ? "이 게시글을 '거래 완료' 상태로 변경하시겠습니까? 거래가 완료되면 더 이상 채팅을 받을 수 없습니다."
+                : "이 게시글을 '판매 중' 상태로 변경하시겠습니까?"}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusDialogOpen(false)}>
+              취소
+            </Button>
+            <Button onClick={confirmStatusChange} className="bg-[#800020] hover:bg-[#800020]/90">
+              확인
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div >
   )
 }

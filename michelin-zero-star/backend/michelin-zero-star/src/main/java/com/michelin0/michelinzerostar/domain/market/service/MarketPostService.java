@@ -8,6 +8,8 @@ import com.michelin0.michelinzerostar.domain.market.entity.MarketPost;
 import com.michelin0.michelinzerostar.domain.market.entity.MarketPostImage;
 import com.michelin0.michelinzerostar.domain.market.entity.PostStatus;
 import com.michelin0.michelinzerostar.domain.market.repository.MarketPostRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.domain.user.entity.UserProfile;
 import com.michelin0.michelinzerostar.domain.user.repository.UserRepository;
@@ -125,10 +127,16 @@ public class MarketPostService {
 
         post.update(request.getTitle(), request.getContent(), request.getPrice(), request.getMeetingPlace());
 
-        if (newImages != null && !newImages.isEmpty()) {
+        if (images != null && !images.isEmpty()) {
             deletePostImages(post); // 기존 이미지 삭제
-            uploadImages(post, newImages); // 새 이미지 업로드
+            uploadImages(post, images); // 새 이미지 업로드
         }
+    }
+    
+    // 내가 쓴 게시글 조회
+    public Page<MarketPostListResponse> getMyPosts(Long userId, Pageable pageable) {
+        return marketPostRepository.findAllByWriterId(userId, pageable)
+                .map(MarketPostListResponse::new);
     }
 
     // 게시글 상태 수정 (판매중, 예약중, 거래완료)
