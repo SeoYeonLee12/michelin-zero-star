@@ -37,12 +37,12 @@ public class AiChatController {
 
     @MessageMapping("/recipes/ask")
     public void saveUserMessage(
-            @Payload ChatSaveMessageRequest request,
-            @AuthenticationPrincipal UserPrincipal principal
+            @Payload ChatSaveMessageRequest request
+//            @AuthenticationPrincipal UserPrincipal principal
     ) {
         Long currentUserId = 2L;
         RecipeChatbotCommand command = new RecipeChatbotCommand(
-                principal.getId(),
+                currentUserId,
                 request.recipeId(),
                 request.content(),
                 request.currentStepNumber()
