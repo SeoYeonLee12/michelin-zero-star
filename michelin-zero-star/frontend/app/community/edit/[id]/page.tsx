@@ -119,7 +119,6 @@ export default function CommunityEditPage() {
           content: formData.description,
           price: parseInt(formData.price.replace(/[^0-9]/g, "")) || 0,
           meetingPlace: formData.place,
-          category: "SHARE",  // ✅ 백엔드 필수 검증 통과용
         },
         files.length > 0 ? files : undefined  // ✅ 새 이미지가 있으면 전송
       )
