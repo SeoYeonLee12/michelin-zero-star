@@ -153,7 +153,7 @@ public class MarketPostService {
         validateWriter(post, userId);
 
         // 텍스트 정보 업데이트
-        post.update(request.getTitle(), request.getContent(), request.getPrice(), request.getMeetingPlace(), request.getCategory());
+        post.update(request.getTitle(), request.getContent(), request.getPrice(), request.getMeetingPlace());
 
         // 이미지가 전달되었으면 기존 이미지 삭제 후 새 이미지 저장
         if (images != null && !images.isEmpty()) {
@@ -256,7 +256,7 @@ public class MarketPostService {
     }
 
     private void validateExtension(String ext) {
-        String[] allowedExts = {"jpg", "jpeg"};
+        String[] allowedExts = {"jpg", "jpeg", "png"};
         if (!Arrays.asList(allowedExts).contains(ext)) {
             throw new RuntimeException("허용되지 않는 파일 형식입니다: " + ext);
         }
