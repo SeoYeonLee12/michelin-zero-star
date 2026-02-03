@@ -46,7 +46,7 @@ public class RecipeAiService {
                 response.answer()
         );
         aiChatMessageRepository.save(aiChatMessage);
-
+        
         // TODO 소켓으로 답변 전달
         /**
          * 2. 소켓 전송 로직 분리 방법 (결합도 낮추기)

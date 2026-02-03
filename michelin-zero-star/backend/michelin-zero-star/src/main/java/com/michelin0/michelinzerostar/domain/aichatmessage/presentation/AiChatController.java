@@ -5,11 +5,13 @@ import com.michelin0.michelinzerostar.domain.aichatmessage.application.RedisChat
 import com.michelin0.michelinzerostar.domain.aichatmessage.application.command.RecipeChatbotCommand;
 import com.michelin0.michelinzerostar.domain.aichatmessage.presentation.dto.ChatMessage;
 import com.michelin0.michelinzerostar.domain.aichatmessage.presentation.dto.ChatSaveMessageRequest;
+import com.michelin0.michelinzerostar.domain.auth.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 
 @Controller
@@ -35,12 +37,12 @@ public class AiChatController {
 
     @MessageMapping("/recipes/ask")
     public void saveUserMessage(
-            @Payload ChatSaveMessageRequest request
-//            @AuthenticationPrincipal UserPrincipal principal
+            @Payload ChatSaveMessageRequest request,
+            @AuthenticationPrincipal UserPrincipal principal
     ) {
         Long currentUserId = 2L;
         RecipeChatbotCommand command = new RecipeChatbotCommand(
-                currentUserId,
+                principal.getId(),
                 request.recipeId(),
                 request.content(),
                 request.currentStepNumber()
