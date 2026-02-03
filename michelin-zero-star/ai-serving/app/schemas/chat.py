@@ -42,3 +42,7 @@ class QnaRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer: str = Field(..., description="AI 셰프의 답변")
     recommended_recipes: List[RecipeInfo] = Field(..., description="추천 레시피 카드 리스트")
+
+# --- [수정] Q&A 전용 응답 모델 추가 (레시피 리스트 제거) ---
+class QnaResponse(BaseModel):
+    answer: str = Field(..., description="AI 셰프의 답변 (레시피 추천 없음)")
