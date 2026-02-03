@@ -8,12 +8,14 @@ import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeStepRepository;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 // ai 작업할 서비스임(얘는 비동기 작업)
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RecipeAiService {
 
     private final AiChatMessageRepository aiChatMessageRepository;
@@ -36,7 +38,7 @@ public class RecipeAiService {
                 currentStepNumber,
                 steps
         );
-
+        log.info("AI Response: {}", response.answer());
         // 답변 받기
         AiChatMessage aiChatMessage = AiChatMessage.createAIMessage(
                 user,
@@ -64,7 +66,6 @@ public class RecipeAiService {
          * 이렇게 하면 **AI 로직(Service)**과 **알림 전송 로직(Socket)**이 서로 남남이 되어,
          * 나중에 소켓 대신 다른 알림(FCM, 메일 등)으로 바뀌어도 AI 서비스 코드는 건드릴 필요가 없어집니다.
          */
-
     }
 
 }
