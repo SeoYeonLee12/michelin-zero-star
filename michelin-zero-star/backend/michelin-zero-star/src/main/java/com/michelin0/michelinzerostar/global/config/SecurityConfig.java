@@ -71,40 +71,56 @@ public class SecurityConfig {
                 // CORS 설정 적용
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
+                // 기본 보안 설정 (CSRF, FormLogin 등 비활성화)
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .headers(headers -> headers.frameOptions(
-                        HeadersConfigurer.FrameOptionsConfig::sameOrigin))
+                        HeadersConfigurer.FrameOptionsConfig::sameOrigin)) // H2 Console 등을 위해 필요
                 .sessionManagement(
-                        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // JWT 사용하므로 세션 끔
+
+                // 요청별 권한 설정
                 .authorizeHttpRequests(auth -> auth
-                        // 정적 리소스 허용
-                        .requestMatchers("/css/**", "/images/**", "/js/**", "/favicon.*",
-                                "/*/icon-*").permitAll()
+                        // [정적 리소스]
+                        .requestMatchers("/css/**", "/images/**", "/js/**", "/favicon.*", "/*/icon-*").permitAll()
 
-                        // GET 요청만 허용 (레시피 조회 등)
-                        .requestMatchers(HttpMethod.GET, "/api/recipes/**").permitAll()
+                        // [Swagger UI & API Docs]
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/swagger-resources/**",
+                                "/api-docs/**"
+                        ).permitAll()
 
-                        // 로그인, 회원가입, 재발급, 웹소켓 연결 허용
+                        // [공개 API]
                         .requestMatchers(
                                 "/",
                                 "/error",
                                 "/api/v1/auth/**",
                                 "/v1/auth/**",
+                                "/h2-console/**"
+                        ).permitAll()
+
+                        // [WebSocket]
+                        .requestMatchers(
                                 "/ws-stomp/**",
-                                "/api-docs/**",
-                                "/swagger-ui/**",
-                                "/v3/api-docs/**",
-                                "/h2-console/**",
                                 "/ws/connect/**"
                         ).permitAll()
 
-                        // 나머지는 인증 필요
+                        // [GET 요청 허용] - 레시피 조회 등
+                        .requestMatchers(HttpMethod.GET, "/api/recipes/**").permitAll()
+
+                        // [나머지 모든 요청] - 인증 필요
                         .anyRequest().authenticated()
                 )
+
+                // JWT 필터
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
                         UsernamePasswordAuthenticationFilter.class)
+
+                // OAuth2 로그인 설정
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                         .successHandler(oAuth2SuccessHandler)
@@ -114,48 +130,37 @@ public class SecurityConfig {
                             response.getWriter().write("{\"error\": \"OAuth2 Login Failed\"}");
                         })
                 )
+
+                // 예외 처리 (인증/인가 실패 시 JSON 응답)
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) -> {
                             log.error("인증 실패 (401) - URL: {}", request.getRequestURI());
                             response.setContentType("application/json;charset=UTF-8");
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            ErrorResponse errorResponse = ErrorResponse.from(
-                                    AuthErrorCode.AUTHENTICATION_FAILED);
-                            response.getWriter()
-                                    .write(objectMapper.writeValueAsString(errorResponse));
+                            ErrorResponse errorResponse = ErrorResponse.from(AuthErrorCode.AUTHENTICATION_FAILED);
+                            response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
                         })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
                             log.error("권한 없음 (403) - URL: {}", request.getRequestURI());
                             response.setContentType("application/json;charset=UTF-8");
                             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                            ErrorResponse errorResponse = ErrorResponse.from(
-                                    AuthErrorCode.ACCESS_DENIED);
-                            response.getWriter()
-                                    .write(objectMapper.writeValueAsString(errorResponse));
+                            ErrorResponse errorResponse = ErrorResponse.from(AuthErrorCode.ACCESS_DENIED);
+                            response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
                         })
                 );
 
         return http.build();
     }
 
-    // CORS 설정 빈 등록
+    // CORS 설정
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.addAllowedOriginPattern("*");
-
-        // 허용할 HTTP 메서드 설정
-        configuration.setAllowedMethods(
-                Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-
-        // 허용할 헤더 설정
+        configuration.addAllowedOriginPattern("*"); // 개발용 (실서버 배포 시 프론트 도메인으로 변경 해야함)
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(Collections.singletonList("*"));
-
-        // 쿠키(Credential) 전송 허용
         configuration.setAllowCredentials(true);
-
-        // 브라우저가 읽을 수 있게 허용할 헤더 (토큰 등)
         configuration.setExposedHeaders(Arrays.asList("Authorization", "Set-Cookie"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
