@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/auth-context"
+import { uploadImage } from "@/lib/api/recipes"
 import { Camera, ArrowLeft, Eye, EyeOff, Check, X, MapPin, Loader2 } from "lucide-react"
 import Link from "next/link"
 
@@ -28,8 +29,6 @@ const categoryOptions = [
   { value: "기타", label: "기타" },
 ]
 
-const mockNicknames = ["민지", "요리왕", "쉐프김", "맛집탐방"]
-
 export default function ProfileEditPage() {
   const router = useRouter()
   const { user, isLoggedIn, isLoading: isAuthLoading, updateProfile, updateLocation } = useAuth()
@@ -44,6 +43,7 @@ export default function ProfileEditPage() {
   const [nicknameError, setNicknameError] = React.useState("")
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [profileImagePreview, setProfileImagePreview] = React.useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null)
 
   const [formData, setFormData] = React.useState({
     name: user?.name || "",
@@ -75,9 +75,10 @@ export default function ProfileEditPage() {
         email: user.email,
         bio: user.bio || "",
         location: user.location || "",
+        categories: user.categories || [],
       }))
-      if (user.profileImage) {
-        setProfileImagePreview(user.profileImage)
+      if (user.profileImageUrl) {
+        setProfileImagePreview(user.profileImageUrl)
       }
     }
   }, [user])
@@ -85,6 +86,10 @@ export default function ProfileEditPage() {
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      // 1. 파일 상태 저장 (저장 시 업로드용)
+      setSelectedFile(file)
+
+      // 2. 미리보기 생성
       const reader = new FileReader()
       reader.onloadend = () => {
         setProfileImagePreview(reader.result as string)
@@ -93,12 +98,9 @@ export default function ProfileEditPage() {
     }
   }
 
-  // Nickname validation removed (no backend support)
-
   const handleNicknameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     setFormData({ ...formData, nickname: value })
-    // Nickname validation removed
   }
 
   const handleGetLocation = () => {
@@ -112,19 +114,8 @@ export default function ProfileEditPage() {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords
-
-          // 📍 디버깅: 받은 좌표 출력
-          // console.log("🌍 GPS 좌표 획득:")
-          // console.log(`   Latitude:  ${latitude}`)
-          // console.log(`   Longitude: ${longitude}`)
-
-          // 백엔드 API 호출하여 위치 인증
           const locationAddress = await updateLocation(latitude, longitude)
 
-          // 📍 디버깅: 반환된 주소 출력
-          // console.log(`✅ 위치 인증 완료: ${locationAddress}`)
-
-          // 응답 받은 주소와 좌표를 저장 (확인 버튼에서 사용)
           setPendingLocation(locationAddress)
           setPendingCoordinates({ latitude, longitude })
           setLocationDialogOpen(true)
@@ -156,21 +147,10 @@ export default function ProfileEditPage() {
 
     try {
       setIsGettingLocation(true)
-
-      // 📍 백엔드에 위치 저장
-      // console.log("💾 백엔드에 위치 저장 중...")
-      // console.log(`   주소: ${pendingLocation}`)
-      // console.log(`   좌표: (${pendingCoordinates.latitude}, ${pendingCoordinates.longitude})`)
-
-      // 폼 데이터 업데이트
       setFormData((prev) => ({ ...prev, location: pendingLocation }))
-
-      // 다이얼로그 닫기
       setLocationDialogOpen(false)
       setPendingLocation("")
       setPendingCoordinates(null)
-
-      // ✅ 저장 완료
       console.log("✅ 위치 저장 완료")
     } catch (error) {
       console.error("위치 저장 오류:", error)
@@ -194,32 +174,65 @@ export default function ProfileEditPage() {
       alert("닉네임을 확인해주세요.")
       return
     }
-    setIsLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 500))
 
-    updateProfile({
-      // name(실명)은 변경 불가: payload에서 제외
-      nickname: formData.nickname,
-      bio: formData.bio,
-      location: formData.location,
-      profileImage: profileImagePreview || undefined,
-      categories: formData.categories,  // ✅ 카테고리 추가
-    })
-
-    setIsLoading(false)
-    router.push("/mypage")
-  }
-
-  const handleChangePassword = async () => {
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      alert("새 비밀번호가 일치하지 않습니다.")
-      return
+    // Password validation if entered
+    if (passwordData.newPassword) {
+      if (passwordData.newPassword !== passwordData.confirmPassword) {
+        alert("새 비밀번호가 일치하지 않습니다.");
+        return;
+      }
+      if (passwordData.newPassword.length < 8) {
+        alert("비밀번호는 8자 이상이어야 합니다.");
+        return;
+      }
+      if (!passwordData.currentPassword) {
+        alert("현재 비밀번호를 입력해주세요.");
+        return;
+      }
     }
+
     setIsLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" })
-    setIsLoading(false)
-    alert("비밀번호가 변경되었습니다.")
+
+    try {
+      let finalProfileImageUrl = profileImagePreview
+
+      // ✅ 이미지가 변경되었고, 선택된 파일이 있다면 서버에 업로드
+      // (기존 profileImagePreview는 Base64일 수 있으므로 그대로 보내면 500 에러)
+      if (selectedFile) {
+        try {
+          const uploadedUrl = await uploadImage(selectedFile)
+          // URL 절대경로 처리 (필요 시)
+          finalProfileImageUrl = uploadedUrl.startsWith("/")
+            ? `${window.location.origin}${uploadedUrl}`
+            : uploadedUrl
+        } catch (error) {
+          console.error("이미지 업로드 실패:", error)
+          alert("이미지 업로드에 실패했습니다. 다시 시도해주세요.")
+          setIsLoading(false)
+          return
+        }
+      }
+
+      await updateProfile({
+        nickname: formData.nickname,
+        profileImageUrl: finalProfileImageUrl || undefined,
+        categories: formData.categories,
+        // ✅ Add password fields
+        currentPassword: passwordData.currentPassword || undefined,
+        newPassword: passwordData.newPassword || undefined,
+        newPasswordConfirm: passwordData.confirmPassword || undefined,
+      })
+
+      // Clear password fields after success
+      setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+
+      router.push("/mypage")
+    } catch (error) {
+      console.error("프로필 저장 실패:", error)
+      alert("프로필 저장 중 오류가 발생했습니다.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const passwordRequirements = [
@@ -258,7 +271,7 @@ export default function ProfileEditPage() {
               <div className="flex items-center gap-6">
                 <div className="relative">
                   <Avatar className="h-24 w-24">
-                    <AvatarImage src={profileImagePreview || user?.profileImage || "/placeholder.svg"} />
+                    <AvatarImage src={profileImagePreview || user?.profileImageUrl || "/placeholder.svg"} />
                     <AvatarFallback className="text-2xl">
                       {user?.nickname?.charAt(0) || user?.name?.charAt(0) || "U"}
                     </AvatarFallback>
@@ -320,11 +333,7 @@ export default function ProfileEditPage() {
                 <p className="text-xs text-muted-foreground">이메일은 변경할 수 없습니다</p>
               </div>
 
-
-              {/* 자기소개 삭제됨 */}
-
-
-              {/* Preferred Categories moved here (bottom of Basic Info) */}
+              {/* Preferred Categories  */}
               <div className="space-y-2">
                 <Label>선호 카테고리 (복수 선택 가능)</Label>
                 <div className="flex flex-wrap gap-2">
@@ -384,11 +393,11 @@ export default function ProfileEditPage() {
             </CardContent>
           </Card>
 
-          {/* Password Change */}
+          {/* Password Change Card */}
           <Card>
             <CardHeader>
               <CardTitle>비밀번호 변경</CardTitle>
-              <CardDescription>계정 보안을 위해 정기적으로 비밀번호를 변경하세요</CardDescription>
+              <CardDescription>비밀번호를 변경하려면 아래 정보를 입력하고 하단의 저장 버튼을 누르세요.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -463,18 +472,6 @@ export default function ProfileEditPage() {
                   <p className="text-xs text-destructive">비밀번호가 일치하지 않습니다</p>
                 )}
               </div>
-
-              <Button
-                onClick={handleChangePassword}
-                variant="outline"
-                disabled={
-                  !passwordData.currentPassword ||
-                  !passwordData.newPassword ||
-                  passwordData.newPassword !== passwordData.confirmPassword
-                }
-              >
-                비밀번호 변경
-              </Button>
             </CardContent>
           </Card>
 
@@ -488,35 +485,32 @@ export default function ProfileEditPage() {
               disabled={isLoading || !!nicknameError}
               className="bg-[#800020] hover:bg-[#800020]/90"
             >
-              {isLoading ? "저장 중..." : "변경사항 저장"}
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 저장 중...
+                </>
+              ) : (
+                "변경사항 저장"
+              )}
             </Button>
           </div>
         </div>
-      </main>
 
-      {/* 위치 확인 다이얼로그 */}
-      <Dialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>위치 확인</DialogTitle>
-            <DialogDescription>현재 위치가 맞는지 확인해주세요.</DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
-              <MapPin className="h-5 w-5 text-[#800020]" />
-              <span className="font-medium">{pendingLocation}</span>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setLocationDialogOpen(false)}>
-              취소
-            </Button>
-            <Button onClick={handleConfirmLocation} className="bg-[#800020] hover:bg-[#800020]/90">
-              확인
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <Dialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>위치 인증 확인</DialogTitle>
+              <DialogDescription>
+                현재 위치를 <b>{pendingLocation}</b>(으)로 설정하시겠습니까?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setLocationDialogOpen(false)}>취소</Button>
+              <Button onClick={handleConfirmLocation} className="bg-[#800020]">확인</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </main>
     </div>
   )
 }

@@ -15,7 +15,7 @@ import { MichelinIcon } from "@/components/common/MichelinIcon"
 
 const features = [
   { icon: Mic, label: "핸즈프리 요리", desc: "음성으로 레시피를 따라가세요" },
-  { icon: Users, label: "재료 N빵", desc: "이웃과 남은 재료를 나눠요" },
+  { icon: Users, label: "재료 나눔", desc: "이웃과 남은 재료를 나눠요" },
   { icon: Search, label: "다양한 레시피", desc: "AI가 맞춤 레시피를 추천해요" },
 ]
 

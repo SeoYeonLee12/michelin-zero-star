@@ -211,7 +211,7 @@ export default function CommunityDetailPage() {
       router.push("/login")
       return
     }
-    router.push(`/messages/${post.writerId}?name=${encodeURIComponent(post.writerNickname || "이웃")}`)
+    router.push(`/messages/${post.writerId}?name=${encodeURIComponent(post.nickname || "이웃")}`)
   }
 
   const nextImage = () => {
@@ -392,13 +392,18 @@ export default function CommunityDetailPage() {
             {/* User Profile */}
             <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-xl">
               <Avatar className="h-12 w-12">
-                <AvatarImage src={"/placeholder.svg"} /> {/* 작성자 이미지 API에 없음 (writerAvatar 필요? writerNickname만 있음) */}
-                <AvatarFallback>{post.writerNickname?.[0]}</AvatarFallback>
+                <AvatarImage src={post.profileImageUrl || "/placeholder.svg"} />
+                <AvatarFallback>{post.nickname?.[0]}</AvatarFallback>
               </Avatar>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="font-semibold">{post.writerNickname}</p>
-                  {/* Star Level 정보 API에 없음 */}
+                  <p className="font-semibold">{post.nickname}</p>
+                  {post.totalStar !== undefined && (
+                    <Badge variant="outline" className="gap-1 bg-white border-[#800020]/20 text-[#800020] px-1.5 py-0">
+                      <Star className="h-3 w-3 fill-[#800020]" />
+                      <span className="text-xs">{post.totalStar}</span>
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
                   <MapPin className="h-3 w-3" />

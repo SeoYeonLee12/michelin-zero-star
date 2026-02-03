@@ -374,7 +374,7 @@ export function Navbar({ onLogoClick }: NavbarProps) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full h-9 w-9">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user?.profileImage || "/placeholder.svg"} />
+                    <AvatarImage src={user?.profileImageUrl || "/placeholder.svg"} />
                     <AvatarFallback>{user?.name?.charAt(0) || <User className="h-4 w-4" />}</AvatarFallback>
                   </Avatar>
                 </Button>

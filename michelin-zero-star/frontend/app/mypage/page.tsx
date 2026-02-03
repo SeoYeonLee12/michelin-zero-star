@@ -29,7 +29,7 @@ import {
   ChevronDown,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { getPostList, deletePost, updatePost } from "@/lib/api/market" // Import APIs
+import { getPostList, deletePost, updatePost, getMyPostList, getLikedPosts } from "@/lib/api/market" // Import APIs
 import Link from "next/link"
 import Image from "next/image"
 
@@ -85,7 +85,10 @@ export default function MyPage() {
 
   // ✅ Real Data State (Context 대신 사용)
   const [myPosts, setMyPosts] = React.useState<any[]>([])
-  const [isLoadingPosts, setIsLoadingPosts] = React.useState(false)
+  const [isLoadingPosts, setIsLoadingPosts] = React.useState(false) // 내 나눔 로딩
+
+  const [likedMarketPosts, setLikedMarketPosts] = React.useState<any[]>([]) // API 데이터 저장
+  const [isLoadingLiked, setIsLoadingLiked] = React.useState(false) // 찜 목록 로딩
 
   // ✅ 로딩이 끝난 후에만 리다이렉트 체크 (깜빡임 방지)
   React.useEffect(() => {
@@ -101,10 +104,9 @@ export default function MyPage() {
       if (!user || !user.id) return
       setIsLoadingPosts(true)
       try {
-        // const allPosts = await getPostList()
-        // const filtered = allPosts.filter(p => String(p.writerId) === String(user.id))
-        // setMyPosts(filtered)
-        setMyPosts([]) // 현재 백엔드 미지원으로 빈 배열 처리 (필요시 주석 해제)
+        // ✅ API 호출로 변경
+        const response = await getMyPostList(0, 50) // 일단 50개 조회
+        setMyPosts(response.content)
       } catch (e) {
         console.error("Failed to fetch my posts", e)
       } finally {
@@ -112,15 +114,34 @@ export default function MyPage() {
       }
     }
 
+    async function fetchLikedPosts() {
+      if (!user || !user.id) return
+      setIsLoadingLiked(true)
+      try {
+        const response = await getLikedPosts()
+        setLikedMarketPosts(response)
+      } catch (e) {
+        console.error("Failed to fetch liked posts", e)
+      } finally {
+        setIsLoadingLiked(false)
+      }
+    }
+
     if (activeTab === "myPosts") {
       fetchMyPosts()
+    } else if (activeTab === "likedPosts") {
+      fetchLikedPosts()
     }
   }, [activeTab, user])
 
   // 별 애니메이션
   React.useEffect(() => {
-    if (isLoggedIn && user?.stars !== undefined) {
-      const targetStars = user.stars
+    if (isLoggedIn && user?.totalStar !== undefined) {
+      // totalStar의 소수점 부분을 0~100 퍼센트로 변환 (예: 3.5 -> 50, 3.1 -> 10)
+      // 부동소수점 오차 방지를 위해 문자열로 변환 후 처리하거나 반올림 사용
+      const decimalPart = user.totalStar % 1
+      const targetStars = Math.round(decimalPart * 100)
+
       const duration = 1500
       const steps = 60
       const increment = targetStars / steps
@@ -139,7 +160,7 @@ export default function MyPage() {
 
       return () => clearInterval(timer)
     }
-  }, [isLoggedIn, user?.stars])
+  }, [isLoggedIn, user?.totalStar])
 
   // ✅ 로딩 중일 때 화면 렌더링 방지
   if (isLoading) {
@@ -148,8 +169,8 @@ export default function MyPage() {
 
   if (!isLoggedIn) return null
 
-  const totalStars = user?.stars || 0
-  const todayRemaining = 3 - (user?.todayStars || 0)
+  const totalStars = user?.totalStar || 0
+  const todayRemaining = Math.max(0, 3 - (user?.todayStars || 0))
 
   const handleDeleteRecipe = () => {
     if (!selectedRecipeId) return
@@ -219,7 +240,7 @@ export default function MyPage() {
                 <div className="flex flex-col sm:flex-row items-center gap-5 w-full">
                   <div className="relative shrink-0">
                     <Avatar className="h-24 w-24 border">
-                      <AvatarImage src={user?.profileImage || "/placeholder.svg"} />
+                      <AvatarImage src={user?.profileImageUrl || "/placeholder.svg"} />
                       <AvatarFallback className="text-xl bg-muted">
                         {user?.nickname?.charAt(0) || "U"}
                       </AvatarFallback>
@@ -231,7 +252,7 @@ export default function MyPage() {
                       <h1 className="text-2xl font-bold text-foreground truncate">{user?.nickname || "사용자"}</h1>
                       <Badge className="gap-1 bg-[#800020]/5 text-[#800020] border-[#800020]/20 px-2 py-0.5 shrink-0">
                         <Image src="/michelin-star.png" alt="star" width={12} height={12} />
-                        <span className="text-xs font-semibold">미슐랭 {totalStars}스타</span>
+                        <span className="text-xs font-semibold">미슐랭 {user?.totalStar ?? 0}스타</span>
                       </Badge>
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground p-0 ml-1" asChild>
                         <Link href="/profile">
@@ -276,7 +297,7 @@ export default function MyPage() {
                     </Collapsible>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xl font-bold text-[#800020]">{totalStars}개</span>
+                    <span className="text-xl font-bold text-[#800020]">{user?.totalStar ?? 0}</span>
                     <Image src="/michelin-star.png" alt="Star Icon" width={24} height={24} className="object-contain" />
                   </div>
                 </div>
@@ -285,11 +306,11 @@ export default function MyPage() {
                   <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-[#800020] rounded-full transition-all duration-1000 ease-out"
-                      style={{ width: `${Math.min((animatedStars / 100) * 100, 100)}%` }}
+                      style={{ width: `${Math.min((animatedStars || 0), 100)}%` }}
                     />
                   </div>
                   <p className="mt-4 text-right text-[11px] text-muted-foreground">
-                    오늘 <span className="font-bold text-[#800020]">{todayRemaining}개</span> 더 획득할 수 있어요!
+                    오늘 <span className="font-bold text-[#800020]">{Math.max(0, 3 - (user?.todayStars || 0))}개</span> 더 획득할 수 있어요!
                   </p>
                 </div>
               </div>
@@ -399,16 +420,7 @@ export default function MyPage() {
                         <div className="relative aspect-[4/3] overflow-hidden bg-muted rounded-lg mb-2">
                           <Image src={post.thumbnailUrl || "/placeholder.svg"} alt={post.title} fill className="object-cover transition-transform group-hover:scale-105" />
                           {post.status === "COMPLETED" && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><span className="text-white text-sm">거래 완료</span></div>}
-                          <div className="absolute top-2 right-2">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild><Button size="icon" variant="secondary" className="h-7 w-7 rounded-full bg-white/80" onClick={(e) => e.stopPropagation()}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleTogglePostStatus(String(post.id), post.status || "available"); }}><CheckCircle className="h-4 w-4 mr-2" />상태 변경</DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/community/edit/${post.id}`) }}><Edit className="h-4 w-4 mr-2" />수정</DropdownMenuItem>
-                                <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); setSelectedPostId(String(post.id)); setDeletePostDialogOpen(true); }}><Trash2 className="h-4 w-4 mr-2" />삭제</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                          {/* Action button removed */}
                         </div>
                         <h3 className="font-medium text-sm line-clamp-2">{post.title}</h3>
                         <p className="font-bold text-[#800020]">{post.price ? Number(post.price).toLocaleString() : 0}원</p>
@@ -421,20 +433,23 @@ export default function MyPage() {
               {/* 관심있는 나눔 */}
               <TabsContent value="likedPosts" className="space-y-4 outline-none m-0">
                 <TabInfoBox icon={tabInfo.likedPosts.icon} title={tabInfo.likedPosts.title} description={tabInfo.likedPosts.description} />
-                {likedPosts.length === 0 ? (
+                {isLoadingLiked ? (
+                  <div className="p-12 text-center text-muted-foreground">로딩 중...</div>
+                ) : likedMarketPosts.length === 0 ? (
                   <Card><CardContent className="p-8 text-center">
                     <Heart className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
                     <p className="text-muted-foreground">좋아요한 나눔글이 없습니다.</p>
                   </CardContent></Card>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {likedPosts.map((post) => (
+                    {likedMarketPosts.map((post) => (
                       <div key={post.id} className="cursor-pointer group" onClick={() => router.push(`/community/${post.id}`)}>
                         <div className="relative aspect-[4/3] overflow-hidden bg-muted rounded-lg mb-2">
-                          <Image src={(post as any).image || "/placeholder.svg"} alt={(post as any).title} fill className="object-cover" />
+                          <Image src={post.thumbnailUrl || "/placeholder.svg"} alt={post.title} fill className="object-cover transition-transform group-hover:scale-105" />
+                          {post.status === "COMPLETED" && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><span className="text-white text-sm">거래 완료</span></div>}
                         </div>
-                        <h3 className="font-medium text-sm line-clamp-2">{(post as any).title}</h3>
-                        <p className="font-bold text-[#800020]">{(post as any).price}</p>
+                        <h3 className="font-medium text-sm line-clamp-2">{post.title}</h3>
+                        <p className="font-bold text-[#800020]">{post.price ? Number(post.price).toLocaleString() : 0}원</p>
                       </div>
                     ))}
                   </div>

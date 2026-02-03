@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import type { LocationRequestDto } from "./types"
-import { getMe, updateProfile as updateProfileAPI, withdrawUser } from "./api/user"
+import { getMe, updateProfile as updateProfileAPI, withdrawUser, type UpdateProfileRequest } from "./api/user"
 import { login as loginAPI, signup as signupAPI, logout as logoutAPI } from "./api/auth"
 import { verifyLocation } from "./api/user"
 import { setCookie, getCookie, removeCookie } from "./cookie"
@@ -33,7 +33,7 @@ interface User {
   name: string
   nickname: string
   email: string
-  profileImage?: string
+  profileImageUrl?: string
   level: string
   bio: string
   location?: string
@@ -41,9 +41,10 @@ interface User {
   longitude?: number
   locationCode?: string
   stars: number
+  totalStar: number // ✅ User 인터페이스에 totalStar 추가
   todayStars: number
   lastStarDate: string
-  categories?: string[]  // ✅ 추가
+  categories?: string[]
 }
 
 interface LikedRecipe {
@@ -118,7 +119,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>
   signup: (data: { name: string; nickname: string; email: string; password: string }) => Promise<void>
   logout: () => void
-  updateProfile: (data: Partial<User> & { currentPassword?: string; newPassword?: string; newPasswordConfirm?: string }) => Promise<void>
+  updateProfile: (data: UpdateProfileRequest) => Promise<void>
   updateLocation: (latitude: number, longitude: number) => Promise<string>
   likedRecipes: LikedRecipe[]
   toggleLikeRecipe: (recipe: LikedRecipe) => void
@@ -198,7 +199,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: me.name ?? "",
           nickname: me.nickname ?? "",
           email: me.email ?? (savedUser?.email ?? ""),
-          profileImage: me.profileImage,
+          profileImageUrl: me.profileImageUrl, // ✅ Corrected 
           level: me.level ?? "",
           bio: me.bio ?? "",
           location: me.location,
@@ -206,6 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           longitude: me.longitude,
           locationCode: me.locationCode,
           stars: me.stars ?? 0,
+          totalStar: me.totalStar ?? 0, // ✅ 백엔드 totalStar 매핑 (api/user.ts에는 totalStar가 필요함, 확인 필요)
           todayStars: me.todayStars ?? 0,
           lastStarDate: me.lastStarDate ?? new Date().toISOString().split("T")[0],
         }
@@ -320,7 +322,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name: me.name ?? "",
       nickname: me.nickname ?? "",
       email: me.email ?? email,
-      profileImage: me.profileImage,
+      profileImageUrl: me.profileImageUrl, // ✅ Corrected
       level: me.level ?? "",
       bio: me.bio ?? "",
       location: me.location,
@@ -328,6 +330,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       longitude: me.longitude,
       locationCode: me.locationCode,
       stars: me.stars ?? 0,
+      totalStar: me.totalStar ?? 0, // ✅ login 함수에서도 매핑 추가
       todayStars: me.todayStars ?? 0,
       lastStarDate: me.lastStarDate ?? new Date().toISOString().split("T")[0],
     }
@@ -372,26 +375,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const updateProfile = async (data: Partial<User> & { currentPassword?: string; newPassword?: string; newPasswordConfirm?: string }) => {
+  const updateProfile = async (data: UpdateProfileRequest) => {
     if (user) {
       try {
-        // Only send fields that actually changed
-        const updatePayload: any = {}
-        if (data.nickname && data.nickname !== user.nickname) {
-          updatePayload.nickname = data.nickname
-        }
-        if (data.categories !== undefined) {  // ✅ 카테고리 추가
-          updatePayload.categories = data.categories
-        }
-        if (data.currentPassword) updatePayload.currentPassword = data.currentPassword
-        if (data.newPassword) updatePayload.newPassword = data.newPassword
-        if (data.newPasswordConfirm) updatePayload.newPasswordConfirm = data.newPasswordConfirm
+        // ✅ 변경된 필드만 전송 (Optimization & Error Prevention)
+        const payload: UpdateProfileRequest = {}
 
-        await updateProfileAPI(updatePayload)
-        const { currentPassword, newPassword, newPasswordConfirm, ...safeData } = data
-        const updatedUser = { ...user, ...safeData }
-        setUser(updatedUser)
-        localStorage.setItem("cooksync_user", JSON.stringify(updatedUser))
+        // 1. Nickname Check
+        if (data.nickname && data.nickname !== user.nickname) {
+          payload.nickname = data.nickname
+        }
+
+        // 2. Profile Image Check
+        // data.profileImageUrl comes from preview. user.profileImageUrl is current.
+        // If data has it, check if different. If undefined, ignore.
+        if (data.profileImageUrl && data.profileImageUrl !== user.profileImageUrl) {
+          payload.profileImageUrl = data.profileImageUrl
+        }
+        // Note: If user removes image, logic might need 'null', but current UI doesn't support removal easily.
+
+        // 3. Categories Check
+        if (data.categories) {
+          const currentCats = new Set(user.categories || [])
+          const newCats = new Set(data.categories)
+          // Simple equality check for sets
+          const isSame = currentCats.size === newCats.size && [...currentCats].every(c => newCats.has(c))
+          if (!isSame) {
+            payload.categories = data.categories // Send full list if changed
+          }
+        }
+
+        // 4. Password Check
+        if (data.newPassword) {
+          payload.currentPassword = data.currentPassword
+          payload.newPassword = data.newPassword
+          payload.newPasswordConfirm = data.newPasswordConfirm
+        }
+
+        // 🔄 Payload가 비어있지 않을 때만 요청 전송
+        if (Object.keys(payload).length > 0) {
+          await updateProfileAPI(payload)
+
+          // Optimistic Update is tricky with partial updates.
+          // Best to re-fetch me after successful update to be sure.
+
+          const me = await getMe()
+          const newUser: User = {
+            ...user, // Base on current state
+            ...me,   // Overwrite with fresh data
+            id: String(me.id),
+          }
+
+          setUser(newUser)
+          localStorage.setItem("cooksync_user", JSON.stringify(newUser))
+        } else {
+          console.log("No changes detected, skipping API call.")
+        }
 
       } catch (error) {
         console.error("프로필 수정 실패:", error)

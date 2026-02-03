@@ -64,12 +64,17 @@ export type MarketPostDetailResponse = {
     location: string
     status: string
     chatCount: number
-    writerNickname: string
+    likeCount: number
+    nickname: string   // ✅ Backend: nickname
+    profileImageUrl?: string // ✅ Backend: profileImageUrl
+    totalStar?: number // ✅ Backend: totalStar
     imageUrls: string[]
     createdAt: string
-    owner: boolean
-    writerId?: number // Detail에도 writerId가 있으면 좋지만 owner가 있으니 필수 아님, 하지만 일관성 위해 추가 가능 (백엔드 확인 필요)
-    // 백엔드 Detail DTO를 확인하지 않았지만 owner 필드가 있음.
+    owner: boolean // Backend: isOwner -> mapped to owner or isOwner depending on usage, backend returns isOwner?
+    // Backend returns "isOwner", let's check if we need to map or if JS uses isOwner.
+    // The backend field is "isOwner", so JSON will have "isOwner".
+    isOwner: boolean
+    writerId?: number
 }
 
 export async function getPostDetail(postId: string): Promise<MarketPostDetailResponse> {
@@ -133,4 +138,26 @@ export async function updatePostStatus(postId: string, status: "SELLING" | "RESE
         method: "PATCH",
         body: JSON.stringify({ status }),
     })
+}
+// ... types
+
+export type PageResponse<T> = {
+    content: T[]
+    totalElements: number
+    totalPages: number
+    size: number
+    number: number
+    first: boolean
+    last: boolean
+    empty: boolean
+}
+
+// 내가 쓴 게시글 조회 (페이징)
+export async function getMyPostList(page = 0, size = 10): Promise<PageResponse<MarketPostListResponse>> {
+    return apiFetch<PageResponse<MarketPostListResponse>>(`/api/v1/market/posts/me?page=${page}&size=${size}`)
+}
+
+// 내가 찜한 게시글 조회
+export async function getLikedPosts(): Promise<MarketPostListResponse[]> {
+    return apiFetch<MarketPostListResponse[]>("/api/v1/market/liked")
 }

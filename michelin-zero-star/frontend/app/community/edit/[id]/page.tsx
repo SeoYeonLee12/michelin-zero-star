@@ -148,7 +148,7 @@ export default function CommunityEditPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">게시물 수정</h1>
-            <p className="text-muted-foreground">N빵 게시물 정보를 수정하세요</p>
+            <p className="text-muted-foreground">나눔 게시물 정보를 수정하세요</p>
           </div>
         </div>
 

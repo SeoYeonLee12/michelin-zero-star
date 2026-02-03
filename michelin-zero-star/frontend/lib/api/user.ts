@@ -5,7 +5,7 @@ export type MeResponse = {
   name: string
   nickname: string
   email: string
-  profileImage?: string
+  profileImageUrl?: string // ✅ Renamed from profileImage
   level?: string
   bio?: string
   location?: string
@@ -13,6 +13,7 @@ export type MeResponse = {
   longitude?: number
   locationCode?: string
   stars?: number
+  totalStar?: number // ✅ 추가
   todayStars?: number
   lastStarDate?: string
 }
@@ -43,7 +44,8 @@ export function verifyLocation(body: VerifyLocationRequest) {
 // ✅ 추가: 유저 정보 수정 Request DTO
 export type UpdateProfileRequest = {
   nickname?: string
-  categories?: string[]  // ✅ 추가
+  profileImageUrl?: string // ✅ 백엔드 DTO와 일치 (profileImage -> profileImageUrl)
+  categories?: string[]
   currentPassword?: string
   newPassword?: string
   newPasswordConfirm?: string

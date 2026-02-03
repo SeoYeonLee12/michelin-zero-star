@@ -136,16 +136,78 @@ export interface RegisterRecipeRequest {
   }[]
 }
 
+// 이미지 업로드 응답 DTO
+interface ImageResponse {
+  imageUrl: string
+}
+
+/**
+ * 이미지 단일 업로드 API
+ * @param file 업로드할 파일 객체
+ */
+export async function uploadImage(file: File): Promise<string> {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  const res = await apiFetch<ImageResponse>("/api/v1/images", {
+    method: "POST",
+    body: formData,
+  })
+  return res.imageUrl
+}
+
+
 export interface RegisterRecipeResponse {
   recipeId: number
   isAwardedRecipeRegisterReward: boolean
 }
 
+interface RegisterRecipeFiles {
+  mainImage?: File | null
+  stepImages?: { [stepNumber: number]: File }
+}
+
 /**
- * 레시피 등록 API
- * @param data 등록할 레시피 정보
+ * 레시피 등록 API (이미지 업로드 포함)
+ * @param data 등록할 레시피 정보 (JSON)
+ * @param files 업로드할 이미지 파일들 (Main + Steps)
  */
-export async function registerRecipe(data: RegisterRecipeRequest) {
+export async function registerRecipe(data: RegisterRecipeRequest, files?: RegisterRecipeFiles) {
+  // 1. 메인 이미지 업로드
+  if (files?.mainImage) {
+    try {
+      const url = await uploadImage(files.mainImage)
+      // @URL 검증 통과를 위해 절대 경로로 변환 (상대 경로인 경우)
+      data.mainImageUrl = url.startsWith("/") ? `${window.location.origin}${url}` : url
+    } catch (e) {
+      console.error("Main image upload failed", e)
+      throw new Error("대표 이미지 업로드에 실패했습니다.")
+    }
+  }
+
+  // 2. 스텝 이미지 업로드 (병렬 처리)
+  if (files?.stepImages) {
+    const uploadPromises = Object.entries(files.stepImages).map(async ([stepNumStr, file]) => {
+      const stepNumber = Number(stepNumStr)
+      try {
+        const url = await uploadImage(file)
+
+        // 데이터에서 해당 스텝 찾아서 URL 업데이트
+        const step = data.steps.find((s) => s.stepNumber === stepNumber)
+        if (step) {
+          // @URL 검증 통과를 위해 절대 경로로 변환
+          step.stepImageUrl = url.startsWith("/") ? `${window.location.origin}${url}` : url
+        }
+      } catch (e) {
+        console.error(`Step ${stepNumber} image upload failed`, e)
+        throw new Error(`${stepNumber}번 단계 이미지 업로드에 실패했습니다.`)
+      }
+    })
+
+    await Promise.all(uploadPromises)
+  }
+
+  // 3. 최종 레시피 등록 요청
   return apiFetch<RegisterRecipeResponse>("/api/recipes", {
     method: "POST",
     body: JSON.stringify(data),

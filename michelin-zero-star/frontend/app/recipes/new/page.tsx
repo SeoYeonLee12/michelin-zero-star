@@ -52,21 +52,21 @@ interface Ingredient {
 }
 
 const categoryOptions = [
-  { value: "korean", label: "한식" },
-  { value: "chinese", label: "중식" },
-  { value: "japanese", label: "일식" },
-  { value: "western", label: "양식" },
-  { value: "dessert", label: "디저트" },
-  { value: "snack", label: "분식" },
-  { value: "salad", label: "샐러드" },
-  { value: "drink", label: "음료" },
-  { value: "nightsnack", label: "야식&술안주" },
-  { value: "etc", label: "기타" },
+  { value: "밥", label: "밥" },
+  { value: "반찬", label: "반찬" },
+  { value: "국물", label: "국물" },
+  { value: "면", label: "면" },
+  { value: "디저트", label: "디저트" },
+  { value: "분식", label: "분식" },
+  { value: "샐러드", label: "샐러드" },
+  { value: "음료", label: "음료" },
+  { value: "야식&술안주", label: "야식&술안주" },
+  { value: "기타", label: "기타" },
 ]
 
 const CATEGORY_MAP: Record<string, number> = {
-  "korean": 1, "chinese": 2, "japanese": 3, "western": 4, "dessert": 5,
-  "snack": 6, "salad": 7, "drink": 8, "nightsnack": 9, "etc": 10
+  "밥": 1, "반찬": 2, "국물": 3, "면": 4, "디저트": 5,
+  "분식": 6, "샐러드": 7, "음료": 8, "기타": 9, "야식&술안주": 10
 }
 
 export default function NewRecipePage() {
@@ -221,8 +221,7 @@ export default function NewRecipePage() {
       // 1. 데이터 매핑
       const requestData: RegisterRecipeRequest = {
         title,
-        // ✅ Blob URL 대신 placeholder URL 사용 (백엔드 URL 검증 통과용)
-        mainImageUrl: thumbnailPreview ? "https://example.com/placeholder-recipe-image.jpg" : "",
+        mainImageUrl: "", // API 내부에서 업로드 후 채워짐
         recipeDescription: description,
         cookTime: totalCookingTime,
         servings: Number(servings) || 1,
@@ -244,14 +243,24 @@ export default function NewRecipePage() {
           stepNumber: s.id,
           stepDescription: s.description,
           timerSeconds: s.duration,
-          // ✅ Blob URL 대신 placeholder URL 사용 (백엔드 URL 검증 통과용)
-          stepImageUrl: s.imagePreview ? "https://example.com/placeholder-step-image.jpg" : "",
+          stepImageUrl: "", // API 내부에서 업로드 후 채워짐
           cookingTip: s.tips || null
         }))
       }
 
-      // 2. API 호출
-      await registerRecipe(requestData) // Token argument removed
+      // 2. 파일 객체 수집
+      const files = {
+        mainImage: thumbnail,
+        stepImages: steps.reduce((acc, step) => {
+          if (step.image) {
+            acc[step.id] = step.image
+          }
+          return acc
+        }, {} as { [key: number]: File })
+      }
+
+      // 3. API 호출 (JSON + Files)
+      await registerRecipe(requestData, files)
 
       // 3. 성공 처리
       setSuccessDialogOpen(true)
