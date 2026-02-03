@@ -9,7 +9,7 @@ public interface RecipeStepRepository extends JpaRepository<RecipeStep, Long> {
 
     void removeAllBy(Long recipeId);
 
-    void deleteAByRecipe(Recipe recipe);
+    void deleteByRecipe(Recipe recipe);
 
     List<RecipeStep> findAllByRecipeOrderByStepNumberAsc(Recipe recipe);
 }
