@@ -36,7 +36,7 @@ public class RecipeUpdate {
         searchedRecipe.updateRecipe(updatedRecipe);
 
         recipeIngredientRepository.deleteByRecipe(searchedRecipe);
-        recipeStepRepository.deleteAByRecipe(searchedRecipe);
+        recipeStepRepository.deleteByRecipe(searchedRecipe); // deleteAByRecipe 오타 수정
         recipeTagRepository.deleteByRecipe(searchedRecipe);
         recipeCategoryRepository.deleteByRecipe(searchedRecipe);
 

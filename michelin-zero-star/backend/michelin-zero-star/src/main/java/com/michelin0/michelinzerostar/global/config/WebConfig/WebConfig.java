@@ -1,13 +1,13 @@
-package com.michelin0.michelinzerostar.global.config;
+package com.michelin0.michelinzerostar.global.config.WebConfig;
 
+import java.io.File;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-import java.io.File;
 @Configuration
-public class WebMvcConfig implements WebMvcConfigurer {
+public class WebConfig implements WebMvcConfigurer {
 
     // application.yml에서 설정을 가져옴 (운영체제별로 경로를 다르게 하기 위해)
     @Value("${file.upload-dir}")

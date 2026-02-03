@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.0.1'
+    id 'org.springframework.boot' version '3.4.1'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -25,46 +25,49 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-h2console'
+    // --- [1] Spring Boot Core ---
+    implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-    implementation 'org.springframework.boot:spring-boot-starter-websocket'
-    compileOnly 'org.projectlombok:lombok'
-    developmentOnly 'org.springframework.boot:spring-boot-devtools'
-    testRuntimeOnly 'com.h2database:h2'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+
+    // --- [2] Reliability & Retry (ChatService 필수) ---
+    implementation 'org.springframework.retry:spring-retry:2.0.11'
+
+    // --- [3] Database ---
     runtimeOnly 'com.mysql:mysql-connector-j'
-    annotationProcessor 'org.projectlombok:lombok'
-    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    runtimeOnly 'com.h2database:h2'
 
-    // Redis
-    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-
-    // JWT
+    // --- [4] Security & JWT ---
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
 
-    // Spring Security
-    implementation 'org.springframework.boot:spring-boot-starter-security'
+    // --- [5] Redis & WebSocket ---
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
-
-    // [변경] Spring Boot 4.x 호환 최신 버전 (2026.01.01 출시)
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.1'
-
-    // [추가] SpringDoc이 내부적으로 찾는 설정 클래스를 위해 추가
-    implementation 'org.springframework.boot:spring-boot-starter-actuator'
-
-    // 구글 로그인 의존성 설정
-    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
-
+    // --- [6] QueryDSL (Java 21 & Boot 3.4.x 호환) ---
     implementation 'io.github.openfeign.querydsl:querydsl-jpa:6.10.1'
     annotationProcessor "io.github.openfeign.querydsl:querydsl-apt:6.10.1:jpa"
     annotationProcessor "jakarta.persistence:jakarta.persistence-api"
     annotationProcessor "jakarta.annotation:jakarta.annotation-api"
 
+    // --- [7] Swagger (SpringDoc - Boot 3.4.x 대응) ---
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
+
+    // --- [8] Tools ---
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // --- [9] Test ---
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {

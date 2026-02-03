@@ -14,11 +14,15 @@ import com.michelin0.michelinzerostar.global.exception.errorcode.UserErrorCode;
 import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
 import java.io.File;
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,128 +37,183 @@ public class ChatService {
     private final MarketPostRepository marketPostRepository;
     private final UserRepository userRepository;
 
-    public Long createOrGetChatRoom(Long postId, Long buyerId) {
-        return chatRoomRepository.findByPostIdAndBuyerId(postId, buyerId).map(ChatRoom::getId)
-                .orElseGet(() -> createChatRoom(postId, buyerId));
-    }
-
-    private Long createChatRoom(Long postId, Long buyerId) {
-        MarketPost post = marketPostRepository.findById(postId)
-                .orElseThrow(() -> new RuntimeException("게시글을 찾을 수 없습니다."));
-
-        User buyer = userRepository.findById(buyerId)
-                .orElseThrow(() -> new GlobalException(UserErrorCode.USER_NOT_FOUND));
-
-        // 본인 게시글에 채팅 불가 체크
-        if (post.getWriter().getId().equals(buyerId)) {
-            throw new RuntimeException("본인의 게시글에는 채팅할 수 없습니다.");
-        }
-
-        ChatRoom chatRoom = ChatRoom.builder().post(post).seller(post.getWriter()).buyer(buyer)
-                .build();
-
-        return chatRoomRepository.save(chatRoom).getId();
-    }
-
-    public void saveMessage(Long roomId, Long senderId, String content) {
-        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new RuntimeException("채팅방이 존재하지 않습니다."));
-
-        User sender = userRepository.findById(senderId)
-                .orElseThrow(() -> new GlobalException(UserErrorCode.USER_NOT_FOUND));
-
-        ChatMessage message = ChatMessage.builder().chatRoom(chatRoom).sender(sender)
-                .message(content).build();
-
-        chatMessageRepository.save(message);
-
-        chatRoom.updateLastMessage(content);
-    }
-
-    public List<ChatMessageResponse> getMessage(Long roomId, Long userId) {
-
-        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new RuntimeException("채팅방이 존재하지 않습니다."));
-        if (!chatRoom.getSeller().getId().equals(userId) && !chatRoom.getBuyer().getId()
-                .equals(userId)) {
-            throw new RuntimeException("해당 채팅방에 접근 권한이 없습니다.");
-        }
-        chatMessageRepository.bulkUpdateReadStatus(roomId, userId);
-        List<ChatMessage> messages = chatMessageRepository.findByChatRoomIdOrderByCreatedAt(roomId);
-        return messages.stream().map(ChatMessageResponse::new).collect(Collectors.toList());
-    }
-
     @Value("${file.upload-dir}")
     private String uploadDir;
 
-    public void sendImage(Long roomId, Long senderId, MultipartFile file) {
-        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new RuntimeException("채팅방이 없습니다."));
+    // 방 생성 (구매자 입장)
+    public Long createOrGetChatRoom(Long postId, Long buyerId) {
+        ChatRoom chatRoom = chatRoomRepository.findByPostIdAndBuyerId(postId, buyerId)
+                .orElseGet(() -> createChatRoom(postId, buyerId));
 
+        // 구매자가 나간 상태라면 복귀 (초대)
+        if (chatRoom.isBuyerLeft()) {
+            chatRoom.setBuyerLeft(false);
+            chatRoom.setBuyerJoinedAt(LocalDateTime.now());
+        }
+        return chatRoom.getId();
+    }
+
+    private ChatRoom createChatRoom(Long postId, Long buyerId) {
+        MarketPost post = marketPostRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("게시글 없음"));
+        User buyer = userRepository.findById(buyerId)
+                .orElseThrow(() -> new GlobalException(UserErrorCode.USER_NOT_FOUND));
+
+        ChatRoom chatRoom = ChatRoom.builder()
+                .post(post)
+                .seller(post.getWriter())
+                .buyer(buyer)
+                .build();
+
+        chatRoom.setSellerJoinedAt(LocalDateTime.now());
+        chatRoom.setBuyerJoinedAt(LocalDateTime.now());
+
+        return chatRoomRepository.save(chatRoom);
+    }
+
+    // 메시지 저장 (상대방 자동 소환 로직)
+    public ChatMessageResponse saveMessage(Long roomId, Long senderId, String content) {
+        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new RuntimeException("채팅방 없음"));
         User sender = userRepository.findById(senderId)
                 .orElseThrow(() -> new GlobalException(UserErrorCode.USER_NOT_FOUND));
 
-        // "image/jpeg", "image/png" 처럼 "image"로 시작하지 않으면 튕겨냄
-        String contentType = file.getContentType();
-        if (contentType == null || !contentType.startsWith("image")) {
-            throw new RuntimeException("이미지 파일만 업로드할 수 있습니다.");
+        // 상대방이 나갔으면 다시 들어오게 처리 (JoinedAt 갱신)
+        checkAndRejoinPartner(chatRoom, senderId);
+
+        ChatMessage message = ChatMessage.builder()
+                .chatRoom(chatRoom)
+                .sender(sender)
+                .message(content)
+                .build();
+        ChatMessage savedMessage = chatMessageRepository.save(message);
+        chatRoom.updateLastMessage(content);
+
+        return new ChatMessageResponse(savedMessage);
+    }
+
+    // 메시지 조회
+    public List<ChatMessageResponse> getMessage(Long roomId, Long userId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new RuntimeException("채팅방 없음"));
+
+        LocalDateTime myJoinedAt;
+        if (chatRoom.getSeller().getId().equals(userId)) {
+            myJoinedAt = chatRoom.getSellerJoinedAt() != null ? chatRoom.getSellerJoinedAt()
+                    : LocalDateTime.now();
+        } else if (chatRoom.getBuyer().getId().equals(userId)) {
+            myJoinedAt = chatRoom.getBuyerJoinedAt() != null ? chatRoom.getBuyerJoinedAt()
+                    : LocalDateTime.now();
+        } else {
+            throw new RuntimeException("접근 권한이 없습니다.");
         }
 
-        // 파일이 비어있는지 확인
+        // 조회 시 읽음 처리도 같이 수행
+        markAsRead(roomId, userId);
+
+        return chatMessageRepository.findByChatRoomIdAndCreatedAtAfterOrderByCreatedAt(roomId,
+                        myJoinedAt)
+                .stream().map(ChatMessageResponse::new).collect(Collectors.toList());
+    }
+
+    public void sendImage(Long roomId, Long senderId, MultipartFile file) {
+        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new RuntimeException("채팅방 없음"));
+        User sender = userRepository.findById(senderId)
+                .orElseThrow(() -> new GlobalException(UserErrorCode.USER_NOT_FOUND));
+
+        checkAndRejoinPartner(chatRoom, senderId);
+
         if (file.isEmpty()) {
-            throw new RuntimeException("파일이 없습니다.");
+            throw new RuntimeException("파일 없음");
         }
 
         try {
-            // 파일 저장 경로 설정 (폴더 없으면 생성)
             File folder = new File(uploadDir);
             if (!folder.exists()) {
                 folder.mkdirs();
             }
 
-            // 파일명 중복 방지 (UUID 사용)
-            String originalFileName = file.getOriginalFilename();
-            String extension = originalFileName.substring(originalFileName.lastIndexOf("."));
-            String savedFileName = UUID.randomUUID().toString() + extension; // 예: asd-123.jpg
-
-            // 실제 파일 저장
+            String savedFileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
             File destination = new File(uploadDir + File.separator + savedFileName);
             file.transferTo(destination);
 
-            // DB에 저장할 접근 URL (예: /images/asd-123.jpg)
             String imageUrl = "/images/" + savedFileName;
-
-            // ChatMessage 저장
             ChatMessage message = ChatMessage.builder()
                     .chatRoom(chatRoom)
                     .sender(sender)
-                    .message("사진을 보냈습니다.") // 텍스트는 대체 문구
-                    .imageUrl(imageUrl)       // URL 저장
+                    .message("사진을 보냈습니다.")
+                    .imageUrl(imageUrl)
                     .build();
 
             chatMessageRepository.save(message);
             chatRoom.updateLastMessage("사진을 보냈습니다.");
-
         } catch (IOException e) {
-            throw new RuntimeException("파일 저장 중 오류가 발생했습니다.");
+            throw new RuntimeException("파일 저장 실패");
         }
     }
 
+    // 읽음 처리 메서드
+    @Retryable(
+            retryFor = {CannotAcquireLockException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000)
+    )
+    public void markAsRead(Long roomId, Long userId) {
+        chatMessageRepository.bulkUpdateReadStatus(roomId, userId);
+    }
 
+    // 채팅방 목록 조회
     @Transactional(readOnly = true)
     public List<ChatRoomListResponse> getChatRoomList(Long userId) {
         List<ChatRoom> chatRooms = chatRoomRepository.findMyChatRooms(userId);
+
         return chatRooms.stream().map(chatRoom -> {
             User partner;
+            LocalDateTime myJoinedAt;
+
             if (chatRoom.getSeller().getId().equals(userId)) {
-                partner = chatRoom.getBuyer(); // 내가 판매자면 -> 상대는 구매자
+                partner = chatRoom.getBuyer();
+                myJoinedAt = chatRoom.getSellerJoinedAt() != null ? chatRoom.getSellerJoinedAt()
+                        : LocalDateTime.now();
             } else {
-                partner = chatRoom.getSeller(); // 내가 구매자면 -> 상대는 판매자
+                partner = chatRoom.getSeller();
+                myJoinedAt = chatRoom.getBuyerJoinedAt() != null ? chatRoom.getBuyerJoinedAt()
+                        : LocalDateTime.now();
             }
-            // 안 읽은 메시지 개수 가져오기
-            int unreadCount = chatMessageRepository.countByChatRoomIdAndSenderIdNotAndIsReadFalse(
-                    chatRoom.getId(), userId);
+
+            int unreadCount = chatMessageRepository.countUnreadMessages(chatRoom.getId(), userId,
+                    myJoinedAt);
             return new ChatRoomListResponse(chatRoom, partner, unreadCount);
         }).collect(Collectors.toList());
+    }
+
+    // 방 나가기 (상태만 변경)
+    public void leaveChatRoom(Long roomId, Long userId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new RuntimeException("채팅방 없음"));
+
+        if (chatRoom.getSeller().getId().equals(userId)) {
+            chatRoom.setSellerLeft(true);
+        } else if (chatRoom.getBuyer().getId().equals(userId)) {
+            chatRoom.setBuyerLeft(true);
+        } else {
+            throw new RuntimeException("권한 없음");
+        }
+    }
+
+    // 상대방 복귀 로직
+    private void checkAndRejoinPartner(ChatRoom chatRoom, Long senderId) {
+        if (chatRoom.getSeller().getId().equals(senderId)) {
+            if (chatRoom.isBuyerLeft()) {
+                chatRoom.setBuyerLeft(false);
+                chatRoom.setBuyerJoinedAt(LocalDateTime.now());
+            }
+        } else {
+            if (chatRoom.isSellerLeft()) {
+                chatRoom.setSellerLeft(false);
+                chatRoom.setSellerJoinedAt(LocalDateTime.now());
+            }
+        }
     }
 }
