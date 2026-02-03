@@ -20,8 +20,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // [연결 URL] ws://localhost:8080/ws-stomp
         registry.addEndpoint("/ws-stomp")
-                .setAllowedOriginPatterns("*") // 모든 출처 허용 (CORS)
-                .withSockJS(); // SockJS 지원 (브라우저 호환성)
+                .setAllowedOriginPatterns("*"); // 모든 출처 허용 (CORS)
     }
 
     @Override

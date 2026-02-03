@@ -40,6 +40,16 @@ public class MarketPostController {
         return ResponseEntity.ok(marketPostService.findAllPosts());
     }
 
+    // ★ [내가 쓴 게시물 조회] API
+    @GetMapping("/posts/me")
+    public ResponseEntity<Page<MarketPostListResponse>> getMyPosts(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+
+        Page<MarketPostListResponse> myPosts = marketPostService.getMyPosts(userPrincipal.getId(), pageable);
+        return ResponseEntity.ok(myPosts);
+    }
+
     // 내 근처 게시글 조회
     @GetMapping("/posts/nearby")
     public ResponseEntity<List<MarketPostListResponse>> getNearbyPosts(
