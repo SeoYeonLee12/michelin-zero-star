@@ -57,6 +57,23 @@ export function updateProfile(body: UpdateProfileRequest) {
   })
 }
 
+// ✅ 내가 찜한 마켓 게시글 조회
+export interface MarketPostListItem {
+  id: number
+  title: string
+  price: number
+  location: string
+  thumbnailUrl?: string
+  status: string
+  chatCount: number
+}
+
+export function getMyLikedPosts() {
+  return apiFetch<MarketPostListItem[]>("/api/v1/users/me/likes", {
+    method: "GET",
+  })
+}
+
 // ✅ 추가: 회원 탈퇴 API
 export function withdrawUser() {
   return apiFetch<string>("/api/v1/users/me", {

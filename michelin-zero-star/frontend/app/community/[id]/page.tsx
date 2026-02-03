@@ -17,7 +17,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { getPostDetail, deletePost } from "@/lib/api/market"
+import { getPostDetail, deletePost, toggleLike, updatePostStatus } from "@/lib/api/market"
 import {
   ArrowLeft,
   Heart,
@@ -145,7 +145,7 @@ export default function CommunityDetailPage() {
   const { likedPosts } = useAuth()
   const isLiked = likedPosts.some((p) => p.id === postId)
 
-  const isMyPost = post?.owner || false
+  const isMyPost = post?.isOwner || false
 
   if (loading) {
     return (
@@ -174,24 +174,34 @@ export default function CommunityDetailPage() {
     )
   }
 
-  const handleLike = (e: React.MouseEvent) => {
+  const handleLike = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+
     if (!isLoggedIn) {
       router.push("/login")
       return
     }
-    // API 데이터와 AuthContext 포맷 맞추기 (임시)
-    const postForContext = {
-      id: String(post.id),
-      title: post.title,
-      description: post.content,
-      price: post.price.toLocaleString(),
-      image: post.imageUrls[0],
-      place: post.meetingPlace,
-      likes: 0,
-      createdAt: post.createdAt,
-      status: post.status as "available" | "completed",
+
+    try {
+      // 백엔드는 POST로 토글 (좋아요↔취소)
+      await toggleLike(String(post.id))
+
+      // AuthContext와 동기화
+      toggleLikePost(e, {
+        id: String(post.id),
+        title: post.title,
+        description: post.content,
+        price: post.price.toLocaleString(),
+        image: post.imageUrls[0],
+        place: post.meetingPlace,
+        likes: 0,
+        createdAt: post.createdAt,
+        status: post.status as "available" | "completed",
+      } as any)
+    } catch (error) {
+      console.error("좋아요 처리 실패:", error)
+      alert("좋아요 처리에 실패했습니다.")
     }
-    toggleLikePost(e, postForContext as any)
   }
 
   const handleChat = () => {
@@ -216,15 +226,16 @@ export default function CommunityDetailPage() {
   }
 
   const confirmStatusChange = async () => {
-    // API 필요 (updatePost로 status 변경 가능한지 확인 필요, 현재 DTO에는 status 없음)
-    // 현재 제공된 API spec에는 updatePost DTO에 status가 없음.
-    // 따라서 이 기능은 잠시 보류하거나 updatePost에 status 추가 요청 필요.
-    // -> 일단 UI에서만 변경하는 척 하거나, updatePost에 status 필드가 있다면 보냄.
-    // 명세상 DTO: title, content, price, meetingPlace.
-    // Status 변경 API가 별도로 없으므로, '수정' 페이지에서만 가능한가?
-    // 일단 API 호출은 생략하고 UI만 닫음 (또는 updatePost 시도)
-    setStatusDialogOpen(false)
-    alert("상태 변경 기능을 확인해주세요.")
+    try {
+      await updatePostStatus(String(post.id), pendingStatus === "completed" ? "COMPLETED" : "ACTIVE")
+      // 페이지 새로고침하여 변경된 상태 반영
+      window.location.reload()
+    } catch (error) {
+      console.error("상태 변경 실패:", error)
+      alert("상태 변경에 실패했습니다.")
+    } finally {
+      setStatusDialogOpen(false)
+    }
   }
 
   const handleDelete = async () => {
@@ -240,7 +251,7 @@ export default function CommunityDetailPage() {
     }
   }
 
-  const likeCount = (post.likes || 0) + (isLiked ? 1 : 0) // API에 likes가 없으면 0 처리
+  const likeCount = post.likeCount || 0 // API에서 likeCount 가져오기
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -317,8 +328,10 @@ export default function CommunityDetailPage() {
               <h1 className="text-2xl font-bold mb-2">{post.title}</h1>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
-                {/* timeAgo는 Detail Response에 없으므로 createdAt 가공 필요하거나 API 추가 필요. 일단 createdAt 표시 */}
-                <span>{new Date(post.createdAt).toLocaleDateString()}</span>
+                <span>{new Date(post.createdAt).toLocaleString("ko-KR", {
+                  year: "numeric", month: "numeric", day: "numeric",
+                  hour: "2-digit", minute: "2-digit"
+                })}</span>
               </div>
             </div>
 
@@ -337,16 +350,15 @@ export default function CommunityDetailPage() {
               <div className="p-4 bg-[#800020]/5 rounded-xl border border-[#800020]/20 space-y-3">
                 <p className="text-sm font-medium text-[#800020]">내 게시글 관리</p>
                 <div className="flex gap-2">
-                  {/* Status Change - API 미지원이므로 비활성화 혹은 TODO */}
-                  {/* <Button
-                    variant={post.status === "completed" ? "default" : "outline"}
+                  <Button
+                    variant={post.status === "COMPLETED" ? "default" : "outline"}
                     size="sm"
-                    onClick={() => handleStatusChange(post.status === "completed" ? "available" : "completed")}
-                    className={cn("flex-1 gap-2", post.status === "completed" && "bg-gray-600 hover:bg-gray-700")}
+                    onClick={() => handleStatusChange(post.status === "COMPLETED" ? "available" : "completed")}
+                    className={cn("flex-1 gap-2", post.status === "COMPLETED" && "bg-gray-600 hover:bg-gray-700")}
                   >
                     <CheckCircle className="h-4 w-4" />
-                    {post.status === "completed" ? "거래완료 취소" : "거래완료로 변경"}
-                  </Button> */}
+                    {post.status === "COMPLETED" ? "거래완료 취소" : "거래완료로 변경"}
+                  </Button>
 
                   <Button
                     variant="outline"

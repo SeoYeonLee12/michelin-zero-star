@@ -110,8 +110,27 @@ export async function updatePost(
     })
 }
 
+/**
+ * 게시글 좋아요 토글 (좋아요 추가/취소)
+ */
+export async function toggleLike(postId: string): Promise<string> {
+    return apiFetch<string>(`/api/v1/market/posts/${postId}/likes`, {
+        method: "POST",
+    })
+}
+
 export async function deletePost(postId: string): Promise<string> {
     return apiFetch<string>(`/api/v1/market/posts/${postId}`, {
         method: "DELETE",
+    })
+}
+
+/**
+ * 게시글 상태 변경 (거래중 ↔ 거래완료)
+ */
+export async function updatePostStatus(postId: string, status: "ACTIVE" | "COMPLETED"): Promise<string> {
+    return apiFetch<string>(`/api/v1/market/posts/${postId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
     })
 }
