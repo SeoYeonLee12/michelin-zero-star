@@ -1,7 +1,7 @@
 package com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure;
 
+import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiRecipeChatbotRequest;
 import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiRecipeChatbotResponse;
-import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.UserRecipeChatbotRequest;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeStep;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import java.util.List;
@@ -24,7 +24,7 @@ public class AiTransferClient {
             Integer currentStepNumber,
             List<RecipeStep> steps
     ) {
-        UserRecipeChatbotRequest request = UserRecipeChatbotRequest.of(
+        AiRecipeChatbotRequest request = AiRecipeChatbotRequest.of(
                 user,
                 content,
                 currentStepNumber,

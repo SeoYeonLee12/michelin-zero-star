@@ -5,16 +5,16 @@ import com.michelin0.michelinzerostar.domain.user.entity.User;
 import java.util.Comparator;
 import java.util.List;
 
-public record UserRecipeChatbotRequest(
+public record AiRecipeChatbotRequest(
         Long user_id,
         String query,
         Integer current_step,
         List<RecipeAllStepRequest> recipe_all_steps
 ) {
 
-    public static UserRecipeChatbotRequest of(User user, String content, Integer currentStep,
+    public static AiRecipeChatbotRequest of(User user, String content, Integer currentStep,
             List<RecipeStep> steps) {
-        return new UserRecipeChatbotRequest(
+        return new AiRecipeChatbotRequest(
                 user.getId(),
                 content,
                 currentStep,
