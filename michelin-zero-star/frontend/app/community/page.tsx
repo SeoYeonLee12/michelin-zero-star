@@ -17,7 +17,7 @@ import Image from "next/image"
 import { cn } from "@/lib/utils"
 
 import { useEffect } from "react"
-import { getNearbyPosts, getPostList } from "@/lib/api/market"
+import { getNearbyPosts, getPostList, getMyPostList } from "@/lib/api/market"
 
 const initialShares: any[] = [] // 더미 데이터 제거 (타입 유지를 위해 빈 배열)
 
@@ -33,7 +33,16 @@ export default function CommunityPage() {
 
   // ✅ Hook을 early return 이전에 호출
   const [posts, setPosts] = useState<any[]>([])
+  const [myPostIds, setMyPostIds] = useState<Set<number>>(new Set())
   const [viewMode, setViewMode] = useState<"nearby" | "all">("nearby")
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      getMyPostList(0, 100).then(res => {
+        setMyPostIds(new Set(res.content.map(p => p.id)))
+      }).catch(err => console.error("Failed to fetch my posts", err))
+    }
+  }, [isLoggedIn])
 
   useEffect(() => {
     async function fetchPosts() {
@@ -101,7 +110,7 @@ export default function CommunityPage() {
     likes: 0,
     chatCount: post.chatCount,
     status: (post.status === "SOLD" || post.status === "COMPLETED" ? "completed" : "available") as "available" | "completed",
-    isMyPost: false,
+    isMyPost: myPostIds.has(post.id),
   }))
 
   const filteredShares = allShares.filter((share) => {
@@ -262,8 +271,14 @@ export default function CommunityPage() {
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <span>{share.place}</span>
                 <span>·</span>
-                <span>끌올 {share.timeAgo}</span>
+                <span>{share.timeAgo}</span>
               </div>
+
+              {share.isMyPost && (
+                <div className="absolute top-2 left-2 bg-[#800020] text-white text-[10px] px-2 py-0.5 rounded-full font-medium z-10 shadow-sm">
+                  내 나눔글
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -323,7 +323,7 @@ export default function HomePage() {
                         className="bg-transparent shadow-none rounded-none"
                         imgClassName="h-4 w-4"
                       />
-                      미슐랭 {isLoggedIn && user ? user.stars : 0}스타
+                      미슐랭 {isLoggedIn && user ? user.totalStar : 0}스타
                     </div>
                   </motion.div>
 

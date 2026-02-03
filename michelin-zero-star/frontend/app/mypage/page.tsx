@@ -137,10 +137,8 @@ export default function MyPage() {
   // 별 애니메이션
   React.useEffect(() => {
     if (isLoggedIn && user?.totalStar !== undefined) {
-      // totalStar의 소수점 부분을 0~100 퍼센트로 변환 (예: 3.5 -> 50, 3.1 -> 10)
-      // 부동소수점 오차 방지를 위해 문자열로 변환 후 처리하거나 반올림 사용
-      const decimalPart = user.totalStar % 1
-      const targetStars = Math.round(decimalPart * 100)
+      // totalStar를 100을 기준으로 퍼센트 변환 (예: 50 -> 50%)
+      const targetStars = user.totalStar
 
       const duration = 1500
       const steps = 60
@@ -373,7 +371,23 @@ export default function MyPage() {
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                     {likedRecipes.map((recipe) => (
-                      <RecipeCard key={recipe.id} recipe={{ ...recipe, name: recipe.title || recipe.name }} isLiked={true} onHeartClick={() => toggleLikeRecipe(recipe)} onClick={() => router.push(`/recipes/${recipe.id}`)} />
+                      <RecipeCard
+                        key={recipe.id}
+                        recipe={{
+                          ...recipe,
+                          name: recipe.title, // LikedRecipe uses title, Recipe uses name. Map it.
+                          thumbnail: recipe.image, // LikedRecipe uses image
+                          tags: [],
+                          description: "",
+                          servings: 1,
+                          steps: [],
+                          duration: 0,
+                          difficulty: "초보"
+                        }}
+                        isLiked={true}
+                        onHeartClick={() => toggleLikeRecipe(recipe)}
+                        onClick={() => router.push(`/recipes/${recipe.id}`)}
+                      />
                     ))}
                   </div>
                 )}
@@ -394,7 +408,23 @@ export default function MyPage() {
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                     {userRecipes.map((recipe) => (
-                      <RecipeCard key={recipe.id} recipe={{ ...recipe, isUserRecipe: true, name: recipe.title, image: recipe.thumbnail, hashtags: recipe.tags }} onEdit={() => router.push(`/recipes/edit/${recipe.id}`)} onDelete={() => { setSelectedRecipeId(recipe.id); setDeleteRecipeDialogOpen(true); }} onClick={() => router.push(`/recipes/${recipe.id}`)} />
+                      <RecipeCard
+                        key={recipe.id}
+                        recipe={{
+                          ...recipe,
+                          isUserRecipe: true,
+                          name: recipe.title,
+                          image: recipe.thumbnail,
+                          hashtags: recipe.tags,
+                          // Add missing
+                          duration: 0,
+                          difficulty: "초보",
+                          steps: []
+                        }}
+                        onEdit={() => router.push(`/recipes/edit/${recipe.id}`)}
+                        onDelete={() => { setSelectedRecipeId(recipe.id); setDeleteRecipeDialogOpen(true); }}
+                        onClick={() => router.push(`/recipes/${recipe.id}`)}
+                      />
                     ))}
                   </div>
                 )}

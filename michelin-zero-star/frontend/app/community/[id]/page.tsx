@@ -197,7 +197,8 @@ export default function CommunityDetailPage() {
 
       setPost((prev: any) => ({
         ...prev,
-        likeCount: (prev.likeCount || 0) + (isLiked ? -1 : 1),
+        likeCount: (prev.likeCount ?? prev.like_count ?? 0) + (isLiked ? -1 : 1),
+        like_count: (prev.likeCount ?? prev.like_count ?? 0) + (isLiked ? -1 : 1),
       }))
 
     } catch (error) {
@@ -257,7 +258,7 @@ export default function CommunityDetailPage() {
     }
   }
 
-  const likeCount = post.likeCount || 0 // API에서 likeCount 가져오기
+  const likeCount = post.likeCount ?? post.like_count ?? 0 // API에서 likeCount 가져오기 (snake_case 대응)
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -314,13 +315,12 @@ export default function CommunityDetailPage() {
               )}
               {/* Heart and comments moved to bottom right of image */}
               <div className="absolute bottom-4 right-4 flex items-center gap-3 bg-black/50 rounded-full px-3 py-1.5 z-20">
-                <button
-                  className={cn("flex items-center gap-1 text-white transition-colors", isLiked && "text-red-400")}
-                  onClick={handleLike}
+                <div
+                  className={cn("flex items-center gap-1 text-white")}
                 >
-                  <Heart className={cn("h-5 w-5", isLiked && "fill-current")} />
+                  <Heart className={cn("h-5 w-5", "fill-white")} />
                   <span className="text-sm font-medium">{likeCount}</span>
-                </button>
+                </div>
                 <div className="flex items-center gap-1 text-white">
                   <MessageCircle className="h-5 w-5" />
                   <span className="text-sm font-medium">{post.chatCount}</span>
@@ -335,10 +335,15 @@ export default function CommunityDetailPage() {
               <h1 className="text-2xl font-bold mb-2">{post.title}</h1>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
-                <span>{new Date(post.createdAt).toLocaleString("ko-KR", {
-                  year: "numeric", month: "numeric", day: "numeric",
-                  hour: "2-digit", minute: "2-digit"
-                })}</span>
+                <span>{(() => {
+                  const dateStr = post.createdAt.endsWith("Z") ? post.createdAt : post.createdAt + "Z"
+                  const date = new Date(dateStr)
+                  return `${date.toLocaleDateString("ko-KR", {
+                    year: "numeric", month: "numeric", day: "numeric"
+                  })} ${date.toLocaleTimeString("ko-KR", {
+                    hour: "2-digit", minute: "2-digit", hour12: true
+                  })}`
+                })()}</span>
               </div>
             </div>
 
@@ -370,7 +375,7 @@ export default function CommunityDetailPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => router.push(`/community/edit/${postId}`)}
+                    onClick={() => router.push(`/community/new?id=${postId}`)}
                     className="flex-1 gap-2"
                   >
                     <Pencil className="h-4 w-4" />
@@ -401,7 +406,7 @@ export default function CommunityDetailPage() {
                   {post.totalStar !== undefined && (
                     <Badge variant="outline" className="gap-1 bg-white border-[#800020]/20 text-[#800020] px-1.5 py-0">
                       <Star className="h-3 w-3 fill-[#800020]" />
-                      <span className="text-xs">{post.totalStar}</span>
+                      <span className="text-xs">{isMyPost && user?.totalStar !== undefined ? user.totalStar : post.totalStar}</span>
                     </Badge>
                   )}
                 </div>

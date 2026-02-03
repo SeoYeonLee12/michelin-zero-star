@@ -177,7 +177,8 @@ export async function registerRecipe(data: RegisterRecipeRequest, files?: Regist
   if (files?.mainImage) {
     try {
       const url = await uploadImage(files.mainImage)
-      // @URL 검증 통과를 위해 절대 경로로 변환 (상대 경로인 경우)
+      // 백엔드 validation이 절대 경로(URL)를 요구하므로 임시로 origin 주소 붙임
+      // (주의: 이렇게 하면 EC2 등 외부에서 이미지가 안 보일 수 있음 -> 백엔드가 S3 URL을 줘야 함)
       data.mainImageUrl = url.startsWith("/") ? `${window.location.origin}${url}` : url
     } catch (e) {
       console.error("Main image upload failed", e)
@@ -195,7 +196,6 @@ export async function registerRecipe(data: RegisterRecipeRequest, files?: Regist
         // 데이터에서 해당 스텝 찾아서 URL 업데이트
         const step = data.steps.find((s) => s.stepNumber === stepNumber)
         if (step) {
-          // @URL 검증 통과를 위해 절대 경로로 변환
           step.stepImageUrl = url.startsWith("/") ? `${window.location.origin}${url}` : url
         }
       } catch (e) {
@@ -216,8 +216,43 @@ export async function registerRecipe(data: RegisterRecipeRequest, files?: Regist
 
 /**
  * 레시피 수정 API ("그대로" 요청 바디 사용, ID만 URL 파라미터)
+ * @param recipeId 레시피 ID
+ * @param data 수정할 레시피 정보 (JSON)
+ * @param files 업로드할 이미지 파일들 (Main + Steps)
  */
-export async function updateRecipe(recipeId: string, data: RegisterRecipeRequest) {
+export async function updateRecipe(recipeId: string, data: RegisterRecipeRequest, files?: RegisterRecipeFiles) {
+  // 1. 메인 이미지 업로드
+  if (files?.mainImage) {
+    try {
+      const url = await uploadImage(files.mainImage)
+      data.mainImageUrl = url.startsWith("/") ? `${window.location.origin}${url}` : url
+    } catch (e) {
+      console.error("Main image upload failed", e)
+      throw new Error("대표 이미지 업로드에 실패했습니다.")
+    }
+  }
+
+  // 2. 스텝 이미지 업로드 (병렬 처리)
+  if (files?.stepImages) {
+    const uploadPromises = Object.entries(files.stepImages).map(async ([stepNumStr, file]) => {
+      const stepNumber = Number(stepNumStr)
+      try {
+        const url = await uploadImage(file)
+
+        // 데이터에서 해당 스텝 찾아서 URL 업데이트
+        const step = data.steps.find((s) => s.stepNumber === stepNumber)
+        if (step) {
+          step.stepImageUrl = url.startsWith("/") ? `${window.location.origin}${url}` : url
+        }
+      } catch (e) {
+        console.error(`Step ${stepNumber} image upload failed`, e)
+        throw new Error(`${stepNumber}번 단계 이미지 업로드에 실패했습니다.`)
+      }
+    })
+
+    await Promise.all(uploadPromises)
+  }
+
   return apiFetch<RegisterRecipeResponse>(`/api/recipes/${recipeId}`, {
     method: "PUT",
     body: JSON.stringify(data),

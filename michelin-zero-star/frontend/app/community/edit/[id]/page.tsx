@@ -60,7 +60,7 @@ export default function CommunityEditPage() {
         const post = await getPostDetail(postId)
         if (post) {
           // 본인 게시글인지 확인
-          if (!post.owner) {
+          if (!post.isOwner) {
             alert("수정 권한이 없습니다.")
             router.push("/community")
             return

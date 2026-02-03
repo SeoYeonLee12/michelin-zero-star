@@ -7,8 +7,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface RecipeStepRepository extends JpaRepository<RecipeStep, Long> {
 
-    void removeAllBy(Long recipeId);
-
     void deleteByRecipe(Recipe recipe);
 
     List<RecipeStep> findAllByRecipeOrderByStepNumberAsc(Recipe recipe);

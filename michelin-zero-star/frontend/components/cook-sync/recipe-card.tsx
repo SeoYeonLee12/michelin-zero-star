@@ -95,19 +95,7 @@ export function RecipeCard({ recipe, isLiked, onHeartClick, onEdit, onDelete, on
             )
           })()
         )}
-        <div className="absolute top-2 right-2">
-          <Button
-            size="icon"
-            variant="secondary"
-            className="h-7 w-7 rounded-full bg-white/80 backdrop-blur hover:bg-white"
-            onClick={(e) => {
-              e.stopPropagation()
-              onHeartClick?.(e, recipe)
-            }}
-          >
-            <Heart className={`h-4 w-4 ${isLiked ? "fill-red-500 text-red-500" : ""}`} />
-          </Button>
-        </div>
+        {/* Heart button removed */}
         {recipe.isUserRecipe && (
           <Badge className="absolute bottom-2 left-2 bg-[#800020] text-white border-0 text-xs">
             내 레시피

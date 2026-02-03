@@ -9,11 +9,11 @@ import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import type { Recipe } from "@/lib/types"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import {
   Clock,
   Users,
@@ -154,9 +154,10 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
   const [recipeRating, setRecipeRating] = React.useState(4.5)
   const [nutritionOpen, setNutritionOpen] = React.useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = React.useState(false)
 
   const handleEditRecipe = () => {
-    router.push(`/recipes/${recipe.id}/edit`)
+    router.push(`/recipes/new?id=${recipe.id}`)
   }
 
   const handleDeleteRecipe = async () => {
@@ -339,14 +340,14 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
                 key={idx}
                 src="/michelin-star.png"
                 alt="미슐랭 빈"
-                className="h-5 w-5 opacity-30"
+                className="h-5 w-5"
                 draggable={false}
               />
             )
           })}
         </div>
 
-        {rating > 0 && <span className="text-sm text-[#800020] font-medium">{rating.toFixed(1)}</span>}
+        <span className="text-sm text-[#800020] font-medium">{rating.toFixed(1)}</span>
       </div>
     )
   }
@@ -372,7 +373,37 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
         <div className="space-y-4">
           <div className="space-y-2">
             <h1 className="text-2xl font-bold">{recipe.name}</h1>
-            {recipe.description && <p className="text-sm text-muted-foreground line-clamp-2">{recipe.description}</p>}
+            {recipe.description && (
+              <div>
+                {!isDescriptionExpanded ? (
+                  <div>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {recipe.description}
+                    </p>
+                    {recipe.description.length > 100 && (
+                      <button
+                        onClick={() => setIsDescriptionExpanded(true)}
+                        className="text-xs text-[#800020] hover:underline mt-1 font-medium"
+                      >
+                        전체보기
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="relative animate-in slide-in-from-top-1 fade-in duration-200 w-full">
+                    <div className="min-h-[200px] max-h-[400px] overflow-y-auto overflow-x-hidden p-4 border rounded-xl bg-muted/30 text-sm text-muted-foreground whitespace-pre-wrap break-all leading-relaxed shadow-sm">
+                      {recipe.description}
+                    </div>
+                    <button
+                      onClick={() => setIsDescriptionExpanded(false)}
+                      className="text-xs text-[#800020] hover:underline mt-1 font-medium"
+                    >
+                      접기
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

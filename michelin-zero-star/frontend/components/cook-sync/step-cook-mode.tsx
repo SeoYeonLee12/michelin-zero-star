@@ -2,6 +2,9 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
+import { Client } from "@stomp/stompjs"
+import { getGlobalAccessToken } from "@/lib/api/client"
+import { useAuth } from "@/lib/auth-context"
 import {
   Play,
   Pause,
@@ -73,6 +76,7 @@ export function StepCookMode({
   recipeName?: string
 }) {
   const router = useRouter()
+  const { user } = useAuth()
 
   // ===== State 관리 =====
   const [skillLevel, setSkillLevel] = React.useState<SkillLevel>("intermediate")
@@ -105,6 +109,7 @@ export function StepCookMode({
 
   // ====== refs (클로저 버그 방지: NEXT/PREV/PLAY 등) ======
   const sttStopRef = React.useRef<null | (() => void)>(null)
+  const stompClientRef = React.useRef<Client | null>(null) // ✅ WebSocket Ref
   const porcupineRef = React.useRef<ReturnType<typeof createPorcupineController> | null>(null)
 
   const isListeningRef = React.useRef(isListening)
@@ -124,6 +129,60 @@ export function StepCookMode({
 
   React.useEffect(() => { aiVoiceEnabledRef.current = aiVoiceEnabled }, [aiVoiceEnabled])
   React.useEffect(() => { aiTurnRef.current = aiTurn }, [aiTurn])
+
+  // ===== WebSocket Connection =====
+  React.useEffect(() => {
+    const token = getGlobalAccessToken()
+    if (!token) return
+
+    const client = new Client({
+      brokerURL: "ws://localhost:8080/ws/connect",
+      connectHeaders: {
+        Authorization: `Bearer ${token}`,
+      },
+      reconnectDelay: 5000,
+      debug: (str) => console.log("[STOMP]", str),
+    })
+
+    client.onConnect = (frame) => {
+      console.log("✅ WebSocket Connected")
+
+      // AI 응답 구독
+      client.subscribe("/user/queue/ai/reply", (message) => {
+        if (message.body) {
+          try {
+            const body = JSON.parse(message.body)
+            const answer = body.answer || body.content || body.message || message.body
+            setAiMessages((prev) => [...prev, { role: "ai", content: answer }])
+
+            // 응답이 오면 다시 듣기 모드 (지연 후)
+            setTimeout(() => {
+              setAiTurnSafe("listening")
+              if (aiOpenRef.current && aiVoiceEnabledRef.current) {
+                // scheduleSttRetry(50) // 루프 가능성 있으므로 상황 봐서
+              }
+            }, 500)
+
+          } catch (e) {
+            console.error("Msg Parse Error", e)
+            setAiMessages((prev) => [...prev, { role: "ai", content: message.body }])
+            setAiTurnSafe("listening")
+          }
+        }
+      })
+    }
+
+    client.onStompError = (frame) => {
+      console.error("Broker error: " + frame.headers["message"])
+    }
+
+    client.activate()
+    stompClientRef.current = client
+
+    return () => {
+      client.deactivate()
+    }
+  }, [user?.id])
 
   React.useEffect(() => { isListeningRef.current = isListening }, [isListening])
   React.useEffect(() => { aiOpenRef.current = aiOpen }, [aiOpen])
@@ -275,16 +334,29 @@ export function StepCookMode({
 
           setAiTurnSafe("thinking")
 
-          try {
-            const res = await postCookingChat({
-              recipeId,
-              currentStepIndex: stepIndexRef.current,
-              message: raw,
+          // ✅ WebSocket으로 전송 (기존 API 호출 대체)
+          if (stompClientRef.current && stompClientRef.current.connected) {
+            const payload = {
+              content: raw,
+              recipeId: recipeId,
+              currentStepNumber: stepIndexRef.current + 1
+            }
+            stompClientRef.current.publish({
+              destination: "/app/recipes/ask",
+              body: JSON.stringify(payload),
             })
-            setAiMessages((prev) => [...prev, { role: "ai", content: res.answer }])
-          } catch {
-            setAiMessages((prev) => [...prev, { role: "ai", content: "서버 응답을 받지 못했어요." }])
+            // 응답은 WebSocket subscribe에서 처리
+          } else {
+            setAiMessages((prev) => [...prev, { role: "ai", content: "서버 연결이 원활하지 않아 메시지를 보낼 수 없어요." }])
+            setAiTurnSafe("listening")
           }
+
+          // 참고: 기존에는 await postCookingChat() 후 setAiTurnSafe("listening")을 했으나,
+          // 소켓은 비동기이므로 응답을 받을 때 상태를 변경해야 함.
+          // 여기서 강제로 listening으로 돌리면 "생각중" UI가 순식간에 사라짐.
+          // 하지만 백엔드가 아직 응답을 안 주므로... 일단 UI 흐름상 "thinking" 유지하거나,
+          // 사용자 경험을 위해 잠시 후 listening으로 복귀시키는 타임아웃을 둘 수 있음.
+          // (일단 여기서는 socket send success 가정하고 넘어감)
 
           setAiTurnSafe("listening")
 
@@ -494,23 +566,28 @@ export function StepCookMode({
     }
   }, [])
 
-  // ===== AI 메시지 전송(팀원 코드: 더미 → 네 코드: 실제 postChat) =====
+  // ===== AI 메시지 전송 (WebSocket) =====
   const handleAiSend = async () => {
     if (!aiInput.trim()) return
     const userText = aiInput.trim()
 
     setAiMessages((prev) => [...prev, { role: "user", content: userText }])
     setAiInput("")
+    setAiTurnSafe("thinking")
 
-    try {
-      const res = await postCookingChat({
-        recipeId,
-        currentStepIndex: stepIndexRef.current,
-        message: userText,
+    if (stompClientRef.current && stompClientRef.current.connected) {
+      const payload = {
+        content: userText,
+        recipeId: recipeId,
+        currentStepNumber: currentStepIndex + 1
+      }
+      stompClientRef.current.publish({
+        destination: "/app/recipes/ask",
+        body: JSON.stringify(payload),
       })
-      setAiMessages((prev) => [...prev, { role: "ai", content: res.answer }])
-    } catch {
-      setAiMessages((prev) => [...prev, { role: "ai", content: "서버 연결에 실패했어요. 잠시 후 다시 시도해 주세요." }])
+    } else {
+      setAiMessages((prev) => [...prev, { role: "ai", content: "서버와 연결되지 않았어요." }])
+      setAiTurnSafe("listening")
     }
   }
 

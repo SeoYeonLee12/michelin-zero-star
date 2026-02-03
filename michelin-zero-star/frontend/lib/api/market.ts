@@ -11,6 +11,8 @@ export type MarketPostCreateRequest = {
 export type MarketPostResponse = string // API 명세에 따르면 "string" 반환
 
 // 프론트 Community -> 백엔드 Market
+// 프론트 Community -> 백엔드 Market
+// 프론트 Community -> 백엔드 Market
 export async function createPost(
     postData: MarketPostCreateRequest,
     images: File[]
@@ -24,9 +26,11 @@ export async function createPost(
     formData.append("post", postBlob)
 
     // 2. 이미지 파일들
-    images.forEach((file) => {
-        formData.append("images", file)
-    })
+    if (images && images.length > 0) {
+        images.forEach((file) => {
+            formData.append("images", file)
+        })
+    }
 
     return apiFetch<MarketPostResponse>("/api/v1/market/posts", {
         method: "POST",
@@ -65,14 +69,11 @@ export type MarketPostDetailResponse = {
     status: string
     chatCount: number
     likeCount: number
-    nickname: string   // ✅ Backend: nickname
-    profileImageUrl?: string // ✅ Backend: profileImageUrl
-    totalStar?: number // ✅ Backend: totalStar
+    nickname: string
+    profileImageUrl?: string
+    totalStar?: number
     imageUrls: string[]
     createdAt: string
-    owner: boolean // Backend: isOwner -> mapped to owner or isOwner depending on usage, backend returns isOwner?
-    // Backend returns "isOwner", let's check if we need to map or if JS uses isOwner.
-    // The backend field is "isOwner", so JSON will have "isOwner".
     isOwner: boolean
     writerId?: number
 }

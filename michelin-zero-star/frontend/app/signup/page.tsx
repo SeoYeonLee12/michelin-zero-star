@@ -182,6 +182,7 @@ export default function SignupPage() {
                   className="h-12"
                 />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="nickname">닉네임</Label>
                 <Input

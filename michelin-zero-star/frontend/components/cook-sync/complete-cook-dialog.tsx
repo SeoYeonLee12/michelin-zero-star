@@ -60,41 +60,27 @@ export function CompleteCookDialog({
 
   const isCompletedRecipeLiked = isRecipeLiked(completedRecipe.id)
 
-  const handleLikeRecipe = (recipe: Recipe) => {
+
+
+  const handleLikeCompletedRecipe = () => {
     if (!isLoggedIn) return
-    const wasLiked = isRecipeLiked(recipe.id)
+    const wasLiked = isRecipeLiked(completedRecipe.id)
+
     toggleLikeRecipe({
-      id: recipe.id,
-      title: recipe.name,
-      image: recipe.thumbnail || "/placeholder.svg",
-      author: recipe.hashtags?.[0] || "미슐랭 0스타",
-      savedAt: new Date().toISOString(),
+      id: completedRecipe.id,
+      title: completedRecipe.name,
+      image: completedRecipe.thumbnail || "/placeholder.svg",
+      author: completedRecipe.hashtags?.[0] || "미슐랭 0스타",
+      savedAt: "",
     })
+
     if (!wasLiked) {
       setScrapFeedback("스크랩했습니다")
       setTimeout(() => setScrapFeedback(null), 2000)
     }
   }
 
-  const handleLikeCompletedRecipe = () => {
-  if (!isLoggedIn) return
-  const wasLiked = isRecipeLiked(completedRecipe.id)
-
-  toggleLikeRecipe({
-    id: completedRecipe.id,
-    title: completedRecipe.name,
-    image: completedRecipe.thumbnail || "/placeholder.svg",
-    author: completedRecipe.hashtags?.[0] || "미슐랭 0스타",
-    savedAt: "",
-  })
-
-  if (!wasLiked) {
-    setScrapFeedback("스크랩했습니다")
-    setTimeout(() => setScrapFeedback(null), 2000)
-  }
-}
-
-const handleSubmitReview = () => {
+  const handleSubmitReview = () => {
     if (rating === 0 || !isLoggedIn) return
     console.log("Review submitted as recipe comment:", { rating, comment, recipeId: completedRecipe.id, userId: user?.id })
     // 리뷰는 레시피당 1회만 허용
@@ -117,7 +103,7 @@ const handleSubmitReview = () => {
     onOpenChange(false)
   }
 
-    // completedRecipe 없으면 렌더 안 함
+  // completedRecipe 없으면 렌더 안 함
   if (!completedRecipe) return null
   // open 아닐 때도 렌더 안 함 (Radix 제거 핵심)
   if (!open) return null
@@ -254,55 +240,7 @@ const handleSubmitReview = () => {
               </div>
             )}
 
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Heart className="h-4 w-4 text-[#800020]" />
-                <span className="text-base font-medium">같은 재료로 만들 수 있는 다른 레시피들!</span>
-              </div>
-              <p className="text-sm text-muted-foreground">하트를 눌러 나중에 만들어볼 레시피에 저장하세요</p>
-              <div className="grid gap-3">
-                {leftoverRecipes.map((recipe) => (
-                  <Card key={recipe.id} className="cursor-pointer transition-all hover:shadow-md">
-                    <CardContent className="flex items-center gap-4 p-4">
-                      <img
-                        src={recipe.thumbnail || "/placeholder.svg"}
-                        alt={recipe.name}
-                        className="h-16 w-16 rounded-lg object-cover"
-                      />
-                      <div
-                        className="flex-1"
-                        onClick={() => {
-                          onSelectLeftover(recipe)
-                          onOpenChange(false)
-                        }}
-                      >
-                        <p className="font-medium text-lg">{recipe.name}</p>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {recipe.duration}분
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleLikeRecipe(recipe)
-                        }}
-                      >
-                        <Heart
-                          className={cn(
-                            "h-5 w-5",
-                            isRecipeLiked(recipe.id) ? "fill-red-500 text-red-500" : "text-muted-foreground",
-                          )}
-                        />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
+
 
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1 bg-transparent gap-2" onClick={handleBackToCooking}>
