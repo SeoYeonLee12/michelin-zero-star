@@ -44,7 +44,8 @@ public class MarketPostService {
 
     // 게시글 생성
     @Transactional
-    public void createPost(Long userId, MarketPostCreateRequest request, List<MultipartFile> images) {
+    public void createPost(Long userId, MarketPostCreateRequest request,
+            List<MultipartFile> images) {
         User writer = userRepository.findById(userId)
                 .orElseThrow(() -> new GlobalException(UserErrorCode.USER_NOT_FOUND));
 
@@ -70,6 +71,7 @@ public class MarketPostService {
         uploadImages(post, images); // 이미지 업로드
 
         marketPostRepository.save(post);
+        log.info("게시글 등록 완료: ID={}, Title={}", post.getId(), post.getTitle());
     }
 
     // 게시글 상세 조회
@@ -87,20 +89,11 @@ public class MarketPostService {
                 });
     }
 
-    // 전체 게시글 조회
+    // 전체 게시글 조회 (최신순)
     public List<MarketPostListResponse> findAllPosts() {
         return marketPostRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(MarketPostListResponse::new)
                 .collect(Collectors.toList());
-    }
-
-    // 내가 쓴 게시물 조회
-    public Page<MarketPostListResponse> getMyPosts(Long userId, Pageable pageable) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new GlobalException(UserErrorCode.USER_NOT_FOUND));
-
-        return marketPostRepository.findAllByWriterOrderByCreatedAtDesc(user, pageable)
-                .map(MarketPostListResponse::new);
     }
 
     // 내 근처 게시글 조회
@@ -125,23 +118,35 @@ public class MarketPostService {
                 .collect(Collectors.toList());
     }
 
-    // 게시글 내용 수정
+    // 게시글 내용 수정 (이미지 포함)
     @Transactional
-    public void updatePost(Long postId, Long userId, MarketPostUpdateRequest request, List<MultipartFile> newImages) {
+    public void updatePost(Long postId, Long userId, MarketPostUpdateRequest request,
+            List<MultipartFile> images) {
         MarketPost post = marketPostRepository.findById(postId)
                 .orElseThrow(() -> new GlobalException(MarketErrorCode.POST_NOT_FOUND));
 
         validateWriter(post, userId);
 
-        post.update(request.getTitle(), request.getContent(), request.getPrice(), request.getMeetingPlace());
+        // 텍스트 정보 업데이트
+        post.update(request.getTitle(), request.getContent(), request.getPrice(),
+                request.getMeetingPlace());
 
-        if (newImages != null && !newImages.isEmpty()) {
-            deletePostImages(post); // 기존 이미지 삭제
-            uploadImages(post, newImages); // 새 이미지 업로드
+        // 이미지가 전달되었으면 기존 이미지 삭제 후 새 이미지 저장
+        if (images != null && !images.isEmpty()) {
+            deletePostImages(post); // 기존 이미지 파일 삭제 및 DB 리스트 clear
+            uploadImages(post, images); // 새 이미지 업로드 및 추가
         }
+        log.info("게시글 수정 완료: ID={}", post.getId());
     }
 
-    // 게시글 상태 수정
+    // ★ 내가 쓴 게시물 조회 (ID 기반 최적화)
+    public Page<MarketPostListResponse> getMyPosts(Long userId, Pageable pageable) {
+        // Repository 메서드명을 명확하게 OrderByCreatedAtDesc로 사용하는 것을 추천합니다.
+        return marketPostRepository.findAllByWriterIdOrderByCreatedAtDesc(userId, pageable)
+                .map(MarketPostListResponse::new);
+    }
+
+    // 게시글 상태 수정 (판매중, 예약중, 거래완료)
     @Transactional
     public void updatePostStatus(Long postId, Long userId, String statusStr) {
         MarketPost post = marketPostRepository.findById(postId)
@@ -157,7 +162,7 @@ public class MarketPostService {
         }
     }
 
-    // 게시글 삭제
+    // 게시글 삭제 (Soft Delete)
     @Transactional
     public void deletePost(Long postId, Long userId) {
         MarketPost post = marketPostRepository.findByIdIncludeDeleted(postId)
@@ -170,6 +175,7 @@ public class MarketPostService {
         }
 
         marketPostRepository.delete(post);
+        log.info("게시글 삭제 완료: ID={}", postId);
     }
 
     // 내가 찜한 게시글 목록 조회
@@ -177,29 +183,36 @@ public class MarketPostService {
         if (!userRepository.existsById(userId)) {
             throw new GlobalException(UserErrorCode.USER_NOT_FOUND);
         }
+
         return marketPostRepository.findLikedPostsByUserId(userId).stream()
                 .map(MarketPostListResponse::new)
                 .collect(Collectors.toList());
     }
 
-    // 권한 검증
+    // 권한 검증 공통 로직
     private void validateWriter(MarketPost post, Long userId) {
         if (!post.getWriter().getId().equals(userId)) {
-            log.warn("권한 없는 수정 시도: PostID={}, LoginUserID={}", post.getId(), userId);
+            log.warn("권한 없는 접근 시도: PostID={}, LoginUserID={}", post.getId(), userId);
             throw new GlobalException(MarketErrorCode.NOT_POST_OWNER);
         }
     }
 
     // 내부 이미지 업로드 로직
     private void uploadImages(MarketPost post, List<MultipartFile> images) {
-        if (images == null || images.isEmpty()) return;
+        if (images == null || images.isEmpty()) {
+            return;
+        }
 
         File dir = new File(uploadDir);
-        if (!dir.exists()) dir.mkdirs();
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
 
         for (int i = 0; i < images.size(); i++) {
             MultipartFile file = images.get(i);
-            if (file.isEmpty()) continue;
+            if (file.isEmpty()) {
+                continue;
+            }
 
             String originalFilename = file.getOriginalFilename();
             String ext = extractExt(originalFilename);
@@ -240,7 +253,9 @@ public class MarketPostService {
 
     private String extractExt(String originalFilename) {
         int pos = originalFilename.lastIndexOf(".");
-        if (pos == -1) return "";
+        if (pos == -1) {
+            return "";
+        }
         return originalFilename.substring(pos + 1).toLowerCase();
     }
 

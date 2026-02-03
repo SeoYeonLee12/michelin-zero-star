@@ -18,9 +18,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // [연결 URL] ws://localhost:8080/ws-stomp
         registry.addEndpoint("/ws-stomp")
-                .setAllowedOriginPatterns("*"); // 모든 출처 허용 (CORS)
+                .setAllowedOriginPatterns(
+                        "http://localhost:3000",
+                        "http://localhost:8080",
+                        "https://i14b208.p.ssafy.io",
+                        "https://www.i14b208.p.ssafy.io"
+                );
     }
 
     @Override

@@ -157,7 +157,13 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.addAllowedOriginPattern("*"); // 개발용 (실서버 배포 시 프론트 도메인으로 변경 해야함)
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+                "http://localhost:3000",          // 프론트 로컬
+                "http://localhost:8080",          // 백엔드 로컬
+                "https://i14b208.p.ssafy.io",     // 배포 서버 프론트
+                "https://www.i14b208.p.ssafy.io"  // (선택) www 서브도메인
+        ));
+
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(Collections.singletonList("*"));
         configuration.setAllowCredentials(true);
