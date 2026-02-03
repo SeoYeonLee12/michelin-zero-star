@@ -6,7 +6,7 @@ import com.michelin0.michelinzerostar.domain.market.dto.response.MarketPostDetai
 import com.michelin0.michelinzerostar.domain.market.dto.response.MarketPostListResponse;
 import com.michelin0.michelinzerostar.domain.market.entity.MarketPost;
 import com.michelin0.michelinzerostar.domain.market.entity.MarketPostImage;
-import com.michelin0.michelinzerostar.domain.market.entity.PostStatus; // Enum import 확인
+import com.michelin0.michelinzerostar.domain.market.entity.PostStatus;
 import com.michelin0.michelinzerostar.domain.market.repository.MarketPostRepository;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.domain.user.entity.UserProfile;
@@ -152,10 +152,10 @@ public class MarketPostService {
 
         validateWriter(post, userId);
 
-        // 1. 텍스트 정보 업데이트
+        // 텍스트 정보 업데이트
         post.update(request.getTitle(), request.getContent(), request.getPrice(), request.getMeetingPlace(), request.getCategory());
 
-        // 2. 이미지가 전달되었으면 기존 이미지 삭제 후 새 이미지 저장
+        // 이미지가 전달되었으면 기존 이미지 삭제 후 새 이미지 저장
         if (images != null && !images.isEmpty()) {
             // 기존 이미지 삭제
             post.getImages().clear();

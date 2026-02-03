@@ -261,11 +261,11 @@ CREATE TABLE chat_rooms
     post_id          BIGINT    NOT NULL,
     seller_id        BIGINT    NOT NULL,
     buyer_id         BIGINT    NOT NULL,
-    
+
     -- ★ [추가됨] 입장 시간 (나갔다 들어왔을 때 이전 대화 안 보이게 하기 위함)
     seller_joined_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     buyer_joined_at  TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-    
+
     -- ★ [추가됨] 퇴장 여부 (상대방이 나가도 내 목록엔 남아야 하므로)
     is_seller_left   TINYINT(1) NOT NULL DEFAULT 0,
     is_buyer_left    TINYINT(1) NOT NULL DEFAULT 0,

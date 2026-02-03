@@ -7,7 +7,7 @@ import com.michelin0.michelinzerostar.domain.market.dto.request.MarketPostUpdate
 import com.michelin0.michelinzerostar.domain.market.dto.response.MarketPostDetailResponse;
 import com.michelin0.michelinzerostar.domain.market.dto.response.MarketPostListResponse;
 import com.michelin0.michelinzerostar.domain.market.service.MarketPostService;
-import jakarta.validation.Valid; // ★ Import 필수
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;

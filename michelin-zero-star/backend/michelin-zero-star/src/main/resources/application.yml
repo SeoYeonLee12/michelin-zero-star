@@ -1,5 +1,4 @@
 server:
-  # [추가됨] 프록시/로드밸런서 뒤에서 실제 도메인(i14b208.p.ssafy.io)을 인식하기 위한 설정
   forward-headers-strategy: native
 
 spring:
@@ -16,10 +15,8 @@ spring:
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    # 도커 내부(3306)를 기본으로, 외부 환경 변수에 따라 유동적으로 접속
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:michelin-zero-star}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
 
-    # docker-compose.yml의 환경 변수명(DB_USER, DB_PW)과 일치시킴
     username: ${DB_USER:michelin-user}
     password: ${DB_PW:123}
 
@@ -86,7 +83,6 @@ kakao:
   rest-api-key: ${KAKAO_REST_API_KEY}
 
 file:
-  # 도커 환경(리눅스)을 고려하여 기본값을 유연하게 설정
   upload-dir: ${FILE_UPLOAD_DIR:/app/images}
 
 logging:
