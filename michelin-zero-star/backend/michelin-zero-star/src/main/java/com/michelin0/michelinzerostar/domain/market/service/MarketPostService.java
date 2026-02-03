@@ -144,15 +144,58 @@ public class MarketPostService {
                 .collect(Collectors.toList());
     }
 
-    // 게시글 내용 수정
+    // 게시글 내용 수정 (이미지 포함)
     @Transactional
-    public void updatePost(Long postId, Long userId, MarketPostUpdateRequest request) {
+    public void updatePost(Long postId, Long userId, MarketPostUpdateRequest request, List<MultipartFile> images) {
         MarketPost post = marketPostRepository.findById(postId)
                 .orElseThrow(() -> new GlobalException(MarketErrorCode.POST_NOT_FOUND));
 
         validateWriter(post, userId);
 
-        post.update(request.getTitle(), request.getContent(), request.getPrice(), request.getMeetingPlace(), request.getCategory());    }
+        // 1. 텍스트 정보 업데이트
+        post.update(request.getTitle(), request.getContent(), request.getPrice(), request.getMeetingPlace(), request.getCategory());
+
+        // 2. 이미지가 전달되었으면 기존 이미지 삭제 후 새 이미지 저장
+        if (images != null && !images.isEmpty()) {
+            // 기존 이미지 삭제
+            post.getImages().clear();
+
+            // 새 이미지 저장 (createPost와 동일한 로직)
+            File dir = new File(uploadDir);
+            if (!dir.exists()) {
+                boolean mkdirs = dir.mkdirs();
+                if (!mkdirs) log.error("디렉토리 생성 실패: {}", uploadDir);
+            }
+
+            for (int i = 0; i < images.size(); i++) {
+                MultipartFile file = images.get(i);
+                if (file.isEmpty()) continue;
+
+                String originalFilename = file.getOriginalFilename();
+                String ext = extractExt(originalFilename);
+                validateExtension(ext);
+
+                String storeFileName = UUID.randomUUID() + "." + ext;
+                String fullPath = Paths.get(uploadDir, storeFileName).toString();
+
+                try {
+                    file.transferTo(new File(fullPath));
+                    MarketPostImage image = MarketPostImage.builder()
+                            .imageUrl("/images/" + storeFileName)
+                            .orderIndex(i)
+                            .build();
+                    post.addImage(image);
+                } catch (IOException e) {
+                    log.error("이미지 저장 중 오류 발생: {}", e.getMessage());
+                    throw new RuntimeException("이미지 저장 중 오류가 발생했습니다.", e);
+                }
+            }
+
+            log.info("게시글 수정 완료 (이미지 {}장 포함): ID={}, Title={}", images.size(), post.getId(), post.getTitle());
+        } else {
+            log.info("게시글 수정 완료 (이미지 변경 없음): ID={}, Title={}", post.getId(), post.getTitle());
+        }
+    }
 
     // 게시글 상태 수정 (판매중, 예약중, 거래완료)
     @Transactional

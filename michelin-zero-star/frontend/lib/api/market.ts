@@ -84,10 +84,29 @@ export type MarketPostUpdateRequest = {
     category?: string  // ✅ 백엔드 필수 검증 통과용
 }
 
-export async function updatePost(postId: string, data: MarketPostUpdateRequest): Promise<string> {
+export async function updatePost(
+    postId: string,
+    postData: MarketPostUpdateRequest,
+    images?: File[]
+): Promise<string> {
+    const formData = new FormData()
+
+    // 1. Post 정보 (JSON blob)
+    const postBlob = new Blob([JSON.stringify(postData)], {
+        type: "application/json",
+    })
+    formData.append("post", postBlob)
+
+    // 2. 이미지 파일들 (선택사항)
+    if (images && images.length > 0) {
+        images.forEach((file) => {
+            formData.append("images", file)
+        })
+    }
+
     return apiFetch<string>(`/api/v1/market/posts/${postId}`, {
         method: "PUT",
-        body: JSON.stringify(data),
+        body: formData,
     })
 }
 
