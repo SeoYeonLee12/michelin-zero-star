@@ -120,6 +120,8 @@ export default function RecipeDetailPage() {
     try {
       setIsCookingLoading(true)
       const data = await getCookingModeDetails(recipeId)
+      console.log("🔍 Cooking Data:", data)
+      console.log("🔍 Steps:", data.steps)
       setCookingData(data)
       setViewState("cooking")
     } catch (error) {
@@ -163,7 +165,7 @@ export default function RecipeDetailPage() {
         <main className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-4">
             <h1 className="text-2xl font-bold">레시피를 찾을 수 없습니다</h1>
-            <p className="text-muted-foreground">요청하신 레시피가 존재하지 않거나 에러가 발생했습니다.</p>
+            <p className="text-muted-foreground">요청하신 레시피가 존재하지 않습니다.</p>
             <Button onClick={() => router.push("/recipes")} className="bg-[#800020] hover:bg-[#800020]/90">
               레시피 목록으로
             </Button>
@@ -218,6 +220,7 @@ export default function RecipeDetailPage() {
               </div>
 
               <StepCookMode
+                recipeId={Number(recipeId)}
                 steps={cookingData.steps.map(step => ({
                   id: step.recipeStepId,
                   stepNumber: step.stepNumber,
@@ -225,7 +228,7 @@ export default function RecipeDetailPage() {
                   description: step.stepDescription,
                   ingredients: [], // API doesn't provide step-specific ingredients
                   tools: [],      // API doesn't provide tools
-                  duration: step.timerSeconds,
+                  duration: step.timerSeconds || 60, // Fallback to 60 seconds
                   imageUrl: step.stepImageUrl,
                   tips: step.cookingTip || undefined,
                 }))}
@@ -239,6 +242,7 @@ export default function RecipeDetailPage() {
         </div>
       </main>
 
+      {/* Complete Dialog */}
       <CompleteCookDialog
         open={showCompleteDialog}
         onOpenChange={setShowCompleteDialog}
