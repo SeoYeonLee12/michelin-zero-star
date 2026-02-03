@@ -20,7 +20,7 @@ RUN ./gradlew dependencies --no-daemon
 
 # 소스 코드 복사 및 빌드 실행 (테스트는 생략 -x test)
 COPY src src
-RUN ./gradlew clean build -x test --no-daemon
+RUN ./gradlew clean compileJava build -x test --no-daemon
 
 # =======================================
 # 2. 실행 단계 (Runtime Stage)

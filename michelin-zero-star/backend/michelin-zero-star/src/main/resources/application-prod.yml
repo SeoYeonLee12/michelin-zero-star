@@ -27,3 +27,6 @@ logging:
     com.michelin0.michelinzerostar: INFO
     org.hibernate.SQL: OFF
     org.hibernate.type.descriptor.sql: OFF
+
+ai-server:
+  url: http://localhost:8000
