@@ -5,10 +5,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
+@RequiredArgsConstructor
+@EnableWebSocketMessageBroker
+@EnableWebSocket
 @Configuration
 @EnableWebSocketMessageBroker
 @RequiredArgsConstructor
@@ -18,9 +22,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // [연결 URL] ws://localhost:8080/ws-stomp
-        registry.addEndpoint("/ws-stomp")
-                .setAllowedOriginPatterns("*"); // 모든 출처 허용 (CORS)
+        // 웹소켓 연결 요청 경로
+        registry.addEndpoint(END_POINT)
+                .setAllowedOriginPatterns("*");
+//                .withSockJS();
     }
 
     @Override

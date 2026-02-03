@@ -1,0 +1,20 @@
+{
+  "user_id": 1,
+  "query": "지금 뚜껑 덮어야 해?",
+  "recipe_all_steps": [
+    {
+      "step_number": 1,
+      "description": "물을 끓입니다."
+    },
+    {
+      "step_number": 2,
+      "description": "면과 스프를 넣고 센 불에 끓입니다."
+    },
+    {
+      "step_number": 3,
+      "description": "파를 넣고 마무리합니다."
+    }
+  ],
+  "current_step": 2,
+  "chat_history": []
+}

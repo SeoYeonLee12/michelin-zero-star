@@ -152,13 +152,15 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // CORS 설정
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.addAllowedOriginPattern("*"); // 개발용 (실서버 배포 시 프론트 도메인으로 변경 해야함)
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        // [수정됨] 모든 출처 허용 (*).
+        // setAllowCredentials(true)와 함께 쓸 때는 setAllowedOrigins("*") 대신 Patterns를 써야 함
+        configuration.setAllowedOriginPatterns(Collections.singletonList("*"));
+        configuration.setAllowedMethods(
+                Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(Collections.singletonList("*"));
         configuration.setAllowCredentials(true);
         configuration.setExposedHeaders(Arrays.asList("Authorization", "Set-Cookie"));
