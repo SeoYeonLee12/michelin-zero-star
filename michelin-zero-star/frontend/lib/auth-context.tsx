@@ -373,6 +373,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // WS URL 동적 생성 (Path 제거 및 Origin만 사용)
     const getWsUrl = () => {
+      // 1. 브라우저 환경이고 Localhost가 아니면, 현재 도메인 사용 (배포 환경 우선)
+      if (typeof window !== "undefined") {
+        const hostname = window.location.hostname;
+        if (hostname !== "localhost" && hostname !== "127.0.0.1") {
+          const protocol = window.location.protocol === "https:" ? "wss://" : "ws://"
+          return `${protocol}${window.location.host}/ws-stomp`;
+        }
+      }
+
+      // 2. Localhost이거나 Server-side면 환경변수 확인
       const envUrl = process.env.NEXT_PUBLIC_WS_URL
       if (envUrl) return envUrl
 
@@ -387,15 +397,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error("Invalid API Base URL", e)
       }
 
-      // Fallback: 브라우저 현재 호스트 기준
-      if (typeof window !== "undefined") {
-        const protocol = window.location.protocol === "https:" ? "wss://" : "ws://"
-        return `${protocol}${window.location.host}/ws/connect`
-      }
-
-      // Fallback for local development or when no API_BASE_URL/window is available
-      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
-      return `${baseUrl}/ws-stomp`
+      // 3. 최후의 수단: Localhost Default
+      return "ws://localhost:8080/ws-stomp"
     }
 
     const wsUrl = getWsUrl()
