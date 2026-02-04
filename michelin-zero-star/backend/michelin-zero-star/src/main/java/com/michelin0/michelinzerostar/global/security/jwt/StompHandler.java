@@ -10,7 +10,6 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
-import org.springframework.security.access.AccessDeniedException; // ★ 추가된 Import
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
@@ -24,27 +23,40 @@ public class StompHandler implements ChannelInterceptor {
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
-        StompHeaderAccessor accessor =
-                MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+        StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message,
+                StompHeaderAccessor.class);
 
-        // CONNECT 명령일 때만 토큰 검증 및 인증 정보 저장
         if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
+            // 🔍 [디버깅] 연결 요청이 들어옴을 로그로 확인
+            log.info("STOMP CONNECT 요청 들어옴");
 
-            String authorizationHeader = accessor.getFirstNativeHeader("Authorization");
-            String token = null;
+            try {
+                String authorizationHeader = accessor.getFirstNativeHeader("Authorization");
+                log.info("Authorization Header: {}", authorizationHeader); // 헤더가 오는지 확인
 
-            if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
-                token = authorizationHeader.substring(7);
-            }
+                if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+                    String token = authorizationHeader.substring(7);
 
-            // 토큰 유효성 검증
-            if (token != null && jwtTokenProvider.validateToken(token)) {
-                Authentication authentication = jwtTokenProvider.getAuthentication(token);
-                accessor.setUser(authentication); // 인증 객체 저장
-                log.info("WS CONNECT: 유저 인증 성공 - {}", authentication.getName());
-            } else {
-                log.error("WS CONNECT: 유저 인증 실패 (유효하지 않은 토큰)");
-                throw new AccessDeniedException("유효하지 않은 토큰입니다.");
+                    if (jwtTokenProvider.validateToken(token)) {
+                        Authentication authentication = jwtTokenProvider.getAuthentication(token);
+                        accessor.setUser(authentication);
+                        log.info("STOMP 인증 성공: {}", authentication.getName());
+                    } else {
+                        // 토큰이 유효하지 않음
+                        log.error("STOMP 토큰 유효성 검사 실패");
+                        throw new RuntimeException("Invalid JWT Token");
+                    }
+                } else {
+                    // 헤더가 없거나 형식이 틀림
+                    log.error("STOMP Authorization 헤더가 없음 또는 형식 불일치");
+                    // 필요 시 에러를 던져서 연결 거부
+                    // throw new RuntimeException("Authorization header is missing");
+                }
+            } catch (Exception e) {
+                // 🚨 여기서 에러를 잡아서 로그를 찍어야 콘솔에 보입니다!
+                log.error("STOMP 연결 중 에러 발생: {}", e.getMessage());
+                e.printStackTrace(); // 상세 에러 스택 출력
+                throw e; // 에러를 다시 던져서 클라이언트에게 에러 프레임 전송
             }
         }
         return message;
