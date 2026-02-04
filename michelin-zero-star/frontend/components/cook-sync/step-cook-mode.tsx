@@ -578,8 +578,10 @@ export function StepCookMode({
 
           // 소켓 전송
           if (stompClientRef.current && stompClientRef.current.connected) {
+            const token = getGlobalAccessToken()
             stompClientRef.current.publish({
               destination: "/app/recipes/ask",
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
               body: JSON.stringify({
                 content: raw,
                 recipeId,
@@ -705,8 +707,10 @@ export function StepCookMode({
     setAiTurnSafe("thinking")
 
     if (stompClientRef.current && stompClientRef.current.connected) {
+      const token = getGlobalAccessToken()
       stompClientRef.current.publish({
         destination: "/app/recipes/ask",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: JSON.stringify({
           content: userText,
           recipeId,
