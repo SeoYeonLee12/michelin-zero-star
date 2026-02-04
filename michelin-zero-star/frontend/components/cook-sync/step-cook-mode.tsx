@@ -3,7 +3,10 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import * as SpeechSDK from "microsoft-cognitiveservices-speech-sdk"
+import { Client } from "@stomp/stompjs"
 import { completeCooking } from "@/lib/api/cook-mode"
+import { fetchCookingChatHistory } from "@/lib/cooking-chat-api"
+import { getGlobalAccessToken } from "@/lib/api/client"
 import {
   Play,
   Pause,
@@ -257,10 +260,16 @@ export function StepCookMode({
   // AI 플로팅
   const [aiOpen, setAiOpen] = React.useState(false)
   const [aiInput, setAiInput] = React.useState("")
+  // aiMessages: { role, content } 구조 유지하되, 서버 이력과 통합
   const [aiMessages, setAiMessages] = React.useState<Array<{ role: "user" | "ai"; content: string }>>([
-    { role: "ai", content: "요리 중 궁금한 걸 말씀해 주세요. (예: '다음 단계 요약해줘')" },
+    // 초기 환영 메시지 제거/또는 유지 -> 서버 히스토리 로딩 후 결정
+    // { role: "ai", content: "요리 중 궁금한 걸 말씀해 주세요. (예: '다음 단계 요약해줘')" },
   ])
   const aiEndRef = React.useRef<HTMLDivElement>(null)
+
+  // STOMP Client
+  const stompClientRef = React.useRef<Client | null>(null)
+  const [isConnected, setIsConnected] = React.useState(false)
 
   // 상태 refs (클로저 안전)
   const stepIndexRef = React.useRef(currentStepIndex)
@@ -281,6 +290,74 @@ export function StepCookMode({
   React.useEffect(() => { timerSecondsRef.current = timerSeconds }, [timerSeconds])
   React.useEffect(() => { aiVoiceEnabledRef.current = aiVoiceEnabled }, [aiVoiceEnabled])
   React.useEffect(() => { aiTurnRef.current = aiTurn }, [aiTurn])
+
+  // 0. 초기 히스토리 로드
+  React.useEffect(() => {
+    fetchCookingChatHistory(recipeId)
+      .then((res) => {
+        // 과거 기록 역순? 정순? -> 보통 최신이 위 or 아래. 
+        // prompt 예시: aiChatMessageId 10, 9, 4, 3 ... (내림차순으로 옴)
+        // 화면 표출은 [오래된 것 ... 최신 것] 순이 자연스러움
+        // res.aiChatHistories 가 내림차순이라 가정하고 reverse
+        const history = [...res.aiChatHistories].reverse().map((msg) => ({
+          role: msg.senderType === "AI" ? ("ai" as const) : ("user" as const),
+          content: msg.content,
+        }))
+        setAiMessages(history)
+      })
+      .catch((err) => console.error("히스토리 로드 실패:", err))
+  }, [recipeId])
+
+  // 1. 소켓 연결
+  React.useEffect(() => {
+    const token = getGlobalAccessToken()
+    const client = new Client({
+      brokerURL: "ws://localhost:8080/ws-stomp", // Backend defaults to port 8080, endpoint defined in WebSocketConfig
+      connectHeaders: {
+        Authorization: `Bearer ${token}`,
+      },
+      // debug: (str) => console.log(str),
+      reconnectDelay: 5000,
+      onConnect: () => {
+        setIsConnected(true)
+        console.log("STOMP Connected")
+
+        // 구독
+        client.subscribe(`/topic/recipe/${recipeId}`, (message) => {
+          if (message.body) {
+            const body = JSON.parse(message.body)
+            // { content: "...", senderType: "USER" | "AI", ... }
+            if (body.senderType === "AI") {
+              setAiMessages((prev) => [...prev, { role: "ai", content: body.content }])
+              setAiTurnSafe("listening") // AI 응답 오면 듣기 모드 복귀? (기획 확인 필요하나 일단 자연스러움)
+            } else if (body.senderType === "USER") {
+              // 내 메시지도 소켓으로 오면 여기서 추가? 
+              // 보통 optimistic update 로 내가 보낸 건 미리 추가함.
+              // 중복 방지 로직이 필요할 수도 있음. 일단은 내가 보낸건 aiSend에서 추가하니 여기선 AI만 처리하거나
+              // 혹은 aiSend에선 추가 안하고 여기서만 받아도 됨. (반응 속도 차이)
+              // prompt 요청사항엔 "응답 페이로드"가 있고 senderType: USER 도 있음.
+              // 즉, 내가 보낸 것도 에코로 올 수 있음.
+              // 중복 추가 방지를 위해 일단 여기서는 'AI' 것만 처리하거나,
+              // handleAiSend에서 낙관적 업데이트를 안하거나 해야 함.
+              // 편의상 handleAiSend에서 "낙관적 추가"를 하고, 여기서는 USER 타입은 무시하도록 함(중복 방지).
+              // 만약 다른 기기에서 보낸 거라면 받아야겠지만.. 일단 무시.
+            }
+          }
+        })
+      },
+      onStompError: (frame) => {
+        console.error("Broker reported error: " + frame.headers["message"])
+        console.error("Additional details: " + frame.body)
+      },
+    })
+
+    client.activate()
+    stompClientRef.current = client
+
+    return () => {
+      client.deactivate()
+    }
+  }, [recipeId])
 
   // 중복 명령 방지
   const lastIntentRef = React.useRef<{ type: string; ts: number }>({ type: "", ts: 0 })
@@ -449,9 +526,9 @@ export function StepCookMode({
           return
         }
 
-        // ===== 채팅 처리 =====
+        // ===== 채팅 처리 (음성) =====
         if (intent.type === "CHAT") {
-          // 채팅 열려있고 + 음성모드 + listening일 때만 서버로 전송
+          // 채팅 열려있고 + 음성모드 + listening일 때만 전송
           if (!aiOpenRef.current) return
           if (!aiVoiceEnabledRef.current) return
           if (aiTurnRef.current !== "listening") return
@@ -459,19 +536,22 @@ export function StepCookMode({
           const raw = intent.text.trim()
           if (!raw) return
 
+          // 낙관적 UI 업데이트
           setAiMessages((prev) => [...prev, { role: "user", content: raw }])
           setAiTurnSafe("thinking")
 
-          try {
-            const res = await postCookingChat({
-              recipeId,
-              currentStepIndex: stepIndexRef.current,
-              message: raw,
+          // 소켓 전송
+          if (stompClientRef.current && stompClientRef.current.connected) {
+            stompClientRef.current.publish({
+              destination: "/pub/recipes/ask",
+              body: JSON.stringify({
+                content: raw,
+                recipeId,
+                currentStepNumber: stepIndexRef.current + 1 // 1-based index 인지 확인 (UI상 STEP 1부터 시작하므로 +1)
+              })
             })
-            setAiMessages((prev) => [...prev, { role: "ai", content: res.answer }])
-          } catch {
-            setAiMessages((prev) => [...prev, { role: "ai", content: "서버 응답을 받지 못했어요." }])
-          } finally {
+          } else {
+            setAiMessages((prev) => [...prev, { role: "ai", content: "서버와 연결되지 않았습니다." }])
             setAiTurnSafe("listening")
           }
         }
@@ -578,24 +658,27 @@ export function StepCookMode({
   }
 
   // ===== AI 메시지 전송(키보드/버튼) =====
-  const handleAiSend = async () => {
+  // ===== AI 메시지 전송(키보드/버튼) =====
+  const handleAiSend = () => {
     if (!aiInput.trim()) return
     const userText = aiInput.trim()
 
+    // 낙관적 업데이트
     setAiMessages((prev) => [...prev, { role: "user", content: userText }])
     setAiInput("")
     setAiTurnSafe("thinking")
 
-    try {
-      const res = await postCookingChat({
-        recipeId,
-        currentStepIndex: stepIndexRef.current,
-        message: userText,
+    if (stompClientRef.current && stompClientRef.current.connected) {
+      stompClientRef.current.publish({
+        destination: "/app/recipes/ask",
+        body: JSON.stringify({
+          content: userText,
+          recipeId,
+          currentStepNumber: stepIndexRef.current + 1
+        })
       })
-      setAiMessages((prev) => [...prev, { role: "ai", content: res.answer }])
-    } catch {
-      setAiMessages((prev) => [...prev, { role: "ai", content: "서버 연결에 실패했어요. 잠시 후 다시 시도해 주세요." }])
-    } finally {
+    } else {
+      setAiMessages((prev) => [...prev, { role: "ai", content: "채팅 서버 미연결 상태입니다." }])
       setAiTurnSafe("listening")
     }
   }
