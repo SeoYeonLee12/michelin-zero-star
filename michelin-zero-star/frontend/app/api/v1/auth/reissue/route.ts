@@ -1,4 +1,3 @@
-// michelin-zero-star\frontend\app\api\v1\auth\reissue\route.ts
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 
@@ -14,27 +13,8 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // ✅ [핵심 수정] Docker 환경에 맞는 백엔드 주소 설정 로직
-        // 1. 환경변수 INTERNAL_API_URL이 있으면 최우선 사용 (docker-compose에서 설정한 값)
-        // 2. 없으면 Docker 기본 서비스명인 'backend' 시도
-        // 3. 로컬 개발(Docker 아님)일 경우를 대비해 localhost 유지
-
-        // 3. 백엔드 응답 처리
-        const rawText = await response.text()
-        let data
-        try {
-            data = JSON.parse(rawText)
-        } catch (jsonError) {
-            console.error("[Reissue] Non-JSON response:", rawText)
-
-            // 리프레시 실패 시 쿠키 삭제
-            cookieStore.delete("refreshToken")
-
-            return NextResponse.json(
-                { message: rawText || "토큰 재발급 실패" },
-                { status: response.status || 401 }
-            )
-        }
+        // 1. Backend URL 설정
+        let backendUrl = process.env.INTERNAL_API_URL
 
         if (!backendUrl) {
             // Docker 환경에서 localhost는 127.0.0.1이 아니라 서비스명을 써야 함
@@ -46,8 +26,7 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // console.log(`[Reissue API] Requesting to: ${backendUrl}/auth/reissue`);
-
+        // 2. 백엔드 요청
         try {
             const response = await fetch(`${backendUrl}/auth/reissue`, {
                 method: "POST",
@@ -57,7 +36,7 @@ export async function POST(request: NextRequest) {
                 },
             })
 
-            // 응답 처리 (JSON / Text 분기)
+            // 3. 응답 처리
             const contentType = response.headers.get("content-type")
             let data
             if (contentType && contentType.includes("application/json")) {
@@ -69,11 +48,12 @@ export async function POST(request: NextRequest) {
 
             if (!response.ok) {
                 console.warn("[Reissue API] Refresh Failed:", data)
+                // 유효하지 않은 토큰이면 쿠키 삭제
                 cookieStore.delete("refreshToken")
                 return NextResponse.json(data, { status: response.status })
             }
 
-            // 쿠키 갱신
+            // 4. 쿠키 갱신 (Backend가 Set-Cookie를 준다면)
             const setCookieHeader = response.headers.get("set-cookie")
             if (setCookieHeader) {
                 const refreshTokenMatch = setCookieHeader.match(/refreshToken=([^;]+)/)
@@ -91,26 +71,31 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(data, { status: 200 })
 
         } catch (fetchError) {
-            // backend:8080 연결 실패 시 host.docker.internal로 재시도 (로컬 Docker Desktop용)
             console.warn(`[Reissue API] 1차 시도 실패 (${backendUrl})... host.docker.internal로 재시도합니다.`);
 
+            // Fallback: 로컬 Docker Desktop 환경용
             const fallbackUrl = "http://host.docker.internal:8080/api/v1";
-            const response = await fetch(`${fallbackUrl}/auth/reissue`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Cookie: `refreshToken=${refreshToken}`,
-                },
-            })
+            try {
+                const response = await fetch(`${fallbackUrl}/auth/reissue`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Cookie: `refreshToken=${refreshToken}`,
+                    },
+                })
 
-            const data = await response.json().catch(() => ({ message: "Fallback parsing error" }));
-            return NextResponse.json(data, { status: 200 });
+                const data = await response.json()
+                return NextResponse.json(data, { status: 200 });
+            } catch (fallbackError) {
+                console.error("[Reissue API] Backend Unreachable:", fallbackError)
+                return NextResponse.json({ message: "Backend Unreachable" }, { status: 502 })
+            }
         }
 
     } catch (error) {
         console.error("[Reissue API Route] Fatal Error:", error)
         return NextResponse.json(
-            { message: "Internal Server Error (Backend Connection Failed)" },
+            { message: "Internal Server Error (Reissue Route)" },
             { status: 500 }
         )
     }

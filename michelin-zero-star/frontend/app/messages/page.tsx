@@ -4,7 +4,7 @@
 import React, { useEffect, useState, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
-import { Send, MessageCircle, ChevronLeft, ChevronRight, LogOut, Plus, X } from "lucide-react"
+import { Send, MessageCircle, ChevronLeft, ChevronRight, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Navbar } from "@/components/cook-sync/navbar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -21,7 +21,7 @@ export default function MessagesPage() {
     conversations,
     currentMessages,
     enterChatRoom,
-    exitChatRoom, // Destructure this to separate scope!
+    exitChatRoom,
     sendMessage,
     deleteConversation
   } = useAuth()
@@ -32,13 +32,13 @@ export default function MessagesPage() {
   // 현재 선택된 방 ID
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
 
+  // State for message input
   const [messageText, setMessageText] = useState("")
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const isValidId = (id: string | null | undefined): boolean => {
     return !!id && id !== "undefined" && id !== "null" && !isNaN(Number(id));
@@ -49,80 +49,70 @@ export default function MessagesPage() {
     if (!isLoggedIn) router.push("/login")
   }, [isLoggedIn, router])
 
-  // 2. URL 변경 감지하여 방 입장 (★ 핵심: URL이 바뀌면 자동으로 방 입장)
+  // 2. URL 변경 감지하여 방 입장 (★ 핵심: URL이 바뀌면 자동으로 방 입장, 없으면 퇴장)
   useEffect(() => {
     const paramRoomId = searchParams.get("roomId")
 
     // URL에 roomId가 있고, 현재 선택된 방과 다르면 입장 시도
-    if (isValidId(paramRoomId) && paramRoomId !== selectedRoomId) {
-      console.log(`🔄 URL 변경 감지: 방 ${paramRoomId} 입장`);
-      setSelectedRoomId(paramRoomId!)
-      enterChatRoom(paramRoomId!)
+    if (isValidId(paramRoomId)) {
+      if (paramRoomId !== selectedRoomId) {
+        console.log(`🔄 URL 변경 감지: 방 ${paramRoomId} 입장`);
+        setSelectedRoomId(paramRoomId!)
+        enterChatRoom(paramRoomId!)
+      }
+    } else {
+      // URL에 roomId가 없으면 선택 해제 (나가기 처리 후)
+      if (selectedRoomId) {
+        console.log("🔄 URL 변경 감지: 방 선택 해제");
+        setSelectedRoomId(null)
+        exitChatRoom()
+      }
     }
   }, [searchParams, selectedRoomId])
 
-  // ★ 페이지 언마운트 감지하여 채팅방 나가기 (Cleanup)
+  // 페이지 언마운트 감지하여 채팅방 나가기 (Cleanup)
   useEffect(() => {
-    // 컴포넌트 마운트 시에는 아무것도 안함
-
-    // 언마운트 시 cleanup 실행
     return () => {
       console.log("👋 MessagesPage Unmount -> Calling exitChatRoom");
-      exitChatRoom(); // 이제 정의되어 있으므로 호출 가능
+      exitChatRoom();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // 빈 배열: 마운트/언마운트 시에만 실행
+  }, [])
 
   // 자동 스크롤
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [currentMessages])
 
-  // ★ 방 선택 핸들러 (클릭 시 실행)
-  // ★ 방 선택 핸들러 (클릭 시 실행)
+  // 방 선택 핸들러
   const handleSelectConversation = (roomId: string) => {
     if (!isValidId(roomId)) return;
-
-    // 이미 같은 방이면 무시
     if (roomId === selectedRoomId) return;
 
-    setSelectedRoomId(roomId)
-    enterChatRoom(roomId) // 즉시 입장
-
-    // URL 업데이트 (페이지 이동 느낌을 주면서 리로드 없이 상태 변경)
+    // URL만 변경하면 useEffect가 감지하여 처리함
     const newUrl = new URL(window.location.href);
     newUrl.searchParams.set("roomId", roomId);
-    window.history.pushState({}, "", newUrl);
+    router.replace(newUrl.pathname + newUrl.search)
   }
 
   const handleSend = () => {
-    if (!isValidId(selectedRoomId) || (!messageText.trim() && !imagePreview)) return
+    if (!isValidId(selectedRoomId) || !messageText.trim()) return
 
-    const content = imagePreview ? `[이미지:${imagePreview}]${messageText}` : messageText
+    const content = messageText
     sendMessage(selectedRoomId!, content)
-
     setMessageText("")
-    setImagePreview(null)
   }
 
   const handleDeleteConversation = async () => {
     if (selectedRoomId) {
-      await deleteConversation(selectedRoomId)
+      const roomIdToDelete = selectedRoomId;
       setDeleteDialogOpen(false)
-      setSelectedRoomId(null)
-      // URL에서도 파라미터 제거
-      const newUrl = new URL(window.location.href);
-      newUrl.searchParams.delete("roomId");
-      window.history.pushState({}, "", newUrl);
-    }
-  }
+      // setSelectedRoomId(null) -> Race Condition 방지를 위해 제거 (URL 변경 시 useEffect가 처리)
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => setImagePreview(reader.result as string)
-      reader.readAsDataURL(file)
+      await deleteConversation(roomIdToDelete)
+
+      // Use router to update URL so searchParams hook updates correctly
+      router.replace("/messages")
     }
   }
 
@@ -184,7 +174,6 @@ export default function MessagesPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center mb-1">
                       <p className="font-medium text-sm truncate">{conv.recipientName}</p>
-                      {/* 현재 선택된 방은 뱃지 숨김 (이미 읽었으므로) */}
                       {conv.unreadCount > 0 && selectedRoomId !== conv.id && (
                         <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-[#800020] text-xs text-white flex items-center justify-center">
                           {conv.unreadCount}
@@ -271,7 +260,12 @@ export default function MessagesPage() {
                           {content}
                         </div>
                         <span className="text-[10px] text-gray-400 mb-1 shrink-0">
-                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {(() => {
+                            const timeStr = msg.timestamp;
+                            // If timestamp is ISO string without Z (e.g. from Java LocalDateTime), treat as UTC
+                            const date = new Date(timeStr.endsWith("Z") ? timeStr : timeStr + "Z");
+                            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                          })()}
                         </span>
                       </div>
                     </div>
@@ -282,20 +276,7 @@ export default function MessagesPage() {
             </div>
 
             <div className="p-4 bg-white border-t">
-              {imagePreview && (
-                <div className="mb-2 relative inline-block">
-                  <Image src={imagePreview} alt="Preview" width={80} height={80} className="rounded-lg border" />
-                  <button onClick={() => setImagePreview(null)} className="absolute -top-2 -right-2 bg-gray-500 text-white rounded-full p-0.5">
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              )}
               <div className="flex gap-2">
-                <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} className="shrink-0">
-                  <Plus className="h-5 w-5 text-gray-500" />
-                </Button>
-                <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
-
                 <Input
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}
@@ -303,7 +284,7 @@ export default function MessagesPage() {
                   placeholder="메시지 입력..."
                   className="rounded-full bg-gray-100 border-none focus-visible:ring-1 focus-visible:ring-[#800020]"
                 />
-                <Button onClick={handleSend} disabled={!messageText.trim() && !imagePreview} className="rounded-full bg-[#800020] hover:bg-[#800020]/90 w-10 h-10 p-0 shrink-0">
+                <Button onClick={handleSend} disabled={!messageText.trim()} className="rounded-full bg-[#800020] hover:bg-[#800020]/90 w-10 h-10 p-0 shrink-0">
                   <Send className="h-4 w-4 text-white" />
                 </Button>
               </div>

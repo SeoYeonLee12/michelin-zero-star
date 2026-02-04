@@ -686,6 +686,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const startChatFromPost = async (postId: number): Promise<string> => {
     try {
       const roomId = await createOrEnterChatRoom(postId);
+      await fetchConversations(); // ✅ Refresh list to get partner name immediately
       return String(roomId);
     } catch (error) {
       console.error("Failed to start chat from post", error);
@@ -699,6 +700,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setConversations(prev => prev.filter(c => c.id !== roomId));
       if (currentRoomIdRef.current === roomId) {
         exitChatRoom();
+        setCurrentMessages([]); // ✅ Clear messages from view
       }
     } catch (error) {
       console.error(error);
@@ -845,7 +847,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         reviewedRecipes, markRecipeAsReviewed, hasUserReviewedRecipe,
       }}
     >
-      {children}
+      {isLoading ? null : children}
     </AuthContext.Provider>
   )
 }

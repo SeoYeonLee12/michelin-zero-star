@@ -41,7 +41,9 @@ interface NavbarProps {
 
 function formatKST(isoString?: string) {
   if (!isoString) return ""
-  const d = new Date(isoString)
+  // If timestamp is ISO string without Z, treat as UTC
+  const timeStr = isoString.endsWith("Z") ? isoString : isoString + "Z"
+  const d = new Date(timeStr)
   if (Number.isNaN(d.getTime())) return ""
 
   return new Intl.DateTimeFormat("ko-KR", {
