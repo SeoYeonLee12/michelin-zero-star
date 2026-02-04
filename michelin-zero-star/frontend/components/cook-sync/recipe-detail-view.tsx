@@ -9,11 +9,11 @@ import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import type { Recipe } from "@/lib/types"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import {
   Clock,
   Users,
@@ -35,6 +35,8 @@ import {
   Flame,
   Lock,
   CheckCircle,
+  Activity,
+  Star,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
@@ -97,6 +99,37 @@ function AnimatedNumber({ value, prevValue }: { value: number; prevValue: number
   )
 }
 
+function StarRating({ rating, onRatingChange, disabled }: { rating: number; onRatingChange: (r: number) => void; disabled?: boolean }) {
+  return (
+    <div className={cn("flex items-center gap-1", disabled && "opacity-60")}>
+      {Array.from({ length: 5 }).map((_, i) => {
+        const star = i + 1
+        const filled = rating >= star
+
+        return (
+          <button
+            key={star}
+            type="button"
+            onClick={() => !disabled && onRatingChange(star)}
+            disabled={disabled}
+            className={cn(
+              "transition-transform",
+              disabled ? "cursor-not-allowed" : "hover:scale-110",
+            )}
+          >
+            <img
+              src={filled ? "/michelin-full-star.png" : "/michelin-star.png"}
+              alt="미슐랭"
+              className={cn("h-5 w-5", !filled && "opacity-30")}
+              draggable={false}
+            />
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 const mockComments = [
   {
     id: 1,
@@ -154,9 +187,10 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
   const [recipeRating, setRecipeRating] = React.useState(4.5)
   const [nutritionOpen, setNutritionOpen] = React.useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = React.useState(false)
 
   const handleEditRecipe = () => {
-    router.push(`/recipes/${recipe.id}/edit`)
+    router.push(`/recipes/new?id=${recipe.id}`)
   }
 
   const handleDeleteRecipe = async () => {
@@ -339,14 +373,14 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
                 key={idx}
                 src="/michelin-star.png"
                 alt="미슐랭 빈"
-                className="h-5 w-5 opacity-30"
+                className="h-5 w-5"
                 draggable={false}
               />
             )
           })}
         </div>
 
-        {rating > 0 && <span className="text-sm text-[#800020] font-medium">{rating.toFixed(1)}</span>}
+        <span className="text-sm text-[#800020] font-medium">{rating.toFixed(1)}</span>
       </div>
     )
   }
@@ -362,17 +396,48 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        {/* Left: Image (70% size) */}
-        <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-muted shadow-lg w-[85%]">
-          <Image src={recipe.thumbnail || "/placeholder.svg"} alt={recipe.name} fill className="object-cover" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+        {/* Left: Image (5:5 ratio) */}
+        <div className="relative aspect-square sm:aspect-[4/3] rounded-3xl overflow-hidden bg-muted shadow-2xl group">
+          <Image src={recipe.thumbnail || "/placeholder.svg"} alt={recipe.name} fill className="object-cover transition-transform duration-700 group-hover:scale-105" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
         </div>
 
         {/* Right: Info */}
         <div className="space-y-4">
           <div className="space-y-2">
             <h1 className="text-2xl font-bold">{recipe.name}</h1>
-            {recipe.description && <p className="text-sm text-muted-foreground line-clamp-2">{recipe.description}</p>}
+            {recipe.description && (
+              <div>
+                {!isDescriptionExpanded ? (
+                  <div>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {recipe.description}
+                    </p>
+                    {recipe.description.length > 100 && (
+                      <button
+                        onClick={() => setIsDescriptionExpanded(true)}
+                        className="text-xs text-[#800020] hover:underline mt-1 font-medium"
+                      >
+                        전체보기
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="relative animate-in slide-in-from-top-1 fade-in duration-200 w-full">
+                    <div className="min-h-[200px] max-h-[400px] overflow-y-auto overflow-x-hidden p-4 border rounded-xl bg-muted/30 text-sm text-muted-foreground whitespace-pre-wrap break-all leading-relaxed shadow-sm">
+                      {recipe.description}
+                    </div>
+                    <button
+                      onClick={() => setIsDescriptionExpanded(false)}
+                      className="text-xs text-[#800020] hover:underline mt-1 font-medium"
+                    >
+                      접기
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -417,7 +482,11 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <Clock className="h-4 w-4 text-[#800020]" />
-              <span>{formatCookTime(recipe.duration)}</span>
+              <span>
+                {formatCookTime(
+                  recipe.steps.reduce((acc, step) => acc + (step.duration || 0), 0) || recipe.duration
+                )}
+              </span>
             </div>
             <div className="flex items-center gap-1.5">
               <Users className="h-4 w-4 text-[#800020]" />
@@ -435,7 +504,7 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
                   </CollapsibleTrigger>
                   <CollapsibleContent className="absolute mt-2 z-10">
                     <div className="p-3 bg-card border rounded-lg shadow-lg text-xs space-y-1 min-w-[200px]">
-                      <p className="font-medium text-foreground mb-2">영양정보 (1인분 기준)</p>
+                      <p className="font-medium text-foreground mb-2">영양정보</p>
                       {recipe.nutrition ? (
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                           {recipe.nutrition.protein !== undefined && (
@@ -474,6 +543,18 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
                               <span className="font-medium">{recipe.nutrition.sugar}g</span>
                             </div>
                           )}
+                          {recipe.nutrition.cholesterol !== undefined && (
+                            <div className="flex justify-between">
+                              <span>콜레스테롤</span>
+                              <span className="font-medium">{recipe.nutrition.cholesterol}mg</span>
+                            </div>
+                          )}
+                          {recipe.nutrition.calcium !== undefined && (
+                            <div className="flex justify-between">
+                              <span>칼슘</span>
+                              <span className="font-medium">{recipe.nutrition.calcium}mg</span>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <p className="text-muted-foreground">영양정보가 없습니다</p>
@@ -484,23 +565,6 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
               </div>
             )}
           </div>
-
-          {/* ✅ 여기: 레시피 평점 표시 (부분 채움 반영) */}
-          {renderRecipeRatingFlowers(Number(recipe.averageRating ?? 0))}
-
-          {filteredTags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {filteredTags.map((tag) => (
-                <Badge
-                  key={tag}
-                  variant="secondary"
-                  className="rounded-full font-normal text-xs bg-[#800020]/10 text-[#800020]"
-                >
-                  #{tag}
-                </Badge>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
@@ -524,32 +588,66 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
 
       <div className="space-y-4">
         <h2 className="text-base font-bold text-[#800020]">레시피</h2>
-        <div className="space-y-0">
-          {recipe.steps.map((step, idx) => (
-            <div key={step.id}>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start py-4">
-                <div className="relative aspect-[4/3] rounded-lg overflow-hidden bg-muted shadow-sm w-full max-w-[200px]">
-                  <Image
-                    src={step.imageUrl || "/placeholder.svg"}
-                    alt={`Step ${step.stepNumber}`}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-lg font-bold text-[#800020]">STEP {step.stepNumber}</h3>
-                  <p className="text-base text-foreground leading-relaxed">{step.description}</p>
-                  {step.tips && (
-                    <div className="flex items-start gap-2 p-3 rounded-lg bg-[#800020]/5 border border-[#800020]/10">
-                      <Lightbulb className="h-4 w-4 shrink-0 mt-0.5 text-[#800020]" />
-                      <span className="text-sm text-foreground">{step.tips}</span>
+        <div className="relative space-y-0 pl-1 sm:pl-4">
+          {/* Simple Modern Timeline Line */}
+          <div className="absolute left-[23px] sm:left-[31px] top-10 bottom-10 w-px bg-gray-200" />
+
+          {recipe.steps.map((step, idx) => {
+            // TIP Extraction Logic
+            const tipMatch = step.description.match(/\[TIP\]\s*(.*)/i);
+            const cleanDescription = tipMatch ? step.description.replace(/\[TIP\].*/i, "").trim() : step.description;
+            const extractedTip = tipMatch ? tipMatch[1].trim() : step.tips;
+
+            return (
+              <div key={step.id} className="relative group pb-12 last:pb-4">
+                <div className="flex flex-col md:flex-row gap-8 items-start">
+                  {/* Minimal Step Number Badge */}
+                  <div className="relative z-10 flex-shrink-0 mt-2">
+                    <div className="w-12 h-12 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center transition-colors group-hover:border-[#800020]/30 group-hover:bg-[#800020] group-hover:text-white duration-300">
+                      <span className="text-lg font-bold">{step.stepNumber}</span>
                     </div>
-                  )}
+                  </div>
+
+                  {/* Minimal Step Plate (No cards, no tags) */}
+                  <div className="flex-1 w-full flex flex-col lg:flex-row gap-8 items-start">
+                    {step.imageUrl && (
+                      <div className="relative w-full lg:w-[240px] aspect-[4/3] rounded-2xl overflow-hidden bg-muted shadow-sm hover:shadow-md transition-shadow">
+                        <Image
+                          src={step.imageUrl}
+                          alt={`Step ${step.stepNumber}`}
+                          fill
+                          className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex-1 flex flex-col justify-center space-y-5 pt-1">
+                      <p className="text-base sm:text-lg text-foreground/90 leading-relaxed font-normal">
+                        {cleanDescription}
+                      </p>
+
+                      {extractedTip && (
+                        <div className="flex items-center gap-4 py-3 px-5 rounded-2xl bg-[#800020]/5 border border-[#800020]/5 hover:border-[#800020]/15 transition-all duration-300">
+                          <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-white shadow-sm border border-[#800020]/10">
+                            <Image
+                              src="/chef-tip.png"
+                              alt="Tip icon"
+                              fill
+                              className="object-contain p-1"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-extrabold text-[#800020] tracking-wider uppercase text-[9px] opacity-70">Expert Tip</span>
+                            <span className="text-sm text-foreground/80 font-medium leading-normal">{extractedTip}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-              {idx < recipe.steps.length - 1 && <Separator className="my-2" />}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -562,7 +660,7 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
             <MessageCircle className="h-4 w-4" />
             댓글 {comments.length}개
           </h2>
-          <Select value={commentSort} onValueChange={(v) => setCommentSort(v as "latest" | "likes")}>
+          <Select value={commentSort} onValueChange={(v: string) => setCommentSort(v as "latest" | "likes")}>
             <SelectTrigger className="w-24 h-8 text-xs">
               <SelectValue />
             </SelectTrigger>
@@ -594,159 +692,98 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
           )}
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium">별점:</span>
-
-            <div className={cn("flex items-center gap-1", (!hasCompletedCooking || userAlreadyReviewed) && "opacity-60")}>
-              {Array.from({ length: 5 }).map((_, i) => {
-                const star = i + 1
-                const filled = userRating >= star
-
-                return (
-                  <button
-                    key={star}
-                    type="button"
-                    onClick={() => handleRatingClick(star)}
-                    disabled={!hasCompletedCooking || userAlreadyReviewed}
-                    className={cn(
-                      "transition-transform",
-                      (!hasCompletedCooking || userAlreadyReviewed) ? "cursor-not-allowed" : "hover:scale-110",
-                    )}
-                  >
-                    <img
-                      src={filled ? "/michelin-full-star.png" : "/michelin-star.png"}
-                      alt="미슐랭"
-                      className={cn("h-5 w-5", !filled && "opacity-30")}
-                      draggable={false}
-                    />
-                  </button>
-                )
-              })}
+            <div className="flex-1">
+              <StarRating rating={userRating} onRatingChange={setUserRating} disabled={!hasCompletedCooking || userAlreadyReviewed} />
             </div>
-
-            {userRating > 0 && <span className="text-xs text-muted-foreground ml-1">{userRating}</span>}
-          </div>
-
-          <div className="flex gap-2">
-            <Textarea
-              placeholder={
-                userAlreadyReviewed
-                  ? "이미 평점과 댓글을 남기셨습니다"
-                  : hasCompletedCooking
-                    ? "댓글을 남겨주세요..."
-                    : "요리 완료 후 댓글을 남길 수 있습니다"
-              }
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              rows={2}
-              className="flex-1 text-sm"
-              disabled={!hasCompletedCooking || userAlreadyReviewed}
-            />
             <Button
               onClick={handleSubmitComment}
-              className="self-end bg-[#800020] hover:bg-[#800020]/90 h-8 px-3"
-              disabled={!hasCompletedCooking || userAlreadyReviewed}
+              disabled={!hasCompletedCooking || userAlreadyReviewed || !newComment.trim()}
+              className="bg-[#800020] hover:bg-[#800020]/90 text-white"
             >
-              <Send className="h-4 w-4" />
+              등록
             </Button>
           </div>
+          <Textarea
+            placeholder={
+              !hasCompletedCooking
+                ? "요리를 완료한 후 댓글을 작성할 수 있습니다"
+                : userAlreadyReviewed
+                  ? "이미 댓글을 작성하셨습니다"
+                  : "이 레시피에 대한 의견을 남겨주세요"
+            }
+            value={newComment}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewComment(e.target.value)}
+            disabled={!hasCompletedCooking || userAlreadyReviewed}
+            className="min-h-[100px] bg-background resize-none focus-visible:ring-[#800020]"
+          />
         </div>
 
-        <div className="space-y-3">
-          {paginatedComments.map((comment) => {
-            const isLiked = likedComments.has(comment.id)
-            const currentLikes = comment.likes + (isLiked ? 1 : 0)
-            const prevLikes = prevLikeCounts[comment.id] ?? comment.likes
-            const isOwner = comment.visitorId === (user?.id || "current-user")
-            const isEditing = editingCommentId === comment.id
-
-            return (
-              <div key={comment.id} className="flex gap-2 p-3 bg-card rounded-xl border">
-                <Avatar className="h-8 w-8 shrink-0">
-                  <AvatarImage src={comment.avatar || "/placeholder.svg"} />
-                  <AvatarFallback>{comment.user[0]}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-sm">{comment.user}</span>
-                    <span className="text-xs text-[#800020] font-medium">미슐랭 {comment.starLevel}스타</span>
-                    <div className="flex items-center gap-0.5">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <img
-                          key={i}
-                          src={i < comment.rating ? "/michelin-full-star.png" : "/michelin-star.png"}
-                          alt="미슐랭"
-                          className={cn("h-2.5 w-2.5", i < comment.rating ? "opacity-100" : "opacity-30")}
-                        />
-                      ))}
+        <div className="space-y-4 mt-6">
+          {comments.length === 0 ? (
+            <div className="text-center py-12 bg-muted/30 rounded-2xl border border-dashed">
+              <MessageCircle className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-muted-foreground font-medium">아직 댓글이 없습니다. 첫 번째 댓글을 남겨보세요!</p>
+            </div>
+          ) : (
+            paginatedComments.map((comment: any) => (
+              <div
+                key={comment.id}
+                className="group p-4 bg-background border border-gray-100 rounded-2xl shadow-sm hover:border-[#800020]/20 transition-all duration-300"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10 border border-[#800020]/10">
+                      <AvatarImage src={comment.avatar} />
+                      <AvatarFallback className="bg-[#800020]/5 text-[#800020] font-bold">
+                        {comment.user[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-foreground">{comment.user}</span>
+                        <div className="flex items-center bg-amber-50 px-1.5 py-0.5 rounded text-[10px] font-bold text-amber-600 border border-amber-100">
+                          <img src="/michelin-full-star.png" className="h-2.5 w-2.5 mr-0.5" />
+                          {comment.rating.toFixed(1)}
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground font-medium">
+                        {comment.time}
+                      </span>
                     </div>
-                    <span className="text-xs text-muted-foreground">{comment.time}</span>
-
-                    {isOwner && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto">
-                            <MoreVertical className="h-3 w-3" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEditComment(comment.id, comment.text)}>
-                            <Pencil className="h-3 w-3 mr-2" />
-                            수정
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteComment(comment.id)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-3 w-3 mr-2" />
-                            삭제
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
                   </div>
-
-                  {isEditing ? (
-                    <div className="flex gap-2">
-                      <Input
-                        value={editingText}
-                        onChange={(e) => setEditingText(e.target.value)}
-                        className="flex-1 h-8 text-sm"
-                      />
-                      <Button size="sm" onClick={() => handleSaveEdit(comment.id)} className="h-8 px-2">
-                        저장
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setEditingCommentId(null)}
-                        className="h-8 px-2"
-                      >
-                        취소
-                      </Button>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">{comment.text}</p>
+                  {(comment.visitorId === user?.id) && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleDeleteComment(comment.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   )}
-
+                </div>
+                <p className="mt-3 text-sm text-foreground/80 leading-relaxed whitespace-pre-line pl-13">
+                  {comment.text}
+                </p>
+                <div className="mt-3 flex items-center gap-4 pl-13">
                   <button
-                    className={cn(
-                      "flex items-center gap-1 text-xs mt-1 transition-colors",
-                      isLiked ? "text-blue-500" : "text-muted-foreground hover:text-blue-500",
-                    )}
                     onClick={() => handleLikeComment(comment.id, comment.likes)}
+                    className={cn(
+                      "flex items-center gap-1.5 text-xs font-semibold transition-colors",
+                      likedComments.has(comment.id) ? "text-[#800020]" : "text-muted-foreground hover:text-[#800020]"
+                    )}
                   >
-                    <ThumbsUp className={cn("h-3 w-3", isLiked && "fill-current")} />
-                    <AnimatedNumber value={currentLikes} prevValue={prevLikes} />
+                    <ThumbsUp className={cn("h-3.5 w-3.5", likedComments.has(comment.id) && "fill-current")} />
+                    <span>좋아요 {comment.likes + (likedComments.has(comment.id) ? 1 : 0)}</span>
                   </button>
                 </div>
               </div>
-            )
-          })}
+            ))
+          )}
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2">
+          <div className="flex items-center justify-center gap-4 mt-8">
             <Button
               variant="outline"
               size="sm"
@@ -785,7 +822,11 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
             </div>
             <div className="hidden sm:block">
               <p className="font-medium text-sm line-clamp-1">{recipe.name}</p>
-              <p className="text-xs text-muted-foreground">{recipe.duration}분</p>
+              <p className="text-xs text-muted-foreground">
+                {formatCookTime(
+                  recipe.steps.reduce((acc, step) => acc + (step.duration || 0), 0) || recipe.duration
+                )}
+              </p>
             </div>
           </div>
           <Button
@@ -830,6 +871,6 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </div >
   )
 }

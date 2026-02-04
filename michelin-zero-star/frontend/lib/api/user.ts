@@ -5,7 +5,7 @@ export type MeResponse = {
   name: string
   nickname: string
   email: string
-  profileImage?: string
+  profileImageUrl?: string // ✅ Renamed from profileImage
   level?: string
   bio?: string
   location?: string
@@ -13,6 +13,7 @@ export type MeResponse = {
   longitude?: number
   locationCode?: string
   stars?: number
+  totalStar?: number // ✅ 추가
   todayStars?: number
   lastStarDate?: string
 }
@@ -43,6 +44,8 @@ export function verifyLocation(body: VerifyLocationRequest) {
 // ✅ 추가: 유저 정보 수정 Request DTO
 export type UpdateProfileRequest = {
   nickname?: string
+  profileImageUrl?: string // ✅ 백엔드 DTO와 일치 (profileImage -> profileImageUrl)
+  categories?: string[]
   currentPassword?: string
   newPassword?: string
   newPasswordConfirm?: string
@@ -53,6 +56,23 @@ export function updateProfile(body: UpdateProfileRequest) {
   return apiFetch<string>("/api/v1/users/me", {
     method: "PATCH",
     body: JSON.stringify(body),
+  })
+}
+
+// ✅ 내가 찜한 마켓 게시글 조회
+export interface MarketPostListItem {
+  id: number
+  title: string
+  price: number
+  location: string
+  thumbnailUrl?: string
+  status: string
+  chatCount: number
+}
+
+export function getMyLikedPosts() {
+  return apiFetch<MarketPostListItem[]>("/api/v1/users/me/likes", {
+    method: "GET",
   })
 }
 

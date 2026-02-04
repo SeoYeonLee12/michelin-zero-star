@@ -24,9 +24,11 @@ export async function createPost(
     formData.append("post", postBlob)
 
     // 2. 이미지 파일들
-    images.forEach((file) => {
-        formData.append("images", file)
-    })
+    if (images && images.length > 0) {
+        images.forEach((file) => {
+            formData.append("images", file)
+        })
+    }
 
     return apiFetch<MarketPostResponse>("/api/v1/market/posts", {
         method: "POST",
@@ -43,6 +45,7 @@ export type MarketPostListResponse = {
     timeAgo: string
     status: string
     chatCount: number
+    writerId?: number // "My Post" 표시용
 }
 
 // 전체 게시글 조회
@@ -55,21 +58,24 @@ export async function getNearbyPosts(km = 5): Promise<MarketPostListResponse[]> 
     return apiFetch<MarketPostListResponse[]>(`/api/v1/market/posts/nearby?km=${km}`)
 }
 
+
 export type MarketPostDetailResponse = {
     id: number
     title: string
     content: string
     price: number
     meetingPlace: string
-    location: string
-    status: string
+    location: string // 지역 정보
+    status: "SELLING" | "RESERVED" | "SOLD"
     chatCount: number
-    writerNickname: string
+    likeCount: number // 찜 수
+    nickname: string // 작성자 닉네임
+    profileImageUrl?: string // 작성자 프로필 이미지
+    totalStar?: number // 작성자 별점
     imageUrls: string[]
     createdAt: string
-    owner: boolean
-    writerId?: number // Detail에도 writerId가 있으면 좋지만 owner가 있으니 필수 아님, 하지만 일관성 위해 추가 가능 (백엔드 확인 필요)
-    // 백엔드 Detail DTO를 확인하지 않았지만 owner 필드가 있음.
+    isOwner: boolean // 본인 글 여부
+    writerId?: number // "My Post" 표시용 (Remote)
 }
 
 export async function getPostDetail(postId: string): Promise<MarketPostDetailResponse> {
@@ -81,12 +87,45 @@ export type MarketPostUpdateRequest = {
     content: string
     price: number
     meetingPlace: string
+    category?: string  // ✅ 백엔드 필수 검증 통과용
 }
 
-export async function updatePost(postId: string, data: MarketPostUpdateRequest): Promise<string> {
+export async function updatePost(
+    postId: string,
+    postData: MarketPostUpdateRequest,
+    newImages: File[],
+    existingImageUrls: string[]
+): Promise<string> {
+    const formData = new FormData()
+
+    // 1. Post 정보 (JSON)
+    const postBlob = new Blob([JSON.stringify(postData)], {
+        type: "application/json",
+    })
+    formData.append("post", postBlob)
+
+    // 2. 새로운 이미지 파일들
+    newImages.forEach((file) => {
+        formData.append("newImages", file)
+    })
+
+    // 3. 유지할 기존 이미지 URL들
+    existingImageUrls.forEach((url) => {
+        formData.append("existingImages", url)
+    })
+
     return apiFetch<string>(`/api/v1/market/posts/${postId}`, {
         method: "PUT",
-        body: JSON.stringify(data),
+        body: formData,
+    })
+}
+
+/**
+ * 게시글 좋아요 토글 (좋아요 추가/취소)
+ */
+export async function toggleLike(postId: string): Promise<string> {
+    return apiFetch<string>(`/api/v1/market/posts/${postId}/likes`, {
+        method: "POST",
     })
 }
 
@@ -94,4 +133,36 @@ export async function deletePost(postId: string): Promise<string> {
     return apiFetch<string>(`/api/v1/market/posts/${postId}`, {
         method: "DELETE",
     })
+}
+
+/**
+ * 게시글 상태 변경 (거래중 ↔ 거래완료)
+ */
+export async function updatePostStatus(postId: string, status: "SELLING" | "RESERVED" | "SOLD"): Promise<string> {
+    return apiFetch<string>(`/api/v1/market/posts/${postId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+    })
+}
+// ... types
+
+export type PageResponse<T> = {
+    content: T[]
+    totalElements: number
+    totalPages: number
+    size: number
+    number: number
+    first: boolean
+    last: boolean
+    empty: boolean
+}
+
+// 내가 쓴 게시글 조회 (페이징)
+export async function getMyPostList(page = 0, size = 10): Promise<PageResponse<MarketPostListResponse>> {
+    return apiFetch<PageResponse<MarketPostListResponse>>(`/api/v1/market/posts/me?page=${page}&size=${size}`)
+}
+
+// 내가 찜한 게시글 조회
+export async function getLikedPosts(): Promise<MarketPostListResponse[]> {
+    return apiFetch<MarketPostListResponse[]>("/api/v1/market/liked")
 }

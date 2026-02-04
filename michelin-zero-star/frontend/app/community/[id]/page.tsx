@@ -17,7 +17,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { getPostDetail, deletePost } from "@/lib/api/market"
+import { getPostDetail, deletePost, toggleLike, updatePostStatus } from "@/lib/api/market"
 import {
   ArrowLeft,
   Heart,
@@ -79,7 +79,7 @@ const mockPosts: Record<
       location: "대전 유성구 봉명동",
       starLevel: 5,
     },
-    title: "계란 한 판 N빵 하실 분",
+    title: "계란 한 판 나눔 하실 분",
     description: "계란 30개 한 판 사서 10개씩 나눠요.\n신선한 당일 구매 제품입니다.\n\n봉명동 근처에서 직거래 원해요!",
     price: "2,500원/10개",
     images: ["/eggs-carton.png"],
@@ -124,7 +124,7 @@ export default function CommunityDetailPage() {
   const [loading, setLoading] = useState(true)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [statusDialogOpen, setStatusDialogOpen] = useState(false)
-  const [pendingStatus, setPendingStatus] = useState<"available" | "completed">("available")
+  const [pendingStatus, setPendingStatus] = useState<"SELLING" | "SOLD">("SELLING")
 
   useEffect(() => {
     async function fetchPost() {
@@ -140,12 +140,10 @@ export default function CommunityDetailPage() {
     fetchPost()
   }, [postId])
 
-  // const isLiked = likedPosts.some((p) => p.id === postId) // AuthContext 사용
-  // API 응답에 liked 여부가 없다면 기존 로직 유지
   const { likedPosts } = useAuth()
   const isLiked = likedPosts.some((p) => p.id === postId)
 
-  const isMyPost = post?.owner || false
+  const isMyPost = post?.owner || post?.isOwner || false
 
   if (loading) {
     return (
@@ -174,24 +172,39 @@ export default function CommunityDetailPage() {
     )
   }
 
-  const handleLike = (e: React.MouseEvent) => {
+  const handleLike = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+
     if (!isLoggedIn) {
       router.push("/login")
       return
     }
-    // API 데이터와 AuthContext 포맷 맞추기 (임시)
-    const postForContext = {
-      id: String(post.id),
-      title: post.title,
-      description: post.content,
-      price: post.price.toLocaleString(),
-      image: post.imageUrls[0],
-      place: post.meetingPlace,
-      likes: 0,
-      createdAt: post.createdAt,
-      status: post.status as "available" | "completed",
+
+    try {
+      await toggleLike(String(post.id))
+
+      toggleLikePost(e, {
+        id: String(post.id),
+        title: post.title,
+        description: post.content,
+        price: post.price.toLocaleString(),
+        image: post.imageUrls[0],
+        place: post.meetingPlace,
+        likes: post.likeCount || 0,
+        createdAt: post.createdAt,
+        status: post.status as "available" | "completed",
+      } as any)
+
+      setPost((prev: any) => ({
+        ...prev,
+        likeCount: (prev.likeCount ?? prev.like_count ?? 0) + (isLiked ? -1 : 1),
+        like_count: (prev.likeCount ?? prev.like_count ?? 0) + (isLiked ? -1 : 1),
+      }))
+
+    } catch (error) {
+      console.error("좋아요 처리 실패:", error)
+      alert("좋아요 처리에 실패했습니다.")
     }
-    toggleLikePost(e, postForContext as any)
   }
 
   const handleChat = () => {
@@ -199,7 +212,7 @@ export default function CommunityDetailPage() {
       router.push("/login")
       return
     }
-    router.push(`/messages/${post.writerId}?name=${encodeURIComponent(post.writerNickname || "이웃")}`)
+    router.push(`/messages/${post.writerId}?name=${encodeURIComponent(post.nickname || "이웃")}`)
   }
 
   const nextImage = () => {
@@ -210,22 +223,28 @@ export default function CommunityDetailPage() {
     setCurrentImageIndex((prev) => (prev - 1 + post.imageUrls.length) % post.imageUrls.length)
   }
 
-  const handleStatusChange = async (newStatus: "available" | "completed") => {
+  const handleStatusChange = async (newStatus: "SELLING" | "SOLD") => {
     setPendingStatus(newStatus)
     setStatusDialogOpen(true)
   }
 
   const confirmStatusChange = async () => {
-    // API 필요 (updatePost로 status 변경 가능한지 확인 필요, 현재 DTO에는 status 없음)
-    // 현재 제공된 API spec에는 updatePost DTO에 status가 없음.
-    // 따라서 이 기능은 잠시 보류하거나 updatePost에 status 추가 요청 필요.
-    // -> 일단 UI에서만 변경하는 척 하거나, updatePost에 status 필드가 있다면 보냄.
-    // 명세상 DTO: title, content, price, meetingPlace.
-    // Status 변경 API가 별도로 없으므로, '수정' 페이지에서만 가능한가?
-    // 일단 API 호출은 생략하고 UI만 닫음 (또는 updatePost 시도)
-    setStatusDialogOpen(false)
-    alert("상태 변경 기능을 확인해주세요.")
+    try {
+      if (pendingStatus === "SOLD") {
+        await updatePostStatus(String(post.id), "SOLD")
+      } else {
+        await updatePostStatus(String(post.id), "SELLING")
+      }
+      // 상태 변경 후 페이지 새로고침 (또는 로컬 상태 업데이트)
+      window.location.reload()
+    } catch (error) {
+      console.error("상태 변경 실패:", error)
+      alert("상태 변경에 실패했습니다.")
+    } finally {
+      setStatusDialogOpen(false)
+    }
   }
+
 
   const handleDelete = async () => {
     if (confirm("정말로 이 게시글을 삭제하시겠습니까?")) {
@@ -240,7 +259,7 @@ export default function CommunityDetailPage() {
     }
   }
 
-  const likeCount = (post.likes || 0) + (isLiked ? 1 : 0) // API에 likes가 없으면 0 처리
+  const likeCount = post.likeCount ?? post.like_count ?? 0 // API에서 likeCount 가져오기 (snake_case 대응)
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -262,26 +281,27 @@ export default function CommunityDetailPage() {
                 fill
                 className="object-cover"
               />
-              {post.status === "completed" && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                  <Badge className="bg-gray-600 text-white text-lg px-4 py-2">거래 완료</Badge>
+              {post.status === "SOLD" && (
+                <div className="absolute inset-0 bg-black/60 z-10 flex flex-col items-center justify-center text-white">
+                  <CheckCircle className="w-16 h-16 mb-3" />
+                  <span className="text-2xl font-bold">거래 완료</span>
                 </div>
               )}
               {post.imageUrls?.length > 1 && (
                 <>
                   <button
                     onClick={prevImage}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 z-20"
                   >
                     <ChevronLeft className="h-6 w-6" />
                   </button>
                   <button
                     onClick={nextImage}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 z-20"
                   >
                     <ChevronRight className="h-6 w-6" />
                   </button>
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
                     {post.imageUrls.map((_: any, idx: number) => (
                       <div
                         key={idx}
@@ -295,14 +315,13 @@ export default function CommunityDetailPage() {
                 </>
               )}
               {/* Heart and comments moved to bottom right of image */}
-              <div className="absolute bottom-4 right-4 flex items-center gap-3 bg-black/50 rounded-full px-3 py-1.5">
-                <button
-                  className={cn("flex items-center gap-1 text-white transition-colors", isLiked && "text-red-400")}
-                  onClick={handleLike}
+              <div className="absolute bottom-4 right-4 flex items-center gap-3 bg-black/50 rounded-full px-3 py-1.5 z-20">
+                <div
+                  className={cn("flex items-center gap-1 text-white")}
                 >
-                  <Heart className={cn("h-5 w-5", isLiked && "fill-current")} />
+                  <Heart className={cn("h-5 w-5", "fill-white")} />
                   <span className="text-sm font-medium">{likeCount}</span>
-                </button>
+                </div>
                 <div className="flex items-center gap-1 text-white">
                   <MessageCircle className="h-5 w-5" />
                   <span className="text-sm font-medium">{post.chatCount}</span>
@@ -317,8 +336,15 @@ export default function CommunityDetailPage() {
               <h1 className="text-2xl font-bold mb-2">{post.title}</h1>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
-                {/* timeAgo는 Detail Response에 없으므로 createdAt 가공 필요하거나 API 추가 필요. 일단 createdAt 표시 */}
-                <span>{new Date(post.createdAt).toLocaleDateString()}</span>
+                <span>{(() => {
+                  const dateStr = post.createdAt.endsWith("Z") ? post.createdAt : post.createdAt + "Z"
+                  const date = new Date(dateStr)
+                  return `${date.toLocaleDateString("ko-KR", {
+                    year: "numeric", month: "numeric", day: "numeric"
+                  })} ${date.toLocaleTimeString("ko-KR", {
+                    hour: "2-digit", minute: "2-digit", hour12: true
+                  })}`
+                })()}</span>
               </div>
             </div>
 
@@ -333,53 +359,27 @@ export default function CommunityDetailPage() {
 
             <div className="whitespace-pre-line text-muted-foreground">{post.content}</div>
 
-            {isMyPost && (
-              <div className="p-4 bg-[#800020]/5 rounded-xl border border-[#800020]/20 space-y-3">
-                <p className="text-sm font-medium text-[#800020]">내 게시글 관리</p>
-                <div className="flex gap-2">
-                  {/* Status Change - API 미지원이므로 비활성화 혹은 TODO */}
-                  {/* <Button
-                    variant={post.status === "completed" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleStatusChange(post.status === "completed" ? "available" : "completed")}
-                    className={cn("flex-1 gap-2", post.status === "completed" && "bg-gray-600 hover:bg-gray-700")}
-                  >
-                    <CheckCircle className="h-4 w-4" />
-                    {post.status === "completed" ? "거래완료 취소" : "거래완료로 변경"}
-                  </Button> */}
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push(`/community/edit/${postId}`)}
-                    className="flex-1 gap-2"
-                  >
-                    <Pencil className="h-4 w-4" />
-                    수정
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleDelete}
-                    className="flex-1 gap-2"
-                  >
-                    <Pencil className="h-4 w-4" />
-                    삭제
-                  </Button>
-                </div>
-              </div>
-            )}
 
             {/* User Profile */}
             <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-xl">
               <Avatar className="h-12 w-12">
-                <AvatarImage src={"/placeholder.svg"} /> {/* 작성자 이미지 API에 없음 (writerAvatar 필요? writerNickname만 있음) */}
-                <AvatarFallback>{post.writerNickname?.[0]}</AvatarFallback>
+                <AvatarImage src={post.profileImageUrl || "/placeholder.svg"} />
+                <AvatarFallback>{post.nickname?.[0]}</AvatarFallback>
               </Avatar>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="font-semibold">{post.writerNickname}</p>
-                  {/* Star Level 정보 API에 없음 */}
+                  <p className="font-semibold">{post.nickname}</p>
+                  <span className="flex items-center gap-1 text-xs font-semibold text-[#800020] bg-[#800020]/10 px-2 py-0.5 rounded-full border border-[#800020]/20">
+                    <Image
+                      src="/michelin-star.png"
+                      alt="Michelin Star"
+                      width={12}
+                      height={12}
+                      className="object-contain"
+                    />
+                    미슐랭 {post.totalStar}스타
+                  </span>
                 </div>
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
                   <MapPin className="h-3 w-3" />
@@ -390,32 +390,88 @@ export default function CommunityDetailPage() {
 
             {/* Action Buttons */}
             <div className="flex gap-3">
-              <Button
-                variant="outline"
-                size="lg"
-                className={cn(
-                  "flex-1 gap-2",
-                  isLiked && "border-red-500 text-red-500 hover:text-red-600 hover:border-red-600",
-                )}
-                onClick={handleLike}
-              >
-                <Heart className={cn("h-5 w-5", isLiked && "fill-current")} />
-                관심 {likeCount}
-              </Button>
-              <Button
-                size="lg"
-                className="flex-1 gap-2 bg-[#800020] hover:bg-[#800020]/90"
-                onClick={handleChat}
-                disabled={post.status === "completed" || isMyPost}
-              >
-                <MessageCircle className="h-5 w-5" />
-                {isMyPost ? "내 게시글" : "채팅하기"}
-              </Button>
+              {isMyPost ? (
+                // Owner Setup - Minimal Design
+                <div className="flex flex-1 gap-2">
+                  <Button
+                    variant={post.status === "SOLD" ? "default" : "default"}
+                    className={cn(
+                      "flex-[2] font-semibold",
+                      post.status === "SOLD"
+                        ? "bg-gray-600 hover:bg-gray-700"
+                        : "bg-[#800020] hover:bg-[#800020]/90",
+                    )}
+                    onClick={() => handleStatusChange(post.status === "SOLD" ? "SELLING" : "SOLD")}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {post.status === "SOLD" ? "거래 완료됨" : "거래 완료로 변경"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1 border-muted-foreground/30 text-muted-foreground hover:text-foreground"
+                    onClick={() => router.push(`/community/new?edit=${postId}`)}
+                  >
+                    <Pencil className="h-4 w-4 mr-1.5" />
+                    수정
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1 border-red-200 text-red-500 hover:text-red-600 hover:bg-red-50 hover:border-red-300"
+                    onClick={handleDelete}
+                  >
+                    삭제
+                  </Button>
+                </div>
+              ) : (
+                // Viewer Setup
+                <>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className={cn(
+                      "flex-1 gap-2",
+                      isLiked && "border-red-500 text-red-500 hover:text-red-600 hover:border-red-600",
+                    )}
+                    onClick={handleLike}
+                  >
+                    <Heart className={cn("h-5 w-5", isLiked && "fill-current")} />
+                    관심 {likeCount}
+                  </Button>
+                  <Button
+                    size="lg"
+                    className="flex-1 gap-2 bg-[#800020] hover:bg-[#800020]/90"
+                    onClick={handleChat}
+                    disabled={post.status === "SOLD"}
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                    채팅하기
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
       </main>
-      {/* Dialog for Status kept but commented out logic called */}
-    </div>
+      <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>판매 상태 변경</DialogTitle>
+            <DialogDescription>
+              {pendingStatus === "SOLD"
+                ? "이 게시글을 '거래 완료' 상태로 변경하시겠습니까? 거래가 완료되면 더 이상 채팅을 받을 수 없습니다."
+                : "이 게시글을 '판매 중' 상태로 변경하시겠습니까?"}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusDialogOpen(false)}>
+              취소
+            </Button>
+            <Button onClick={confirmStatusChange} className="bg-[#800020] hover:bg-[#800020]/90">
+              확인
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div >
   )
 }
