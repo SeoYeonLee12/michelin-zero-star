@@ -9,6 +9,8 @@ import static com.michelin0.michelinzerostar.domain.recipe.domain.QRecipeTag.rec
 import static com.michelin0.michelinzerostar.domain.recipescrap.domain.QRecipeScrap.recipeScrap;
 import static com.michelin0.michelinzerostar.domain.user.entity.QUser.user;
 
+import com.michelin0.michelinzerostar.domain.category.domain.QCategory;
+import com.michelin0.michelinzerostar.domain.category.domain.QRecipeCategory;
 import com.michelin0.michelinzerostar.domain.recipe.domain.enums.RecipeSortType;
 import com.michelin0.michelinzerostar.domain.recipe.domain.enums.RecipeType;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModeProjection;
@@ -158,12 +160,20 @@ public class RecipeQueryRepository {
 
     public Page<RecipeListProjection> findAllRecipes(RecipesSearchCondition condition,
             Pageable pageable, Long userId) {
-        List<Long> ids = queryFactory
+        
+        var idsQuery = queryFactory
                 .select(recipe.recipeId)
-                .from(recipe)
+                .from(recipe);
+
+        if (StringUtils.hasText(condition.category())) {
+            idsQuery.join(recipeCategory).on(recipeCategory.recipe.eq(recipe))
+                    .join(recipeCategory.category, category)
+                    .where(category.categoryName.eq(condition.category()));
+        }
+
+        List<Long> ids = idsQuery
                 .where(
                         eqRecipeType(condition.recipeType()),
-                        eqCategory(condition.category()),
                         containsSearchWord(condition.searchWord())
                 )
                 .orderBy(getOrderSpecifier(condition.sort()))
@@ -192,12 +202,19 @@ public class RecipeQueryRepository {
                 .orderBy(getOrderSpecifier(condition.sort()))
                 .fetch();
 
-        Long totalCount = queryFactory
+        var countQuery = queryFactory
                 .select(recipe.count())
-                .from(recipe)
+                .from(recipe);
+
+        if (StringUtils.hasText(condition.category())) {
+            countQuery.join(recipeCategory).on(recipeCategory.recipe.eq(recipe))
+                    .join(recipeCategory.category, category)
+                    .where(category.categoryName.eq(condition.category()));
+        }
+
+        Long totalCount = countQuery
                 .where(
                         eqRecipeType(condition.recipeType()),
-                        eqCategory(condition.category()),
                         containsSearchWord(condition.searchWord())
                 )
                 .fetchOne();
@@ -255,17 +272,6 @@ public class RecipeQueryRepository {
         }
     }
 
-    private BooleanExpression eqCategory(String categoryName) {
-        if (!StringUtils.hasText(categoryName)) {
-            return null;
-        }
-        return recipe.recipeId.in(
-                JPAExpressions.select(recipeCategory.recipe.recipeId)
-                        .from(recipeCategory)
-                        .join(recipeCategory.category, category)
-                        .where(category.categoryName.eq(categoryName))
-        );
-    }
 
     private BooleanExpression isScrappedExpression(Long userId) {
         if (userId == null) {

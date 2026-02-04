@@ -8,6 +8,7 @@ import { Navbar } from "@/components/cook-sync/navbar"
 import { AccessDenied } from "@/components/cook-sync/access-denied"
 import { ScrollToTop } from "@/components/cook-sync/scroll-to-top"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
@@ -30,27 +31,6 @@ export default function CommunityPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
   const [hideCompleted, setHideCompleted] = useState(false)
-
-  // 로그인 체크
-  if (!isLoggedIn) {
-    return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <Navbar />
-        <AccessDenied type="login" />
-      </div>
-    )
-  }
-
-  // 동네 인증 체크
-  if (!user?.location) {
-    return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <Navbar />
-        <AccessDenied type="location" />
-      </div>
-    )
-  }
-
   // API 연동: 게시글 목록 상태
   const [posts, setPosts] = useState<any[]>([])
   const [viewMode, setViewMode] = useState<"nearby" | "all">("nearby")
@@ -75,6 +55,26 @@ export default function CommunityPage() {
       fetchPosts()
     }
   }, [isLoggedIn, user?.location, viewMode])
+
+  // 로그인 체크
+  if (!isLoggedIn) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Navbar />
+        <AccessDenied type="login" />
+      </div>
+    )
+  }
+
+  // 동네 인증 체크
+  if (!user?.location) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Navbar />
+        <AccessDenied type="location" />
+      </div>
+    )
+  }
 
 
 
@@ -101,7 +101,7 @@ export default function CommunityPage() {
     likes: 0,
     chatCount: post.chatCount,
     status: (post.status === "SELLING" ? "available" : "completed") as "available" | "completed",
-    isMyPost: false,
+    isMyPost: (isLoggedIn && user && String(post.writerId) === String(user.id)) || false,
   }))
 
   const filteredShares = allShares.filter((share) => {
@@ -244,6 +244,11 @@ export default function CommunityPage() {
                   fill
                   className="object-cover transition-transform group-hover:scale-105"
                 />
+                {share.isMyPost && (
+                  <div className="absolute top-2 left-2 z-10">
+                    <Badge className="bg-[#800020] text-white hover:bg-[#800020]">내 나눔</Badge>
+                  </div>
+                )}
                 {share.status === "completed" && (
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                     <span className="text-white text-sm font-medium">거래 완료</span>

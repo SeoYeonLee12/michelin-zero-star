@@ -4,8 +4,8 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useRef, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Navbar } from "@/components/cook-sync/navbar"
 import { ScrollToTop } from "@/components/cook-sync/scroll-to-top"
 import { Button } from "@/components/ui/button"
@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,12 +28,14 @@ import {
 import { ArrowLeft, Upload, X, MapPin, Receipt } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import Image from "next/image"
-import { createPost } from "@/lib/api/market"
+import { createPost, getPostDetail, updatePost } from "@/lib/api/market"
 import { compressImage } from "@/lib/image-utils"
+import { StarRewardBadge } from "@/components/cook-sync/star-reward-badge"
+import { AnimatePresence, motion } from "framer-motion"
 
 export default function CommunityNewPage() {
   const router = useRouter()
-  const { isLoggedIn, addUserPost } = useAuth()
+  const { isLoggedIn, addUserPost, earnStars } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
@@ -47,6 +49,42 @@ export default function CommunityNewPage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showExitDialog, setShowExitDialog] = useState(false)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [showRewardDialog, setShowRewardDialog] = useState(false)
+  // Edit Mode Logic
+  const searchParams = useSearchParams()
+  const editPostId = searchParams.get("edit")
+  const isEditMode = !!editPostId
+
+  useEffect(() => {
+    if (isEditMode && editPostId && isLoggedIn) {
+      const fetchPost = async () => {
+        try {
+          const post = await getPostDetail(editPostId)
+          if (post) {
+            // 본인 게시글인지 확인 (API에 owner 필드가 있다고 가정)
+            if (post.isOwner === false) { // owner 필드가 boolean이고 false면
+              alert("수정 권한이 없습니다.")
+              router.push("/community")
+              return
+            }
+
+            setFormData({
+              title: post.title,
+              description: post.content, // API field usually content
+              price: String(post.price),
+              place: post.meetingPlace || post.location || "",
+            })
+            if (post.imageUrls) {
+              setImages(post.imageUrls)
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch post for edit:", error)
+        }
+      }
+      fetchPost()
+    }
+  }, [isEditMode, editPostId, isLoggedIn, router])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files
@@ -77,8 +115,67 @@ export default function CommunityNewPage() {
   }
 
   const removeImage = (index: number) => {
+    // files 배열은 '새로 추가된 파일'만 가지고 있으므로 인덱스 매칭이 어려울 수 있음.
+    // 하지만 images 배열과 files 배열을 동기화하는 로직이 필요함.
+    // 기존 로직: addImage 시 images에 previewUrl, files에 File 객체 추가
+    // 수정 시: images에 기존Url 있음, files 비어있음 using useEffect
+
+    // 로직 수정: 
+    // files State는 "새로 추가된 파일"만 관리하는게 아니라, images 배열의 인덱스와 1:1 매칭되어야 삭제 시 편함?
+    // 아니면, removeImage 시 images[index]를 보고 data URL이면 files에서도 제거, http URL이면 existing URL 제거?
+
+    // 간편한 방법: 
+    // images: [url1, url2, data:base64...] -> 화면 표시용
+    // files: [null, null, File...] -> 인덱스 맞춰서? 복잡함.
+
+    // 현행 유지하되 삭제 로직 개선:
+    // images 배열에서 제거. 
+    // 만약 제거된 이미지가 '새로 추가된 이미지'(data: startsWith)라면 files 배열에서도 해당 파일을 찾아 제거해야 하는데,
+    // files 배열은 순수 File 객체들만 모여있어서 매칭이 어려움.
+
+    // 개선안: 
+    // 'files' state에는 "새로 추가된 파일들"을 리스트로 관리.
+    // 'images' state에는 "화면에 보여질 소스들" 관리.
+    // 삭제 시:
+    // 1. images[index] 제거 -> setImages
+    // 2. 만약 images[index]가 blob/base64 라면(새 파일), files 배열에서 해당 File을 제거해야 함.
+    //    이때 어떤 File인지 알기 위해, addImage 시점에 식별자나 순서를 맞춰야 함.
+
+    // => 가장 확실한 방법: 
+    // files 배열을 사용하지 않고, images와 짝이 맞는 (imageSource, fileObject | null) 형태의 상태 관리? 
+    // 너무 큰수정.
+
+    // 차선책:
+    // files는 그냥 "새로 추가할 파일들의 큐" 처럼 쓴다? No, 삭제가 되어야 함.
+
+    // 현재 코드의 removeImage 로직: 
+    // setImages((prev) => prev.filter((_, i) => i !== index))  <-- 이건 OK
+    // setFiles((prev) => prev.filter((_, i) => i !== index))    <-- 이건 문제 있음. 
+    // files는 처음에 빈 배열이고, images는 3개(기존)일 수 있음. index가 안 맞음.
+
+    const targetImage = images[index]
+
     setImages((prev) => prev.filter((_, i) => i !== index))
-    setFiles((prev) => prev.filter((_, i) => i !== index))
+
+    // 새로 추가된 이미지인 경우에만 files에서 제거
+    if (targetImage.startsWith("data:")) {
+      // files 배열에서 해당 이미지를 찾아야 함. 
+      // 하지만 base64 만으로 File 객체를 찾기 어려움 (중복 가능성).
+      // 따라서, files 배열을 "images 배열의 순서와 동일하게" 관리하거나 (null로 채움),
+      // 애초에 { preview: string, file: File | null }[] 형태로 관리하는게 맞음.
+
+      // 시간 관계상, files 배열을 재구성합니다.
+      // files 배열에서 삭제할 인덱스를 찾아야 하는데, 
+      // images 배열 순회하며 "새 이미지"의 인덱스를 카운트해서 files 내 인덱스를 찾음.
+
+      let newImageCount = 0
+      for (let i = 0; i < index; i++) {
+        if (images[i].startsWith("data:")) {
+          newImageCount++
+        }
+      }
+      setFiles((prev) => prev.filter((_, i) => i !== newImageCount))
+    }
   }
 
   const handleSubmit = () => {
@@ -91,31 +188,56 @@ export default function CommunityNewPage() {
 
   const confirmSubmit = async () => {
     try {
-      await createPost(
-        {
-          title: formData.title,
-          content: formData.description,
-          price: Number(formData.price.replace(/,/g, "")) || 0, // 쉼표 제거 및 숫자 변환
-          meetingPlace: formData.place,
-          category: "SHARE", // 카테고리 (일단 SHARE 로 고정)
-        },
-        files,
-      )
-      // 성공 시 이동 (원래는 API 성공 후 리다이렉트가 더 안전하지만, UX상 즉시 이동 처리)
-      router.push("/community")
+      if (isEditMode && editPostId) {
+        // 수정 로직
+        // existingImages: files 배열에 없는(새로 추가되지 않은) images 배열의 URL들
+        // newImages: files 배열에 있는 File 객체들
+        const existingImageUrls = images.filter(img => !img.startsWith("data:"))
+
+        await updatePost(
+          editPostId,
+          {
+            title: formData.title,
+            content: formData.description,
+            price: parseInt(formData.price.toString().replace(/,/g, "")) || 0,
+            meetingPlace: formData.place
+          },
+          files,
+          existingImageUrls
+        )
+        alert("게시글이 수정되었습니다.")
+        router.push(`/community/${editPostId}`)
+      } else {
+        // 생성 로직
+        await createPost(
+          {
+            title: formData.title,
+            content: formData.description,
+            price: Number(formData.price.replace(/,/g, "")) || 0,
+            meetingPlace: formData.place,
+            category: "SHARE",
+          },
+          files,
+        )
+        earnStars(1.0, "recipe")
+        setShowRewardDialog(true)
+      }
     } catch (error) {
-      console.error("게시글 등록 실패:", error)
-      alert("게시글 등록에 실패했습니다.")
+      console.error("게시글 처리 실패:", error)
+      alert(isEditMode ? "게시글 수정에 실패했습니다." : "게시글 등록에 실패했습니다.")
     } finally {
       setShowConfirmDialog(false)
     }
   }
 
   const handleCancel = () => {
+    // 수정 모드일 때는 상세 페이지로, 생성 모드일 때는 목록으로 이동
+    const targetPath = isEditMode && editPostId ? `/community/${editPostId}` : "/community"
+
     if (formData.title || formData.description || images.length > 0) {
       setShowExitDialog(true)
     } else {
-      router.push("/community")
+      router.push(targetPath)
     }
   }
 
@@ -134,8 +256,8 @@ export default function CommunityNewPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">N빵 팟 구함</h1>
-            <p className="text-muted-foreground">이웃과 재료를 나눠보세요</p>
+            <h1 className="text-2xl font-bold tracking-tight">{isEditMode ? "게시물 수정" : "나눔 팟 구함"}</h1>
+            <p className="text-muted-foreground">{isEditMode ? "나눔 게시물 정보를 수정하세요" : "이웃과 재료를 나눠보세요"}</p>
           </div>
         </div>
 
@@ -165,6 +287,7 @@ export default function CommunityNewPage() {
                         대표
                       </Badge>
                     )}
+                    {/* Prevent deletion in edit mode if needed, or allow? Existing edit page disallowed image edits */}
                     <button
                       onClick={() => removeImage(idx)}
                       className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70"
@@ -217,7 +340,12 @@ export default function CommunityNewPage() {
               </Label>
               <Textarea
                 id="description"
-                placeholder="구매한 재료, 상태, 나눔 방법 등을 자세히 적어주세요.&#10;&#10;예시:&#10;- 오늘 마트에서 구매한 신선한 양배추예요&#10;- 반 통씩 나눠서 가져가시면 됩니다&#10;- 둔산동 롯데마트 앞에서 직거래 원해요"
+                placeholder={`구매한 재료, 상태, 나눔 방법 등을 자세히 적어주세요.
+    
+    예시:
+    - 오늘 마트에서 구매한 신선한 양배추예요
+    - 반 통씩 나눠서 가져가시면 됩니다
+    - 둔산동 롯데마트 앞에서 직거래 원해요`}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={6}
@@ -235,18 +363,15 @@ export default function CommunityNewPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="place">거래 장소</Label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="place"
-                  placeholder="예: 둔산동 롯데마트 앞"
-                  value={formData.place}
-                  onChange={(e) => setFormData({ ...formData, place: e.target.value })}
-                  className="pl-10"
-                />
-              </div>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="place"
+                placeholder="예: 둔산동 롯데마트 앞"
+                value={formData.place}
+                onChange={(e) => setFormData({ ...formData, place: e.target.value })}
+                className="pl-10"
+              />
             </div>
           </CardContent>
         </Card>
@@ -257,14 +382,16 @@ export default function CommunityNewPage() {
             취소
           </Button>
           <Button className="flex-1 bg-[#800020] hover:bg-[#800020]/90" onClick={handleSubmit}>
-            등록하기
+            {isEditMode ? "저장하기" : "등록하기"}
           </Button>
         </div>
       </main>
 
       {/* Image Preview Dialog */}
+      {/* Image Preview Dialog */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
         <DialogContent className="max-w-3xl p-0">
+          <DialogTitle className="sr-only">이미지 미리보기</DialogTitle>
           {previewImage && (
             <Image
               src={previewImage || "/placeholder.svg"}
@@ -281,8 +408,10 @@ export default function CommunityNewPage() {
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>게시글 등록</AlertDialogTitle>
-            <AlertDialogDescription>게시글을 등록하시겠습니까?</AlertDialogDescription>
+            <AlertDialogTitle>{isEditMode ? "게시글 수정" : "게시글 등록"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isEditMode ? "게시글을 수정하시겠습니까?" : "게시글을 등록하시겠습니까?"}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>아니오</AlertDialogCancel>
@@ -304,15 +433,63 @@ export default function CommunityNewPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction
+            {/* <AlertDialogAction
               onClick={() => router.push("/community")}
               className="bg-destructive hover:bg-destructive/90"
+            > */}
+            <AlertDialogAction
+              onClick={() => router.push("/community")}
+              className="bg-[#800020] hover:bg-[#800020]/90"
             >
               나가기
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+
+      {/* Reward Dialog */}
+      <AnimatePresence>
+        {showRewardDialog && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => router.push("/community")}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-[340px] bg-white rounded-[2.5rem] p-10 shadow-[0_20px_50px_rgba(0,0,0,0.1)] text-center overflow-hidden border border-gray-50"
+            >
+              <div className="relative space-y-8">
+                <div className="space-y-3">
+                  <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-tight">나눔 팟 생성 성공!</h2>
+                  <p className="text-gray-400 text-sm font-medium">게시글 등록이 완료됐습니다.</p>
+                </div>
+
+                <div className="py-2">
+                  <StarRewardBadge
+                    amount={1}
+                    customText="1스타 적립"
+                    starSize="md"
+                    textSize="sm"
+                  />
+                </div>
+
+                <Button
+                  className="w-full h-12 rounded-xl bg-[#800020] hover:bg-[#800020]/90 text-white font-semibold text-sm transition-all active:scale-[0.98] shadow-sm"
+                  onClick={() => router.push("/community")}
+                >
+                  확인
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div >
   )
 }

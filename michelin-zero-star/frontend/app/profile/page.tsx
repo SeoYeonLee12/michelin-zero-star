@@ -235,7 +235,7 @@ export default function ProfileEditPage() {
       <main className="flex-1 container mx-auto max-w-3xl px-4 py-8">
         <div className="mb-6">
           <Link href="/mypage">
-            <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground bg-transparent hover:bg-transparent">
               <ArrowLeft className="h-4 w-4" />
               마이페이지로 돌아가기
             </Button>
@@ -373,7 +373,6 @@ export default function ProfileEditPage() {
                   현재 위치
                 </Button>
               </div>
-
               <p className="text-xs text-muted-foreground">
                 위치 정보는 주변 재료 나눔 게시글을 찾는 데 사용됩니다.
                 {isGettingLocation && " GPS로 위치를 탐색 중입니다..."}

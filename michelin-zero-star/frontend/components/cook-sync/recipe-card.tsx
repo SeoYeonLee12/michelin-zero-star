@@ -153,7 +153,7 @@ export function RecipeCard({ recipe, isLiked, onHeartClick, onEdit, onDelete, on
           </div>
         ) : null}
       </div>
-      <div className="p-3">
+      <div className="pt-3 pb-2 px-0">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-base leading-tight line-clamp-2">{recipe.name}</h3>

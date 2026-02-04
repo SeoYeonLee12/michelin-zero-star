@@ -165,6 +165,7 @@ services:
       - NEXT_TELEMETRY_DISABLED=1
       # 브라우저(로컬 PC)에서 접근해야 하므로 localhost 사용 및 /api/v1 추가
       - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api/v1
+      - WATCHPACK_POLLING=true
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -173,7 +174,7 @@ services:
       - mzs-network
     depends_on:
       - backend
-    command: npm run dev -- -H 0.0.0.0 -p 3000
+    command: npm run dev -- --webpack -H 0.0.0.0 -p 3000
 
 #===============================================#
 # Network & Volume Definition

@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { Eye, EyeOff, Check, Mic, Users, Search } from "lucide-react"
+import { Eye, EyeOff, Check, Mic, Users, Search, Home } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,7 +15,7 @@ import { MichelinIcon } from "@/components/common/MichelinIcon"
 
 const features = [
   { icon: Mic, label: "핸즈프리 요리", desc: "음성으로 레시피를 따라가세요" },
-  { icon: Users, label: "재료 N빵", desc: "이웃과 남은 재료를 나눠요" },
+  { icon: Users, label: "재료 나눔", desc: "이웃과 남은 재료를 나눠요" },
   { icon: Search, label: "다양한 레시피", desc: "AI가 맞춤 레시피를 추천해요" },
 ]
 
@@ -97,7 +97,20 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex relative">
+      {/* Home Button */}
+      <div className="absolute top-6 left-6 z-50">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-2 text-muted-foreground hover:text-[#800020] hover:bg-[#800020]/5 transition-all group"
+          onClick={() => router.push("/")}
+        >
+          <Home className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" />
+          <span className="font-medium">홈으로</span>
+        </Button>
+      </div>
+
       {/* Left Panel - Features */}
       <DotPatternBackground
         containerClassName="hidden lg:flex lg:w-1/2 min-h-screen bg-background"

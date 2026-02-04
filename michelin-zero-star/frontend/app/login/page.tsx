@@ -6,7 +6,7 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, Home, ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -75,7 +75,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex relative">
+      {/* Home Button */}
+      <div className="absolute top-6 left-6 z-50">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-2 text-muted-foreground hover:text-[#800020] hover:bg-[#800020]/5 transition-all group"
+          onClick={() => router.push("/")}
+        >
+          <Home className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" />
+          <span className="font-medium">홈으로</span>
+        </Button>
+      </div>
+
       {/* Left Panel */}
       <DotPatternBackground
         containerClassName="hidden lg:flex lg:w-1/2 min-h-screen bg-background"

@@ -10,6 +10,8 @@ import type { Recipe } from "@/lib/types"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { StarRewardBadge } from "./star-reward-badge"
+import { AnimatePresence } from "framer-motion"
 
 interface CompleteCookDialogProps {
   open: boolean
@@ -37,12 +39,14 @@ export function CompleteCookDialog({
     markRecipeAsCompleted,
     hasUserReviewedRecipe,
     markRecipeAsReviewed,
+    earnStars,
   } = useAuth()
   const [rating, setRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
   const [comment, setComment] = useState("")
   const [reviewSubmitted, setReviewSubmitted] = useState(false)
   const [scrapFeedback, setScrapFeedback] = useState<string | null>(null)
+  const [starsEarned, setStarsEarned] = useState(false)
 
   // NOTE: "요리 완료"(completed)와 "리뷰 작성"(reviewed)은 의미가 다르므로 분리합니다.
   // 리뷰 여부는 derived 값으로 계산해 상태 꼬임을 방지합니다.
@@ -52,8 +56,10 @@ export function CompleteCookDialog({
   useEffect(() => {
     if (open && completedRecipe?.id) {
       markRecipeAsCompleted(completedRecipe.id)
+      earnStars(0.5, "cook")
+      setStarsEarned(true) // Always show the reward UI when completion modal opens
     }
-  }, [open, completedRecipe?.id, markRecipeAsCompleted])
+  }, [open, completedRecipe?.id, markRecipeAsCompleted, earnStars])
 
 
   if (!completedRecipe) return null
@@ -77,24 +83,24 @@ export function CompleteCookDialog({
   }
 
   const handleLikeCompletedRecipe = () => {
-  if (!isLoggedIn) return
-  const wasLiked = isRecipeLiked(completedRecipe.id)
+    if (!isLoggedIn) return
+    const wasLiked = isRecipeLiked(completedRecipe.id)
 
-  toggleLikeRecipe({
-    id: completedRecipe.id,
-    title: completedRecipe.name,
-    image: completedRecipe.thumbnail || "/placeholder.svg",
-    author: completedRecipe.hashtags?.[0] || "미슐랭 0스타",
-    savedAt: "",
-  })
+    toggleLikeRecipe({
+      id: completedRecipe.id,
+      title: completedRecipe.name,
+      image: completedRecipe.thumbnail || "/placeholder.svg",
+      author: completedRecipe.hashtags?.[0] || "미슐랭 0스타",
+      savedAt: "",
+    })
 
-  if (!wasLiked) {
-    setScrapFeedback("스크랩했습니다")
-    setTimeout(() => setScrapFeedback(null), 2000)
+    if (!wasLiked) {
+      setScrapFeedback("스크랩했습니다")
+      setTimeout(() => setScrapFeedback(null), 2000)
+    }
   }
-}
 
-const handleSubmitReview = () => {
+  const handleSubmitReview = () => {
     if (rating === 0 || !isLoggedIn) return
     console.log("Review submitted as recipe comment:", { rating, comment, recipeId: completedRecipe.id, userId: user?.id })
     // 리뷰는 레시피당 1회만 허용
@@ -117,7 +123,7 @@ const handleSubmitReview = () => {
     onOpenChange(false)
   }
 
-    // completedRecipe 없으면 렌더 안 함
+  // completedRecipe 없으면 렌더 안 함
   if (!completedRecipe) return null
   // open 아닐 때도 렌더 안 함 (Radix 제거 핵심)
   if (!open) return null
@@ -139,21 +145,38 @@ const handleSubmitReview = () => {
       >
         <div className="p-6">
           {/* Header (DialogHeader 대체) */}
-          <div className="text-center">
-            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[#800020]/10">
-              <PartyPopper className="h-10 w-10 text-[#800020]" />
+          <div className="text-center pt-6 pb-2">
+            <div className="inline-flex items-center justify-center mb-6">
+              <div className="relative">
+                <PartyPopper className="h-12 w-12 text-[#800020]" />
+                <div className="absolute inset-0 bg-[#800020]/10 blur-xl rounded-full -z-10" />
+              </div>
             </div>
-            <h2 className="text-2xl font-semibold">요리 완료!</h2>
-            <p className="text-base mt-1 text-muted-foreground">
-              <span className="font-medium text-foreground">{completedRecipe.name}</span>을(를) 성공적으로 만들었어요!
+            <h2 className="text-3xl font-black text-gray-900 tracking-tight">요리 완료!</h2>
+            <p className="text-gray-400 font-medium mt-2">
+              <span className="text-[#800020]">{completedRecipe.name}</span>을(를) 완벽하게 완성했습니다.
             </p>
+
+            <AnimatePresence mode="wait">
+              {starsEarned && (
+                <div className="flex justify-center mt-4 mb-2">
+                  <StarRewardBadge
+                    amount={0.5}
+                    customText="0.5스타 적립"
+                    layout="horizontal"
+                    starSize="sm"
+                    textSize="sm"
+                  />
+                </div>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="space-y-6 mt-4">
             {/* Completed Recipe Summary */}
             <Card className="border-[#800020]/20 bg-[#800020]/5">
-              <CardContent className="flex items-center gap-4 p-4">
-                <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted shrink-0">
+              <CardContent className="flex items-center gap-4 py-1 px-4">
+                <div className="w-24 h-24 rounded-2xl overflow-hidden bg-muted shrink-0 shadow-md">
                   <img
                     src={completedRecipe.thumbnail || "/placeholder.svg"}
                     alt={completedRecipe.name}
@@ -161,12 +184,12 @@ const handleSubmitReview = () => {
                   />
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-lg">{completedRecipe.name}</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="font-semibold text-xl mb-0.5 leading-tight">{completedRecipe.name}</p>
+                  <p className="text-sm text-muted-foreground font-normal">
                     {isCompletedRecipeLiked ? "즐겨찾기에 저장됨" : "하트를 눌러 즐겨찾기에 저장하세요"}
                   </p>
                 </div>
-                <Button variant="ghost" size="icon" className="h-12 w-12" onClick={handleLikeCompletedRecipe}>
+                <Button variant="ghost" size="icon" className="h-10 w-10 hover:bg-transparent" onClick={handleLikeCompletedRecipe}>
                   <Heart
                     className={cn(
                       "h-8 w-8 transition-all",
@@ -190,7 +213,7 @@ const handleSubmitReview = () => {
                 <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">한 레시피당 하나의 후기만 남길 수 있습니다</p>
               </div>
             ) : (
-              <div className="space-y-4 p-4 bg-muted/50 rounded-xl">
+              <div className="space-y-4 p-6 bg-white border border-[#800020]/10 shadow-[0_4px_20px_-4px_rgba(128,0,32,0.08)] rounded-2xl">
                 <div className="space-y-2">
                   <Label className="text-base font-medium">이 레시피에 별점을 남겨주세요</Label>
                   <div className="flex items-center gap-1">
@@ -257,17 +280,17 @@ const handleSubmitReview = () => {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Heart className="h-4 w-4 text-[#800020]" />
-                <span className="text-base font-medium">같은 재료로 만들 수 있는 다른 레시피들!</span>
+                <span className="text-base font-bold">추천 레시피</span>
               </div>
               <p className="text-sm text-muted-foreground">하트를 눌러 나중에 만들어볼 레시피에 저장하세요</p>
               <div className="grid gap-3">
                 {leftoverRecipes.map((recipe) => (
                   <Card key={recipe.id} className="cursor-pointer transition-all hover:shadow-md">
-                    <CardContent className="flex items-center gap-4 p-4">
+                    <CardContent className="flex items-center gap-4 py-1 px-4">
                       <img
                         src={recipe.thumbnail || "/placeholder.svg"}
                         alt={recipe.name}
-                        className="h-16 w-16 rounded-lg object-cover"
+                        className="h-24 w-24 rounded-2xl object-cover shadow-sm"
                       />
                       <div
                         className="flex-1"
@@ -276,16 +299,35 @@ const handleSubmitReview = () => {
                           onOpenChange(false)
                         }}
                       >
-                        <p className="font-medium text-lg">{recipe.name}</p>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {recipe.duration}분
+                        <p className="font-semibold text-lg leading-tight mb-1">{recipe.name}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {(recipe.tags && recipe.tags.length > 0) ? (
+                            recipe.tags.slice(0, 3).map((tag, idx) => (
+                              <span key={idx} className="text-xs text-[#800020] font-normal">
+                                #{tag}
+                              </span>
+                            ))
+                          ) : (recipe.hashtags && recipe.hashtags.length > 0) ? (
+                            recipe.hashtags.slice(0, 2).map((tag, idx) => (
+                              <span key={idx} className="text-xs text-blue-600 font-normal">
+                                #{tag}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-gray-500 font-normal italic">
+                              #추천레시피
+                            </span>
+                          )}
                         </div>
                       </div>
                       <Button
                         variant="ghost"
-                        size="icon"
-                        className="shrink-0"
+                        size="sm"
+                        className={cn(
+                          "gap-2",
+                          isRecipeLiked(recipe.id) ? "text-red-500" : "text-muted-foreground",
+                          "hover:bg-transparent"
+                        )}
                         onClick={(e) => {
                           e.stopPropagation()
                           handleLikeRecipe(recipe)

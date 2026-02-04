@@ -52,21 +52,21 @@ interface Ingredient {
 }
 
 const categoryOptions = [
-  { value: "korean", label: "한식" },
-  { value: "chinese", label: "중식" },
-  { value: "japanese", label: "일식" },
-  { value: "western", label: "양식" },
+  { value: "rice", label: "밥" },
+  { value: "sidedish", label: "반찬" },
+  { value: "soup", label: "국물" },
+  { value: "noodle", label: "면" },
   { value: "dessert", label: "디저트" },
   { value: "snack", label: "분식" },
   { value: "salad", label: "샐러드" },
   { value: "drink", label: "음료" },
-  { value: "nightsnack", label: "야식&술안주" },
   { value: "etc", label: "기타" },
+  { value: "nightsnack", label: "야식&술안주" },
 ]
 
 const CATEGORY_MAP: Record<string, number> = {
-  "korean": 1, "chinese": 2, "japanese": 3, "western": 4, "dessert": 5,
-  "snack": 6, "salad": 7, "drink": 8, "nightsnack": 9, "etc": 10
+  "rice": 1, "sidedish": 2, "soup": 3, "noodle": 4, "dessert": 5,
+  "snack": 6, "salad": 7, "drink": 8, "etc": 9, "nightsnack": 10
 }
 
 export default function NewRecipePage() {
@@ -436,13 +436,13 @@ export default function NewRecipePage() {
                     placeholder="재료명 (예: 김치)"
                     value={ingredientName}
                     onChange={(e) => setIngredientName(e.target.value)}
-                    className="flex-1"
+                    className="flex-[6]"
                   />
                   <Input
-                    placeholder="용량 (예: 200g)"
+                    placeholder="용량 (예: 200g, 약간, 1큰술, 1.5컵)"
                     value={ingredientAmount}
                     onChange={(e) => setIngredientAmount(e.target.value)}
-                    className="w-32"
+                    className="flex-[4]"
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addIngredient())}
                   />
                   <Button type="button" onClick={addIngredient} variant="outline">
@@ -485,10 +485,6 @@ export default function NewRecipePage() {
                   <span className="text-sm text-muted-foreground">
                     {currentStepIndex + 1} / {steps.length}
                   </span>
-                  <Button type="button" variant="outline" size="sm" onClick={addStep} className="gap-1 bg-transparent">
-                    <Plus className="h-4 w-4" />
-                    단계 추가
-                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -616,11 +612,16 @@ export default function NewRecipePage() {
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => setCurrentStepIndex((prev) => Math.min(steps.length - 1, prev + 1))}
-                  disabled={currentStepIndex === steps.length - 1}
+                  onClick={() => {
+                    if (currentStepIndex === steps.length - 1) {
+                      addStep()
+                    } else {
+                      setCurrentStepIndex((prev) => prev + 1)
+                    }
+                  }}
                   className="shrink-0"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  {currentStepIndex === steps.length - 1 ? <Plus className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </Button>
               </div>
 
