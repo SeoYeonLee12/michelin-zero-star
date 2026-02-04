@@ -376,9 +376,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // 1. 브라우저 환경이고 Localhost가 아니면, 현재 도메인 사용 (배포 환경 우선)
       if (typeof window !== "undefined") {
         const hostname = window.location.hostname;
-        if (hostname !== "localhost" && hostname !== "127.0.0.1") {
+        if (hostname !== "localhosㅎt" && hostname !== "127.0.0.1") {
           const protocol = window.location.protocol === "https:" ? "wss://" : "ws://"
-          return `${protocol}${window.location.host}/ws-stomp`;
+          return `${protocol}${window.location.host}/api/v1/ws-stomp`;
         }
       }
 
@@ -391,14 +391,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (apiBase && /^https?:\/\//.test(apiBase)) {
           const url = new URL(apiBase)
           const protocol = url.protocol === "https:" ? "wss:" : "ws:"
-          return `${protocol}//${url.host}/ws-stomp`
+          return `${protocol}//${url.host}/api/v1/ws-stomp`
         }
       } catch (e) {
         console.error("Invalid API Base URL", e)
       }
 
       // 3. 최후의 수단: Localhost Default
-      return "ws://localhost:8080/ws-stomp"
+      return "ws://localhost:8080/api/v1/ws-stomp"
     }
 
     const wsUrl = getWsUrl()
