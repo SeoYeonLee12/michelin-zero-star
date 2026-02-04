@@ -10,6 +10,8 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
+import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -36,17 +38,31 @@ public class GlobalExceptionHandler {
     public ResponseEntity<MethodArgumentExceptionResponse> handleMethodArgumentExceptionResponse(
             MethodArgumentNotValidException exception
     ) {
-        BindingResult bindingResult = exception.getBindingResult();
-
-        Map<String, String> errors = new HashMap<>();
-        for (FieldError fieldError : bindingResult.getFieldErrors()) {
-            errors.put(fieldError.getField(), fieldError.getDefaultMessage());
-        }
-        log.info("MethodArgumentNotValidException occurred: {}", errors);
+        Map<String, String> errors = extractErrors(exception.getBindingResult());
+        log.info("HTTP MethodArgumentNotValidException occurred: {}", errors);
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(MethodArgumentExceptionResponse.from(
                         InternalServerErrorCode.INVALID_INPUT_VALUE, errors));
     }
 
+    @MessageExceptionHandler(MethodArgumentNotValidException.class)
+    @SendToUser("/queue/errors")
+    public MethodArgumentExceptionResponse handleWebSocketValidationException(
+            MethodArgumentNotValidException exception
+    ) {
+        Map<String, String> errors = extractErrors(exception.getBindingResult());
+        log.info("WebSocket Validation Exception occurred: {}", errors);
+
+        return MethodArgumentExceptionResponse.from(
+                InternalServerErrorCode.INVALID_INPUT_VALUE, errors);
+    }
+
+    private Map<String, String> extractErrors(BindingResult bindingResult) {
+        Map<String, String> errors = new HashMap<>();
+        for (FieldError fieldError : bindingResult.getFieldErrors()) {
+            errors.put(fieldError.getField(), fieldError.getDefaultMessage());
+        }
+        return errors;
+    }
 }
