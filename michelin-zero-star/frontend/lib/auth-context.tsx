@@ -371,25 +371,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const connectWebSocket = (token: string) => {
     if (stompClient.current) disconnectWebSocket();
 
-    // WS URL 동적 생성
+    // WS URL 동적 생성 (Path 제거 및 Origin만 사용)
     const getWsUrl = () => {
       const envUrl = process.env.NEXT_PUBLIC_WS_URL
       if (envUrl) return envUrl
 
       const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL
-      let baseUrl = apiBase || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8080")
-
-      if (baseUrl.startsWith("http://")) {
-        baseUrl = baseUrl.replace("http://", "ws://")
-      } else if (baseUrl.startsWith("https://")) {
-        baseUrl = baseUrl.replace("https://", "wss://")
-      } else if (baseUrl.startsWith("/")) {
-        baseUrl = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + baseUrl
-      } else if (!baseUrl.startsWith("ws://") && !baseUrl.startsWith("wss://")) {
-        baseUrl = "ws://" + baseUrl
+      try {
+        if (apiBase && /^https?:\/\//.test(apiBase)) {
+          const url = new URL(apiBase)
+          const protocol = url.protocol === "https:" ? "wss:" : "ws:"
+          return `${protocol}//${url.host}/ws-stomp`
+        }
+      } catch (e) {
+        console.error("Invalid API Base URL", e)
       }
 
-      if (baseUrl.endsWith("/")) baseUrl = baseUrl.slice(0, -1)
+      // Fallback: 브라우저 현재 호스트 기준
+      if (typeof window !== "undefined") {
+        const protocol = window.location.protocol === "https:" ? "wss://" : "ws://"
+        return `${protocol}${window.location.host}/ws/connect`
+      }
+
+      // Fallback for local development or when no API_BASE_URL/window is available
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
       return `${baseUrl}/ws-stomp`
     }
 

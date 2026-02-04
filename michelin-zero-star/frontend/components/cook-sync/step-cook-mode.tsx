@@ -312,29 +312,26 @@ export function StepCookMode({
   React.useEffect(() => {
     const token = getGlobalAccessToken()
 
-    // WS URL 동적 생성
+    // WS URL 동적 생성 (Path 제거 및 Origin만 사용)
     const getWsUrl = () => {
       const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL
-      // API Base가 있으면 그것을 기반으로, 없으면 현재 window origin 사용
-      let baseUrl = apiBase || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8080")
-
-      // http/https -> ws/wss 변환
-      if (baseUrl.startsWith("http://")) {
-        baseUrl = baseUrl.replace("http://", "ws://")
-      } else if (baseUrl.startsWith("https://")) {
-        baseUrl = baseUrl.replace("https://", "wss://")
-      } else if (baseUrl.startsWith("/")) {
-        // 상대 경로인 경우
-        baseUrl = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + baseUrl
-      } else {
-        // 프로토콜이 없는 경우 (예: localhost:8080)
-        baseUrl = "ws://" + baseUrl
+      try {
+        if (apiBase && /^https?:\/\//.test(apiBase)) {
+          const url = new URL(apiBase)
+          const protocol = url.protocol === "https:" ? "wss:" : "ws:"
+          return `${protocol}//${url.host}/ws-stomp`
+        }
+      } catch (e) {
+        console.error("Invalid API Base URL", e)
       }
 
-      // 끝에 슬래시 제거
-      if (baseUrl.endsWith("/")) baseUrl = baseUrl.slice(0, -1)
+      // Fallback: 브라우저 현재 호스트 기준
+      if (typeof window !== "undefined") {
+        const protocol = window.location.protocol === "https:" ? "wss://" : "ws://"
+        return `${protocol}${window.location.host}/ws-stomp`
+      }
 
-      return `${baseUrl}/ws-stomp`
+      return "ws://localhost:8080/ws/connect"
     }
 
     const wsUrl = getWsUrl()
