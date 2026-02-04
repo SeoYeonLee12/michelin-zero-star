@@ -38,11 +38,11 @@ public class AiChatController {
 
     @MessageMapping("/hello")
     public void greeting(ChatMessage message) {
-        redisChataService.saveMessage("default-room", message);
+//        redisChataService.saveMessage("default-room", message);
 
         // 구독하는 클라이언트에게 발행
         ChatMessage response = new ChatMessage("서버가 보냅니다", "반가워요, " + message.getSender());
-        redisChataService.saveMessage("default-room-server", response);
+//        redisChataService.saveMessage("default-room-server", response);
 
         messageTemplate.convertAndSend("/topic/greetings", response);
         log.info("발송완료");

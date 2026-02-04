@@ -30,7 +30,6 @@ public class RecipeAiService {
 
     //TODO: 응답 필요할 시 변경 근데 아직은 모르겠는데 꼭 바꿔야될 거 같기는 함.(Future 타입으로)
     @Async
-    @Transactional
     public void processAI(
             User user,
             Recipe recipe,
@@ -58,15 +57,18 @@ public class RecipeAiService {
     }
 
     @Async
-    public void processCommonChatBotAI(User user, String content) {
+    public void processCommonChatbotAI(User user, String content) {
         List<String> userFavoriteCategories =
                 userFavoriteCategoryRepository.findCategoryNamesByUser(user);
-        AiCommonChatbotResponse response = aiTransferClient.transferData(
+
+        CommonAiAnswer answer = aiTransferClient.transferData(
                 user,
                 content,
                 userFavoriteCategories
         );
-        applicationEventPublisher.publishEvent();
-    }
 
+        applicationEventPublisher.publishEvent(
+                AiChatCompletedEvent.of(user.getId(), answer)
+        );
+    }
 }

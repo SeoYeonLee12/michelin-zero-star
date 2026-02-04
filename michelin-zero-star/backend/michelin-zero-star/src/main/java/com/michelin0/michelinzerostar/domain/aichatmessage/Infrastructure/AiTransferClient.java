@@ -4,8 +4,11 @@ import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.Ai
 import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiCommonChatbotResponse;
 import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiRecipeChatbotRequest;
 import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiRecipeChatbotResponse;
+import com.michelin0.michelinzerostar.domain.aichatmessage.domain.CommonAiAnswer;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeStep;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
+import com.michelin0.michelinzerostar.global.exception.errorcode.AiChatMessageErrorCode;
+import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +43,7 @@ public class AiTransferClient {
                 .body(AiRecipeChatbotResponse.class);
     }
 
-    public AiCommonChatbotResponse transferData(
+    public CommonAiAnswer transferData(
             User user,
             String content,
             List<String> favoriteCategories
@@ -50,11 +53,16 @@ public class AiTransferClient {
                 content,
                 favoriteCategories
         );
-        log.info("Complete Transfer");
-        return aiRestClient.post()
+        log.info("Sending request to AI Server: {}", request);
+
+        AiCommonChatbotResponse response = aiRestClient.post()
                 .uri("/api/chat/search")
                 .body(request)
                 .retrieve()
                 .body(AiCommonChatbotResponse.class);
+        if (response == null) {
+            throw new GlobalException(AiChatMessageErrorCode.EMPTY_AI_CLIENT_REPSONSE);
+        }
+        return response.toDomain();
     }
 }

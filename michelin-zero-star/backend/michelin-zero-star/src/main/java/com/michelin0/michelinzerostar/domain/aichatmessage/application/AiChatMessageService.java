@@ -57,4 +57,11 @@ public class AiChatMessageService {
                 .map(ChatHistoryResult::from)
                 .toList();
     }
+
+    // TODO 여기부터 완성
+    public void askCommonChatAI(CommonChatbotCommand command){
+        User searchedUser= userRepository.getReferenceById(command.userId());
+
+    }
+
 }
