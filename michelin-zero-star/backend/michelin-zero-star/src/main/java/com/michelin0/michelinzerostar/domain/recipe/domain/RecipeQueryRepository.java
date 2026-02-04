@@ -70,7 +70,7 @@ public class RecipeQueryRepository {
                 .select(category.categoryName)
                 .from(recipeCategory)
                 .join(recipeCategory.category, category)
-                .where(recipeCategory.recipe.recipeId.eq(recipe.recipeId))
+                .where(recipeCategory.recipe.recipeId.eq(recipeId))
                 .fetch();
 
         List<RecipeTagProjection> tags = queryFactory
@@ -160,20 +160,12 @@ public class RecipeQueryRepository {
 
     public Page<RecipeListProjection> findAllRecipes(RecipesSearchCondition condition,
             Pageable pageable, Long userId) {
-        
-        var idsQuery = queryFactory
+        List<Long> ids = queryFactory
                 .select(recipe.recipeId)
-                .from(recipe);
-
-        if (StringUtils.hasText(condition.category())) {
-            idsQuery.join(recipeCategory).on(recipeCategory.recipe.eq(recipe))
-                    .join(recipeCategory.category, category)
-                    .where(category.categoryName.eq(condition.category()));
-        }
-
-        List<Long> ids = idsQuery
+                .from(recipe)
                 .where(
                         eqRecipeType(condition.recipeType()),
+                        eqCategory(condition.category()),
                         containsSearchWord(condition.searchWord())
                 )
                 .orderBy(getOrderSpecifier(condition.sort()))
@@ -202,19 +194,12 @@ public class RecipeQueryRepository {
                 .orderBy(getOrderSpecifier(condition.sort()))
                 .fetch();
 
-        var countQuery = queryFactory
+        Long totalCount = queryFactory
                 .select(recipe.count())
-                .from(recipe);
-
-        if (StringUtils.hasText(condition.category())) {
-            countQuery.join(recipeCategory).on(recipeCategory.recipe.eq(recipe))
-                    .join(recipeCategory.category, category)
-                    .where(category.categoryName.eq(condition.category()));
-        }
-
-        Long totalCount = countQuery
+                .from(recipe)
                 .where(
                         eqRecipeType(condition.recipeType()),
+                        eqCategory(condition.category()),
                         containsSearchWord(condition.searchWord())
                 )
                 .fetchOne();
@@ -272,6 +257,19 @@ public class RecipeQueryRepository {
         }
     }
 
+    private BooleanExpression eqCategory(String categoryName) {
+        if (!StringUtils.hasText(categoryName)) {
+            return null;
+        }
+        QRecipeCategory subRecipeCategory = new QRecipeCategory("subRecipeCategory");
+        QCategory subCategory = new QCategory("subCategory");
+        return recipe.recipeId.in(
+                JPAExpressions.select(subRecipeCategory.recipe.recipeId)
+                        .from(subRecipeCategory)
+                        .join(subRecipeCategory.category, subCategory)
+                        .where(subCategory.categoryName.eq(categoryName))
+        );
+    }
 
     private BooleanExpression isScrappedExpression(Long userId) {
         if (userId == null) {

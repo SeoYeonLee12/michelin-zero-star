@@ -1,7 +1,9 @@
 package com.michelin0.michelinzerostar.global.config;
 
+import com.michelin0.michelinzerostar.global.security.jwt.StompHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
@@ -18,6 +20,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private static final String SIMPLE_BROKER_TOPIC = "/topic";
     private static final String SIMPLE_BROKER_QUEUE = "/queue";
     private static final String PUBLISH = "/app";
+    private final StompHandler stompHandler;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
@@ -34,5 +37,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.addEndpoint(END_POINT)
                 .setAllowedOriginPatterns("*");
 //                .withSockJS();
+    }
+
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        // 소켓 연결 시 JWT 토큰 검증 인터셉터 등록
+        registration.interceptors(stompHandler);
     }
 }

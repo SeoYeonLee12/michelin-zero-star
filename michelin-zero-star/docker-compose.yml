@@ -22,6 +22,9 @@ services:
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
       - AI_SERVER_URL=http://ai-serving:8000
 
+      # [중요] OAuth2 로그인 후 리다이렉트될 프론트엔드 도메인
+      - APP_FRONTEND_URL=https://i14b208.p.ssafy.io
+
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - KAKAO_CLIENT_ID=${KAKAO_CLIENT_ID}
@@ -164,8 +167,8 @@ services:
     environment:
       - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
-      # 브라우저(로컬 PC)에서 접근해야 하므로 localhost 사용 및 /api/v1 추가
-      - NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
+      # [Hybrid Merge] Localhost value with Remote Variable Name
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api/v1
       - WATCHPACK_POLLING=true
       - CHOKIDAR_USEPOLLING=true
     volumes:

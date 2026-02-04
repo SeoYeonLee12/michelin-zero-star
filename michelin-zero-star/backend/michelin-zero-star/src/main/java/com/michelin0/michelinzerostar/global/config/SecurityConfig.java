@@ -44,16 +44,12 @@ public class SecurityConfig {
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
     @Bean
-    public DaoAuthenticationProvider authenticationProvider(
-            CustomUserDetailsService customUserDetailsService,
-            PasswordEncoder passwordEncoder
-    ) {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(customUserDetailsService);
-        provider.setPasswordEncoder(passwordEncoder);
-        return provider;
+    public DaoAuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(customUserDetailsService);
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
     }
-
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration)
@@ -72,42 +68,61 @@ public class SecurityConfig {
         ObjectMapper objectMapper = new ObjectMapper();
 
         http
-                // CORS 설정 추가 (가장 중요!)
+                // CORS 설정 적용
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
+                // 기본 보안 설정 (CSRF, FormLogin 등 비활성화)
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .headers(headers -> headers.frameOptions(
-                        HeadersConfigurer.FrameOptionsConfig::sameOrigin))
+                        HeadersConfigurer.FrameOptionsConfig::sameOrigin)) // H2 Console 등을 위해 필요
                 .sessionManagement(
-                        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                        session -> session.sessionCreationPolicy(
+                                SessionCreationPolicy.STATELESS)) // JWT 사용하므로 세션 끔
+
+                // 요청별 권한 설정
                 .authorizeHttpRequests(auth -> auth
-                        // 정적 리소스 허용
+                        // [정적 리소스]
                         .requestMatchers("/css/**", "/images/**", "/js/**", "/favicon.*",
                                 "/*/icon-*").permitAll()
 
-                        // GET 요청만 허용
-                        .requestMatchers(HttpMethod.GET, "/api/recipes/**").permitAll()
+                        // [Swagger UI & API Docs]
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/swagger-resources/**",
+                                "/api-docs/**"
+                        ).permitAll()
 
-                        // 로그인, 회원가입, 재발급 등 허용
+                        // [공개 API]
                         .requestMatchers(
                                 "/",
                                 "/error",
-                                "/api/v1/auth/**", // ★ reissue 포함됨 (중요)
-                                "/api-docs/**",
-                                "/swagger-ui/**",
-                                "/v3/api-docs/**",
-                                "/h2-console/**",
-                                // 웹소켓 연결 허용
+                                "/api/v1/auth/**",
+                                "/v1/auth/**",
+                                "/h2-console/**"
+                        ).permitAll()
+
+                        // [WebSocket]
+                        .requestMatchers(
+                                "/ws-stomp/**",
                                 "/ws/connect/**"
                         ).permitAll()
 
-                        // 나머지는 인증 필요
+                        // [GET 요청 허용] - 레시피 조회 등
+                        .requestMatchers(HttpMethod.GET, "/api/recipes/**").permitAll()
+
+                        // [나머지 모든 요청] - 인증 필요
                         .anyRequest().authenticated()
                 )
+
+                // JWT 필터
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
                         UsernamePasswordAuthenticationFilter.class)
+
+                // OAuth2 로그인 설정
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                         .successHandler(oAuth2SuccessHandler)
@@ -117,6 +132,8 @@ public class SecurityConfig {
                             response.getWriter().write("{\"error\": \"OAuth2 Login Failed\"}");
                         })
                 )
+
+                // 예외 처리 (인증/인가 실패 시 JSON 응답)
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) -> {
                             log.error("인증 실패 (401) - URL: {}", request.getRequestURI());
@@ -141,20 +158,28 @@ public class SecurityConfig {
         return http.build();
     }
 
+    // CORS 설정
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // [수정됨] 모든 출처 허용 (*).
-        // setAllowCredentials(true)와 함께 쓸 때는 setAllowedOrigins("*") 대신 Patterns를 써야 함
-        configuration.setAllowedOriginPatterns(Collections.singletonList("*"));
+        // [수정 전] 특정 도메인만 허용되어 있어서, 로컬 파일(html) 실행 시 막힘
+        /* configuration.setAllowedOriginPatterns(Arrays.asList(
+                "http://localhost:3000",
+                "http://localhost:8080",
+                "http://localhost:8081",
+                "https://i14b208.p.ssafy.io"
+        ));
+        */
+
+        // [수정 후] 테스트를 위해 "모든 주소(*)" 허용으로 변경
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
         configuration.setAllowedMethods(
                 Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(Collections.singletonList("*"));
-
-        // 쿠키(Credential) 전송 허용
         configuration.setAllowCredentials(true);
         configuration.setExposedHeaders(Arrays.asList("Authorization", "Set-Cookie"));
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

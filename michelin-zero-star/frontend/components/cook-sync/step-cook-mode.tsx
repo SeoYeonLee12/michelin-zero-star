@@ -222,7 +222,8 @@ export function StepCookMode({
             setMicPermission("granted")
             setIsListening(true)
           })
-          .catch(() => {
+          .catch((e) => {
+            console.error("[getUserMedia@mount] failed:", e?.name, e?.message, e)
             setMicPermission("denied")
           })
       } catch {
@@ -486,7 +487,7 @@ export function StepCookMode({
     // 처음 한 번만 컨트롤러 생성
     if (!porcupineRef.current) {
       porcupineRef.current = createPorcupineController({
-        accessKey: "1r8W1qECGfTQBkcinHH2MBud1NtH832F1mw4de4VfSEY4GMgSjuYCw==",
+        accessKey: "PdCMcmOqLkfpf+23tTzvPe2TIro/Kae/vMNBas8v5vhUso6Yo9UWAQ==",
         modelPublicPath: "/porcupine/ko.pv",
         keywords: [
           { label: "WAKE", publicPath: "/porcupine/wake.ppn" },

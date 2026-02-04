@@ -8,8 +8,6 @@ import com.michelin0.michelinzerostar.domain.market.entity.MarketPost;
 import com.michelin0.michelinzerostar.domain.market.entity.MarketPostImage;
 import com.michelin0.michelinzerostar.domain.market.entity.PostStatus;
 import com.michelin0.michelinzerostar.domain.market.repository.MarketPostRepository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.domain.user.entity.UserProfile;
 import com.michelin0.michelinzerostar.domain.user.repository.UserRepository;
@@ -26,6 +24,8 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -44,7 +44,8 @@ public class MarketPostService {
 
     // 게시글 생성
     @Transactional
-    public void createPost(Long userId, MarketPostCreateRequest request, List<MultipartFile> images) {
+    public void createPost(Long userId, MarketPostCreateRequest request,
+            List<MultipartFile> images) {
         User writer = userRepository.findById(userId)
                 .orElseThrow(() -> new GlobalException(UserErrorCode.USER_NOT_FOUND));
 
@@ -58,19 +59,19 @@ public class MarketPostService {
                 .writer(writer)
                 .title(request.getTitle())
                 .content(request.getContent())
-                .price(request.getPrice())
+                .price(request.getPrice()) // 0원일 경우 나눔 처리
                 .meetingPlace(request.getMeetingPlace())
-                .category(request.getCategory())
                 .locationText(profile.getLocationAddress())
                 .locationCode(profile.getLocationCode())
                 .latitude(profile.getLatitude())
                 .longitude(profile.getLongitude())
                 .build();
 
-        uploadImages(post, images); // 이미지 업로드
+        uploadImages(post, images);
 
         marketPostRepository.save(post);
-        log.info("게시글 등록 완료: ID={}, Title={}", post.getId(), post.getTitle());
+        log.info("게시글 등록 완료: ID={}, Title={}, Price={}", post.getId(), post.getTitle(),
+                post.getPrice());
     }
 
     // 게시글 상세 조회
@@ -117,29 +118,32 @@ public class MarketPostService {
                 .collect(Collectors.toList());
     }
 
-    // 게시글 내용 수정 (이미지 포함)
+    // 게시글 수정
     @Transactional
-    public void updatePost(Long postId, Long userId, MarketPostUpdateRequest request, List<MultipartFile> images) {
+    public void updatePost(Long postId, Long userId, MarketPostUpdateRequest request,
+            List<MultipartFile> images) {
         MarketPost post = marketPostRepository.findById(postId)
                 .orElseThrow(() -> new GlobalException(MarketErrorCode.POST_NOT_FOUND));
 
         validateWriter(post, userId);
 
-        post.update(request.getTitle(), request.getContent(), request.getPrice(), request.getMeetingPlace());
+        post.update(request.getTitle(), request.getContent(), request.getPrice(),
+                request.getMeetingPlace());
 
         if (images != null && !images.isEmpty()) {
-            deletePostImages(post); // 기존 이미지 삭제
-            uploadImages(post, images); // 새 이미지 업로드
+            deletePostImages(post);
+            uploadImages(post, images);
         }
+        log.info("게시글 수정 완료: ID={}", post.getId());
     }
-    
-    // 내가 쓴 게시글 조회
+
+    // 내가 쓴 게시물 조회
     public Page<MarketPostListResponse> getMyPosts(Long userId, Pageable pageable) {
-        return marketPostRepository.findAllByWriterId(userId, pageable)
+        return marketPostRepository.findAllByWriterIdOrderByCreatedAtDesc(userId, pageable)
                 .map(MarketPostListResponse::new);
     }
 
-    // 게시글 상태 수정 (판매중, 예약중, 거래완료)
+    // 상태 수정
     @Transactional
     public void updatePostStatus(Long postId, Long userId, String statusStr) {
         MarketPost post = marketPostRepository.findById(postId)
@@ -151,12 +155,11 @@ public class MarketPostService {
             PostStatus newStatus = PostStatus.valueOf(statusStr.toUpperCase());
             post.updateStatus(newStatus);
         } catch (IllegalArgumentException e) {
-            // 적절한 에러 코드로 변경 가능 (예: INVALID_INPUT_VALUE)
             throw new IllegalArgumentException("유효하지 않은 상태 값입니다. (SELLING, RESERVED, SOLD)");
         }
     }
 
-    // 게시글 삭제
+    // 삭제
     @Transactional
     public void deletePost(Long postId, Long userId) {
         MarketPost post = marketPostRepository.findByIdIncludeDeleted(postId)
@@ -168,88 +171,76 @@ public class MarketPostService {
             throw new GlobalException(MarketErrorCode.ALREADY_DELETED_POST);
         }
 
-        marketPostRepository.delete(post); // Soft Delete
+        marketPostRepository.delete(post);
     }
 
-    // 내가 찜한 게시글 목록 조회
+    // 찜 목록 조회
     public List<MarketPostListResponse> getMyLikedPosts(Long userId) {
         if (!userRepository.existsById(userId)) {
             throw new GlobalException(UserErrorCode.USER_NOT_FOUND);
         }
-
-        List<MarketPost> likedPosts = marketPostRepository.findLikedPostsByUserId(userId);
-
-        return likedPosts.stream()
+        return marketPostRepository.findLikedPostsByUserId(userId).stream()
                 .map(MarketPostListResponse::new)
                 .collect(Collectors.toList());
     }
 
-    // 권한 검증
     private void validateWriter(MarketPost post, Long userId) {
         if (!post.getWriter().getId().equals(userId)) {
-            log.warn("권한 없는 수정 시도: PostID={}, LoginUserID={}", post.getId(), userId);
             throw new GlobalException(MarketErrorCode.NOT_POST_OWNER);
         }
     }
 
-    // 내부 이미지 업로드 로직
     private void uploadImages(MarketPost post, List<MultipartFile> images) {
-        if (images == null || images.isEmpty()) return;
+        if (images == null || images.isEmpty()) {
+            return;
+        }
 
         File dir = new File(uploadDir);
-        if (!dir.exists()) dir.mkdirs();
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
 
         for (int i = 0; i < images.size(); i++) {
             MultipartFile file = images.get(i);
-            if (file.isEmpty()) continue;
+            if (file == null || file.isEmpty()) {
+                continue;
+            }
 
-            String originalFilename = file.getOriginalFilename();
-            String ext = extractExt(originalFilename);
+            String ext = extractExt(file.getOriginalFilename());
             validateExtension(ext);
 
             String storeFileName = UUID.randomUUID() + "." + ext;
-            String fullPath = Paths.get(uploadDir, storeFileName).toString();
-
             try {
-                file.transferTo(new File(fullPath));
-                MarketPostImage image = MarketPostImage.builder()
+                file.transferTo(new File(Paths.get(uploadDir, storeFileName).toString()));
+                post.addImage(MarketPostImage.builder()
                         .imageUrl("/images/" + storeFileName)
                         .orderIndex(i)
-                        .build();
-                post.addImage(image);
+                        .build());
             } catch (IOException e) {
-                log.error("이미지 저장 중 오류 발생: {}", e.getMessage());
-                throw new RuntimeException("이미지 저장 중 오류가 발생했습니다.", e);
+                throw new RuntimeException("이미지 저장 실패", e);
             }
         }
     }
 
-    // 기존 이미지 삭제 로직
     private void deletePostImages(MarketPost post) {
-        for (MarketPostImage img : post.getImages()) {
-            try {
-                String fileName = img.getImageUrl().replace("/images/", "");
-                File file = new File(Paths.get(uploadDir, fileName).toString());
-                if (file.exists()) {
-                    file.delete();
-                }
-            } catch (Exception e) {
-                log.warn("이미지 파일 삭제 실패: {}", img.getImageUrl());
+        post.getImages().forEach(img -> {
+            File file = new File(
+                    Paths.get(uploadDir, img.getImageUrl().replace("/images/", "")).toString());
+            if (file.exists()) {
+                file.delete();
             }
-        }
+        });
         post.getImages().clear();
     }
 
-    private String extractExt(String originalFilename) {
-        int pos = originalFilename.lastIndexOf(".");
-        if (pos == -1) return "";
-        return originalFilename.substring(pos + 1).toLowerCase();
+    private String extractExt(String filename) {
+        int pos = filename.lastIndexOf(".");
+        return pos == -1 ? "" : filename.substring(pos + 1).toLowerCase();
     }
 
     private void validateExtension(String ext) {
-        String[] allowedExts = {"jpg", "jpeg", "png"};
-        if (!Arrays.asList(allowedExts).contains(ext)) {
-            throw new RuntimeException("허용되지 않는 파일 형식입니다: " + ext);
+        if (!Arrays.asList("jpg", "jpeg", "png").contains(ext)) {
+            throw new RuntimeException("허용되지 않는 파일 형식: " + ext);
         }
     }
 }
