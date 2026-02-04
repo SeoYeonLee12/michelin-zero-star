@@ -34,7 +34,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/api/v1/ws-stomp") // Changed to /api/v1/ws-stomp to match Nginx proxy
+        registry.addEndpoint("/ws-stomp")
                 .setAllowedOriginPatterns("*"); // CORS 전체 허용
     }
 
