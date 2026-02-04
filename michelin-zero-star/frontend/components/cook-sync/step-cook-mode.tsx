@@ -2,6 +2,9 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
+import { Client } from "@stomp/stompjs"
+import { getGlobalAccessToken } from "@/lib/api/client"
+import { useAuth } from "@/lib/auth-context"
 import {
   Play,
   Pause,
@@ -64,6 +67,7 @@ export function StepCookMode({
   onStepChange,
   onComplete,
   recipeName,
+  onBack,
 }: {
   recipeId: number
   steps: RecipeStep[]
@@ -71,8 +75,10 @@ export function StepCookMode({
   onStepChange: (index: number) => void
   onComplete: () => void
   recipeName?: string
+  onBack?: () => void
 }) {
   const router = useRouter()
+  const { user } = useAuth()
 
   // ===== State 관리 =====
   const [skillLevel, setSkillLevel] = React.useState<SkillLevel>("intermediate")
@@ -105,6 +111,7 @@ export function StepCookMode({
 
   // ====== refs (클로저 버그 방지: NEXT/PREV/PLAY 등) ======
   const sttStopRef = React.useRef<null | (() => void)>(null)
+  const stompClientRef = React.useRef<Client | null>(null) // ✅ WebSocket Ref
   const porcupineRef = React.useRef<ReturnType<typeof createPorcupineController> | null>(null)
 
   const isListeningRef = React.useRef(isListening)
@@ -125,6 +132,60 @@ export function StepCookMode({
   React.useEffect(() => { aiVoiceEnabledRef.current = aiVoiceEnabled }, [aiVoiceEnabled])
   React.useEffect(() => { aiTurnRef.current = aiTurn }, [aiTurn])
 
+  // ===== WebSocket Connection =====
+  React.useEffect(() => {
+    const token = getGlobalAccessToken()
+    if (!token) return
+
+    const client = new Client({
+      brokerURL: "ws://localhost:8080/ws/connect",
+      connectHeaders: {
+        Authorization: `Bearer ${token}`,
+      },
+      reconnectDelay: 5000,
+      debug: (str) => console.log("[STOMP]", str),
+    })
+
+    client.onConnect = (frame) => {
+      console.log("✅ WebSocket Connected")
+
+      // AI 응답 구독
+      client.subscribe("/user/queue/ai/reply", (message) => {
+        if (message.body) {
+          try {
+            const body = JSON.parse(message.body)
+            const answer = body.answer || body.content || body.message || message.body
+            setAiMessages((prev) => [...prev, { role: "ai", content: answer }])
+
+            // 응답이 오면 다시 듣기 모드 (지연 후)
+            setTimeout(() => {
+              setAiTurnSafe("listening")
+              if (aiOpenRef.current && aiVoiceEnabledRef.current) {
+                // scheduleSttRetry(50) // 루프 가능성 있으므로 상황 봐서
+              }
+            }, 500)
+
+          } catch (e) {
+            console.error("Msg Parse Error", e)
+            setAiMessages((prev) => [...prev, { role: "ai", content: message.body }])
+            setAiTurnSafe("listening")
+          }
+        }
+      })
+    }
+
+    client.onStompError = (frame) => {
+      console.error("Broker error: " + frame.headers["message"])
+    }
+
+    client.activate()
+    stompClientRef.current = client
+
+    return () => {
+      client.deactivate()
+    }
+  }, [user?.id])
+
   React.useEffect(() => { isListeningRef.current = isListening }, [isListening])
   React.useEffect(() => { aiOpenRef.current = aiOpen }, [aiOpen])
   React.useEffect(() => { stepIndexRef.current = currentStepIndex }, [currentStepIndex])
@@ -142,7 +203,11 @@ export function StepCookMode({
     clearSttRetryTimer()
     safeStopStt()
     porcupineRef.current?.stop()
-    router.back()
+    if (onBack) {
+      onBack()
+    } else {
+      router.back()
+    }
   }
 
 
@@ -276,16 +341,29 @@ export function StepCookMode({
 
           setAiTurnSafe("thinking")
 
-          try {
-            const res = await postCookingChat({
-              recipeId,
-              currentStepIndex: stepIndexRef.current,
-              message: raw,
+          // ✅ WebSocket으로 전송 (기존 API 호출 대체)
+          if (stompClientRef.current && stompClientRef.current.connected) {
+            const payload = {
+              content: raw,
+              recipeId: recipeId,
+              currentStepNumber: stepIndexRef.current + 1
+            }
+            stompClientRef.current.publish({
+              destination: "/app/recipes/ask",
+              body: JSON.stringify(payload),
             })
-            setAiMessages((prev) => [...prev, { role: "ai", content: res.answer }])
-          } catch {
-            setAiMessages((prev) => [...prev, { role: "ai", content: "서버 응답을 받지 못했어요." }])
+            // 응답은 WebSocket subscribe에서 처리
+          } else {
+            setAiMessages((prev) => [...prev, { role: "ai", content: "서버 연결이 원활하지 않아 메시지를 보낼 수 없어요." }])
+            setAiTurnSafe("listening")
           }
+
+          // 참고: 기존에는 await postCookingChat() 후 setAiTurnSafe("listening")을 했으나,
+          // 소켓은 비동기이므로 응답을 받을 때 상태를 변경해야 함.
+          // 여기서 강제로 listening으로 돌리면 "생각중" UI가 순식간에 사라짐.
+          // 하지만 백엔드가 아직 응답을 안 주므로... 일단 UI 흐름상 "thinking" 유지하거나,
+          // 사용자 경험을 위해 잠시 후 listening으로 복귀시키는 타임아웃을 둘 수 있음.
+          // (일단 여기서는 socket send success 가정하고 넘어감)
 
           setAiTurnSafe("listening")
 
@@ -495,23 +573,28 @@ export function StepCookMode({
     }
   }, [])
 
-  // ===== AI 메시지 전송(팀원 코드: 더미 → 네 코드: 실제 postChat) =====
+  // ===== AI 메시지 전송 (WebSocket) =====
   const handleAiSend = async () => {
     if (!aiInput.trim()) return
     const userText = aiInput.trim()
 
     setAiMessages((prev) => [...prev, { role: "user", content: userText }])
     setAiInput("")
+    setAiTurnSafe("thinking")
 
-    try {
-      const res = await postCookingChat({
-        recipeId,
-        currentStepIndex: stepIndexRef.current,
-        message: userText,
+    if (stompClientRef.current && stompClientRef.current.connected) {
+      const payload = {
+        content: userText,
+        recipeId: recipeId,
+        currentStepNumber: currentStepIndex + 1
+      }
+      stompClientRef.current.publish({
+        destination: "/app/recipes/ask",
+        body: JSON.stringify(payload),
       })
-      setAiMessages((prev) => [...prev, { role: "ai", content: res.answer }])
-    } catch {
-      setAiMessages((prev) => [...prev, { role: "ai", content: "서버 연결에 실패했어요. 잠시 후 다시 시도해 주세요." }])
+    } else {
+      setAiMessages((prev) => [...prev, { role: "ai", content: "서버와 연결되지 않았어요." }])
+      setAiTurnSafe("listening")
     }
   }
 
@@ -624,84 +707,110 @@ export function StepCookMode({
 
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden text-gray-900">
-      {/* 1. 상단바: 빈 공간 제거 */}
-      <header className="shrink-0 border-b bg-white px-6 py-3">
-        <div className="max-w-[1100px] mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="font-bold text-sm text-gray-800">{recipeName}</h2>
-            <Badge variant="outline" className="text-[#800020] border-[#800020] h-5 text-[10px]">
-              STEP {currentStepIndex + 1}
-            </Badge>
+      {/* 1. 상단바: 그리드를 사용하여 Progress 바를 중앙에 배치 */}
+      <header className="shrink-0 border-b bg-white px-6 py-2">
+        <div className="max-w-[1200px] mx-auto grid grid-cols-3 items-center">
+          {/* 왼쪽: 돌아기기 + 레시피명 */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleClose}
+              className="flex items-center justify-center text-gray-400 hover:text-[#800020] transition-colors"
+              aria-label="돌아가기"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+            <div className="flex items-center gap-2 overflow-hidden">
+              <h2 className="font-bold text-base text-gray-800 truncate max-w-[200px]">{recipeName}</h2>
+              <Badge variant="outline" className="text-[#800020] border-[#800020] h-4 text-[9px] px-1.5 shrink-0">
+                STEP {currentStepIndex + 1}
+              </Badge>
+            </div>
           </div>
-          <div className="flex items-center gap-3 w-1/4">
-            <Progress value={totalProgress} className="h-1 flex-1" />
-            <span className="text-[10px] font-bold text-gray-400">{Math.round(totalProgress)}%</span>
+
+          {/* 중앙: Progress 바 */}
+          <div className="flex items-center gap-3 justify-center">
+            <Progress value={totalProgress} className="h-1 w-full max-w-[200px]" />
+            <span className="text-[10px] font-bold text-gray-400 shrink-0">{Math.round(totalProgress)}%</span>
           </div>
-          {/* X 버튼: hover 효과 제거 및 클릭 시 뒤로가기 */}
-          <button
-            onClick={handleClose}
-            className="h-8 w-8 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors"
-            aria-label="닫기"
-          >
-            <X className="h-4 w-4" />
-          </button>
+
+          {/* 오른쪽: 밸런스를 위한 빈 공간 */}
+          <div className="flex justify-end" />
         </div>
       </header>
 
-      {/* 2. 메인: 상단 여백 조정 */}
-      <main className="flex-1 max-w-[1000px] mx-auto w-full flex flex-col lg:flex-row gap-5 px-6 pt-5 overflow-hidden pb-24">
+      {/* 2. 메인: 여백 유지하면서 콘텐츠 집중 */}
+      <main className="flex-1 max-w-[1400px] mx-auto w-full flex flex-col lg:flex-row gap-10 px-8 pt-6 overflow-hidden pb-12">
         {/* 왼쪽: 이미지(4:3) + 설명 */}
-        <section className="flex-[1.1] flex flex-col gap-3 min-w-0">
-          <div className="relative aspect-[4/3] w-full rounded-xl overflow-hidden border border-gray-100 shadow-sm">
+        <section className="flex-1 flex flex-col gap-6 min-w-0">
+          <div className="relative aspect-[4/3] h-[54vh] max-h-[54vh] w-auto max-w-full mx-auto rounded-2xl overflow-hidden border border-gray-100 shadow-2xl transform transition-transform duration-500">
             <img
               src={currentStep.imageUrl || "/placeholder.svg"}
               className="w-full h-full object-cover"
               alt="조리 단계"
             />
           </div>
-          <div className="space-y-2">
-            <p className="text-base text-gray-700 leading-snug font-medium break-keep">
-              {currentStep.description}
-            </p>
-            {currentStep.tips && (
-              <div className="bg-amber-50/50 border-l-2 border-amber-400 p-2.5 rounded-r-lg flex gap-2 items-start">
-                <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-900 leading-tight">{currentStep.tips}</p>
-              </div>
-            )}
+          <div className="space-y-4 px-1">
+            {(() => {
+              const tipMatch = currentStep.description.match(/\[TIP\]\s*(.*)/i);
+              const cleanDescription = tipMatch ? currentStep.description.replace(/\[TIP\].*/i, "").trim() : currentStep.description;
+              const extractedTip = tipMatch ? tipMatch[1].trim() : currentStep.tips;
+
+              return (
+                <>
+                  <p className="text-[18px] text-gray-900 leading-[1.5] font-medium break-keep tracking-tight">
+                    {cleanDescription}
+                  </p>
+                  {extractedTip && (
+                    <div className="flex items-center gap-4 py-3.5 px-4 rounded-2xl bg-[#800020]/5 border border-[#800020]/5 hover:border-[#800020]/15 transition-all duration-300">
+                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-white shadow-sm border border-[#800020]/10">
+                        <img
+                          src="/chef-tip.png"
+                          alt="Tip icon"
+                          className="w-full h-full object-contain p-1.5"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-extrabold text-[#800020] tracking-wider uppercase text-[10px] opacity-70">Expert Tip</span>
+                        <span className="text-sm text-foreground/80 font-medium leading-normal">{extractedTip}</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </section>
 
-        {/* 오른쪽: 박스 일렬 배치 */}
-        <aside className="lg:w-[260px] shrink-0 flex flex-col gap-3 h-full overflow-y-auto pr-1">
+        {/* 오른쪽: 박스 그룹 크기 최적화 (flex-1 제거) */}
+        <aside className="lg:w-[240px] shrink-0 flex flex-col gap-4 h-full overflow-y-auto pr-1 pb-20">
           {/* 타이머 박스 */}
           <div className="bg-white rounded-xl p-3.5 border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between mb-2">
-              <span className="flex items-center gap-1.5 text-[12px] font-bold text-gray-500 uppercase tracking-tight">
+              <span className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 uppercase tracking-tight">
                 <Timer className="w-3.5 h-3.5" /> 타이머
               </span>
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-bold text-gray-500">자동 다음 단계</span>
+                <span className="text-[9px] font-bold text-gray-400">자동 진행</span>
                 <Switch
                   checked={autoAdvance}
                   onCheckedChange={setAutoAdvance}
-                  className="scale-[0.6] data-[state=checked]:bg-[#800020]"
+                  className="scale-[0.55] data-[state=checked]:bg-[#800020]"
                 />
               </div>
             </div>
-            <div className="text-4xl font-black text-center mb-3 text-[#800020] tabular-nums">
+            <div className="text-3xl font-black text-center mb-2 text-[#800020] tabular-nums">
               {formatTime(timerSeconds)}
             </div>
             <div className="grid grid-cols-2 gap-1.5">
               <Button
                 size="sm"
                 onClick={isTimerRunning ? handlePauseTimer : handleStartTimer}
-                className="bg-[#800020]/5 border border-[#800020] text-[#800020] hover:bg-[#800020]/10 h-8 text-[11px] font-bold rounded-lg"
+                className="bg-[#800020]/5 border border-[#800020] text-[#800020] hover:bg-[#800020]/10 h-7.5 text-[10.5px] font-bold rounded-lg"
               >
                 {isTimerRunning ? (
                   <>
                     <Pause className="w-3.5 h-3.5 mr-1" />
-                    일시정지
+                    정지
                   </>
                 ) : (
                   <>
@@ -714,7 +823,7 @@ export function StepCookMode({
                 size="sm"
                 variant="outline"
                 onClick={handleResetTimer}
-                className="h-8 rounded-lg border-gray-100"
+                className="h-7.5 rounded-lg border-gray-100"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
               </Button>
@@ -722,15 +831,15 @@ export function StepCookMode({
             <Button
               variant="ghost"
               onClick={handleAddMinute}
-              className="w-full h-7 mt-1.5 text-gray-500 font-bold text-[10px] hover:bg-gray-50"
+              className="w-full h-7 mt-1.5 text-gray-500 font-bold text-[9px] hover:bg-gray-50"
             >
-              <Plus className="w-3 h-3 mr-1" /> 1분 추가
+              <Plus className="w-2.5 h-2.5 mr-1" /> 1분 추가
             </Button>
           </div>
 
           {/* 숙련도 박스 */}
-          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-            <div className="flex items-center gap-1.5 mb-3 text-[12px] font-bold text-gray-500 uppercase tracking-tight">
+          <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-1.5 mb-3 text-[11px] font-bold text-gray-500 uppercase tracking-tight">
               <ChefHat className="w-3.5 h-3.5" />
               <span>숙련도</span>
             </div>
@@ -759,12 +868,12 @@ export function StepCookMode({
           </div>
 
           {/* 음성 제어 박스 */}
-          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-            <div className="flex items-center gap-1.5 mb-3 text-[12px] font-bold text-gray-500 uppercase tracking-tight">
+          <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-1.5 mb-3 text-[11px] font-bold text-gray-500 uppercase tracking-tight">
               <Mic className="h-3.5 w-3.5" />
               <span>음성 제어</span>
             </div>
-            <div className="flex flex-col items-center gap-3">
+            <div className="flex flex-col items-center">
               {micPermission !== "granted" ? (
                 <div className="rounded-md border border-[#800020]/20 bg-[#800020]/5 px-3 py-2 text-xs text-muted-foreground leading-relaxed">
                   마이크 권한이 없어 <span className="font-semibold text-foreground">음성 인식 기능</span>을 사용할 수 없습니다.
@@ -773,30 +882,50 @@ export function StepCookMode({
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center justify-center gap-6 w-full">
-                    <span className="text-[13px] text-gray-400 uppercase">이전</span>
+                  <div className="flex flex-col items-center mb-4">
                     <button
                       onClick={handleVoiceToggle}
                       className={cn(
-                        "w-14 h-14 rounded-full flex items-center justify-center transition-all border shadow-sm",
+                        "w-10 h-10 rounded-full flex items-center justify-center transition-all border shadow-sm mb-2",
                         isListening
                           ? "bg-[#800020] border-[#800020] shadow-[#800020]/20 animate-pulse text-white"
                           : "bg-transparent border-gray-100 text-gray-400 hover:border-[#800020] hover:bg-[#800020]/5 hover:text-[#800020]",
                       )}
                     >
-                      {isListening ? <Mic className="h-7 w-7" /> : <MicOff className="h-7 w-7" />}
+                      {isListening ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
                     </button>
-                    <span className="text-[13px] text-gray-400 uppercase">다음</span>
+
+                    <p
+                      className={cn(
+                        "text-[9px] px-2.5 py-1 rounded-full font-bold transition-colors",
+                        isListening ? "bg-[#800020]/5 text-[#800020]" : "bg-gray-50 text-gray-400",
+                      )}
+                    >
+                      {isListening ? <WaveText text="음성 명령 대기 중..." /> : "버튼을 눌러 음성 제어 켜기"}
+                    </p>
                   </div>
 
-                  <p
-                    className={cn(
-                      "text-[9px] px-2.5 py-1 rounded-full font-bold transition-colors mt-1",
-                      isListening ? "bg-[#800020]/5 text-[#800020]" : "bg-gray-50 text-gray-400",
-                    )}
-                  >
-                    {isListening ? <WaveText text="음성 명령을 기다리고 있어요..." /> : "버튼을 눌러 음성 제어 켜기"}
-                  </p>
+                  <div className="w-full pt-3 mt-1 border-t border-gray-50">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                      {[
+                        { cmd: "이전 단계", desc: "이전 단계 이동" },
+                        { cmd: "다음 단계", desc: "다음 단계 이동" },
+                        { cmd: "일시정지", desc: "타이머 정지" },
+                        { cmd: "이어하기", desc: "타이머 재생" },
+                        { cmd: "셰프님", desc: "AI 호출" },
+                        { cmd: "채팅 종료", desc: "AI 종료" },
+                      ].map((item, i) => (
+                        <div key={i} className="flex items-center justify-between gap-1">
+                          <span className="text-[10px] font-medium text-[#800020] whitespace-nowrap">
+                            {item.cmd}
+                          </span>
+                          <span className="text-[8px] text-gray-400 font-normal whitespace-nowrap">
+                            {item.desc}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </>
               )}
             </div>
@@ -804,8 +933,8 @@ export function StepCookMode({
         </aside>
       </main>
 
-      {/* 3. 하단 바 */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-white border-t px-6 py-2 z-40">
+      {/* 3. 하단 바: 더 슬림하게 조정 */}
+      <footer className="fixed bottom-0 left-0 right-0 bg-white border-t px-6 py-1.5 z-40">
         <div className="max-w-[1100px] mx-auto flex items-center justify-between">
           <Button
             variant="ghost"

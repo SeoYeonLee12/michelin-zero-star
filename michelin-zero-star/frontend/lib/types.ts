@@ -12,11 +12,13 @@ export interface RecipeStep {
 
 export interface NutritionInfo {
   protein?: number // grams
-  carbohydrate?: number // grams (backend field name)
-  carbs?: number // grams (legacy support if needed)
-  fat?: number // grams
-  fiber?: number // grams
+  carbohydrate?: number // grams
+  carbs?: number // grams (legacy)
+  fat?: number // grams (saturated fat)
   sodium?: number // mg
+  cholesterol?: number // mg
+  calcium?: number // mg
+  fiber?: number // grams
   sugar?: number // grams
 }
 

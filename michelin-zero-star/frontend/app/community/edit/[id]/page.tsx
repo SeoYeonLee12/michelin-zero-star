@@ -26,15 +26,15 @@ import {
 import { ArrowLeft, Upload, X, MapPin, Receipt } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import Image from "next/image"
+import { compressImage } from "@/lib/image-utils"  // ✅ import 추가
 
 import { getPostDetail, updatePost } from "@/lib/api/market"
 
-export default function EditPostPage() {
+export default function CommunityEditPage() {
   const router = useRouter()
-  const params = useParams()
-  const postId = params.id as string
   const { isLoggedIn } = useAuth()
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const params = useParams<{ id: string }>()
+  const postId = params.id
 
   const [formData, setFormData] = useState({
     title: "",
@@ -42,11 +42,12 @@ export default function EditPostPage() {
     price: "",
     place: "",
   })
-  const [images, setImages] = useState<string[]>([])
+  const [existingImages, setExistingImages] = useState<string[]>([])
+  const [files, setFiles] = useState<File[]>([])  // ✅ 새로 업로드할 이미지
+  const [loading, setLoading] = useState(true)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showExitDialog, setShowExitDialog] = useState(false)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -59,7 +60,7 @@ export default function EditPostPage() {
         const post = await getPostDetail(postId)
         if (post) {
           // 본인 게시글인지 확인
-          if (!post.owner) {
+          if (!post.isOwner) {
             alert("수정 권한이 없습니다.")
             router.push("/community")
             return
@@ -67,13 +68,11 @@ export default function EditPostPage() {
 
           setFormData({
             title: post.title,
-            description: post.content, // API field is content
-            price: String(post.price),
-            place: post.meetingPlace || post.location,
+            description: post.content,
+            price: post.price.toLocaleString(),
+            place: post.meetingPlace || "",
           })
-          if (post.imageUrls) {
-            setImages(post.imageUrls)
-          }
+          setExistingImages(post.imageUrls || [])  // ✅ setImages → setExistingImages
         }
       } catch (error) {
         console.error("Failed to fetch post", error)
@@ -85,14 +84,22 @@ export default function EditPostPage() {
     fetchPost()
   }, [isLoggedIn, postId, router])
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // 이미지 수정 기능 미지원 (API 제한)
-    alert("현재 이미지 수정은 지원하지 않습니다.")
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(e.target.files || [])
+    if (selectedFiles.length === 0) return
+
+    // 이미지 압축
+    const compressedFiles = await Promise.all(
+      selectedFiles.map((file) => compressImage(file))
+    )
+
+    setFiles((prev) => [...prev, ...compressedFiles])
+    // 기존 이미지는 제거 (새 이미지로 완전 교체)
+    setExistingImages([])
   }
 
   const removeImage = (index: number) => {
-    // 이미지 수정 기능 미지원
-    alert("현재 이미지 수정은 지원하지 않습니다.")
+    setFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleSubmit = () => {
@@ -105,12 +112,16 @@ export default function EditPostPage() {
 
   const confirmSubmit = async () => {
     try {
-      await updatePost(postId, {
-        title: formData.title,
-        content: formData.description,
-        price: parseInt(formData.price.replace(/[^0-9]/g, "")) || 0,
-        meetingPlace: formData.place
-      })
+      await updatePost(
+        postId,
+        {
+          title: formData.title,
+          content: formData.description,
+          price: parseInt(formData.price.replace(/[^0-9]/g, "")) || 0,
+          meetingPlace: formData.place,
+        },
+        files.length > 0 ? files : undefined  // ✅ 새 이미지가 있으면 전송
+      )
       alert("게시글이 수정되었습니다.")
       router.push(`/community/${postId}`)
     } catch (error) {
@@ -137,7 +148,7 @@ export default function EditPostPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">게시물 수정</h1>
-            <p className="text-muted-foreground">N빵 게시물 정보를 수정하세요</p>
+            <p className="text-muted-foreground">나눔 게시물 정보를 수정하세요</p>
           </div>
         </div>
 
@@ -146,23 +157,55 @@ export default function EditPostPage() {
             <CardTitle className="text-lg">기본 정보</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Image Upload - Read Only */}
-            <div className="space-y-2 opacity-60 pointer-events-none">
+            <div className="space-y-2">
               <Label>
-                이미지 <span className="text-muted-foreground text-sm">(수정 불가)</span>
-              </Label>
-              <div className="flex flex-wrap gap-3">
-                {images.map((img, idx) => (
-                  <div key={idx} className="relative w-24 h-24 rounded-lg overflow-hidden bg-muted">
+                이미지 <span className="text-muted-foreground text-sm">(선택사항)</span>
+              </Label>              <div className="flex flex-wrap gap-3">
+                {/* 기존 이미지 표시 */}
+                {existingImages.map((img: string, idx: number) => (
+                  <div key={`existing-${idx}`} className="relative w-24 h-24 rounded-lg overflow-hidden bg-muted">
                     <Image
                       src={img || "/placeholder.svg"}
-                      alt={`Image ${idx + 1}`}
+                      alt={`기존 이미지 ${idx + 1}`}
                       fill
                       className="object-cover"
                     />
+                    <Badge className="absolute top-1 left-1 text-xs">기존</Badge>
                   </div>
                 ))}
+                {/* 새로 업로드한 이미지 표시 */}
+                {files.map((file: File, idx: number) => (
+                  <div key={`new-${idx}`} className="relative w-24 h-24 rounded-lg overflow-hidden bg-muted">
+                    <Image
+                      src={URL.createObjectURL(file)}
+                      alt={`새 이미지 ${idx + 1}`}
+                      fill
+                      className="object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(idx)}
+                      className="absolute top-1 right-1 bg-destructive text-white rounded-full p-1 hover:bg-destructive/90"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+                <label className="w-24 h-24 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary transition-colors">
+                  <Upload className="h-6 w-6 text-muted-foreground mb-1" />
+                  <span className="text-xs text-muted-foreground">추가</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                </label>
               </div>
+              {files.length > 0 && (
+                <p className="text-sm text-yellow-600">새 이미지를 업로드하면 기존 이미지가 모두 삭제됩니다.</p>
+              )}
             </div>
 
             {/* Title */}

@@ -251,9 +251,8 @@ export default function MessagesPage() {
                 localMessages.map((msg) => (
                   <div key={msg.id} className={`flex ${msg.isSentByMe ? "justify-end" : "justify-start"}`}>
                     <div
-                      className={`max-w-xs lg:max-w-md flex items-end gap-2 ${
-                        msg.isSentByMe ? "flex-row-reverse" : "flex-row"
-                      }`}
+                      className={`max-w-xs lg:max-w-md flex items-end gap-2 ${msg.isSentByMe ? "flex-row-reverse" : "flex-row"
+                        }`}
                     >
                       {!msg.isSentByMe && (
                         <Avatar className="h-8 w-8 shrink-0">
@@ -262,11 +261,10 @@ export default function MessagesPage() {
                         </Avatar>
                       )}
                       <div
-                        className={`rounded-2xl px-4 py-2.5 ${
-                          msg.isSentByMe
+                        className={`rounded-2xl px-4 py-2.5 ${msg.isSentByMe
                             ? "bg-[#800020] text-white rounded-br-none"
                             : "bg-gray-200 text-gray-900 rounded-bl-none"
-                        }`}
+                          }`}
                       >
                         {msg.imageUrl && (
                           <Image

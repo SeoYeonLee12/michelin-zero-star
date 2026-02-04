@@ -3,9 +3,8 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useRef, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Navbar } from "@/components/cook-sync/navbar"
 import { ScrollToTop } from "@/components/cook-sync/scroll-to-top"
 import { Button } from "@/components/ui/button"
@@ -14,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,12 +27,21 @@ import {
 import { ArrowLeft, Upload, X, MapPin, Receipt } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import Image from "next/image"
-import { createPost } from "@/lib/api/market"
+import { createPost, getPostDetail, updatePost } from "@/lib/api/market"
 import { compressImage } from "@/lib/image-utils"
+import { StarRewardBadge } from "@/components/cook-sync/star-reward-badge"
+import { AnimatePresence, motion } from "framer-motion"
 
-export default function CommunityNewPage() {
+// URL을 File 객체로 변환하는 헬퍼 함수
+async function urlToFile(url: string, filename: string, mimeType: string): Promise<File> {
+  const res = await fetch(url)
+  const blob = await res.blob()
+  return new File([blob], filename, { type: mimeType })
+}
+
+function CommunityNewForm() {
   const router = useRouter()
-  const { isLoggedIn, addUserPost } = useAuth()
+  const { isLoggedIn, addUserPost, earnStars } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
@@ -42,11 +50,51 @@ export default function CommunityNewPage() {
     price: "",
     place: "",
   })
-  const [images, setImages] = useState<string[]>([])
-  const [files, setFiles] = useState<File[]>([]) // ✅ API 전송용 File 객체 저장
+  const [images, setImages] = useState<string[]>([]) // 미리보기용 URL 리스트 (기존 URL + 새 파일 blob URL)
+  const [files, setFiles] = useState<File[]>([]) // 새로 업로드된 파일 객체들
+  const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]) // 처음에 불러온 기존 이미지 URL들 (수정 시 비교용)
+
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showExitDialog, setShowExitDialog] = useState(false)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [showRewardDialog, setShowRewardDialog] = useState(false)
+  const [loading, setLoading] = useState(false)
+  // Edit Mode Logic
+  const searchParams = useSearchParams()
+  const editPostId = searchParams.get("edit")
+  const isEditMode = !!editPostId
+
+  useEffect(() => {
+    if (isEditMode && editPostId && isLoggedIn) {
+      const fetchPost = async () => {
+        try {
+          const post = await getPostDetail(editPostId)
+          if (post) {
+            // 본인 게시글인지 확인 (API에 owner 필드가 있다고 가정)
+            const hasAuthority = post.isOwner || (post as any).owner;
+            if (!hasAuthority) {
+              alert("수정 권한이 없습니다.")
+              router.push("/community")
+              return
+            }
+
+            setFormData({
+              title: post.title,
+              description: post.content, // API field usually content
+              price: String(post.price),
+              place: post.meetingPlace || post.location || "",
+            })
+            if (post.imageUrls) {
+              setImages(post.imageUrls)
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch post for edit:", error)
+        }
+      }
+      fetchPost()
+    }
+  }, [isEditMode, editPostId, isLoggedIn, router])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files
@@ -77,8 +125,24 @@ export default function CommunityNewPage() {
   }
 
   const removeImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index))
-    setFiles((prev) => prev.filter((_, i) => i !== index))
+    // images 배열에서 해당 인덱스의 이미지를 제거
+    const newImages = images.filter((_, i) => i !== index)
+    setImages(newImages)
+
+    // 만약 제거된 이미지가 기존 이미지였다면 existingImageUrls에서도 제거
+    const removedImageUrl = images[index]
+    if (!removedImageUrl.startsWith("data:")) {
+      setExistingImageUrls((prev) => prev.filter((url) => url !== removedImageUrl))
+    } else {
+      // 제거된 이미지가 새로 추가된 이미지(data URL)였다면, files 배열에서도 제거
+      // files 배열은 새로 추가된 이미지들의 File 객체를 순서대로 가지고 있음.
+      // images 배열에서 data URL인 것들만 필터링하여 files 배열의 인덱스를 찾음.
+      const newImageUrlsInImages = images.filter((url) => url.startsWith("data:"))
+      const removedNewImageIndex = newImageUrlsInImages.indexOf(removedImageUrl)
+      if (removedNewImageIndex !== -1) {
+        setFiles((prev) => prev.filter((_, i) => i !== removedNewImageIndex))
+      }
+    }
   }
 
   const handleSubmit = () => {
@@ -91,37 +155,63 @@ export default function CommunityNewPage() {
 
   const confirmSubmit = async () => {
     try {
-      await createPost(
-        {
-          title: formData.title,
-          content: formData.description,
-          price: Number(formData.price.replace(/,/g, "")) || 0, // 쉼표 제거 및 숫자 변환
-          meetingPlace: formData.place,
-          category: "SHARE", // 카테고리 (일단 SHARE 로 고정)
-        },
-        files,
-      )
-      // 성공 시 이동 (원래는 API 성공 후 리다이렉트가 더 안전하지만, UX상 즉시 이동 처리)
-      router.push("/community")
+      if (isEditMode && editPostId) {
+        // 수정 로직
+        // existingImages: files 배열에 없는(새로 추가되지 않은) images 배열의 URL들
+        // newImages: files 배열에 있는 File 객체들
+        const existingImageUrls = images.filter(img => !img.startsWith("data:"))
+
+        await updatePost(
+          editPostId,
+          {
+            title: formData.title,
+            content: formData.description,
+            price: parseInt(formData.price.toString().replace(/,/g, "")) || 0,
+            meetingPlace: formData.place
+          },
+          files,
+          existingImageUrls
+        )
+        alert("게시글이 수정되었습니다.")
+        router.push(`/community/${editPostId}`)
+      } else {
+        // 생성 로직
+        await createPost(
+          {
+            title: formData.title,
+            content: formData.description,
+            price: Number(formData.price.replace(/,/g, "")) || 0,
+            meetingPlace: formData.place,
+            category: "SHARE",
+          },
+          files,
+        )
+        earnStars(1.0, "recipe")
+        setShowRewardDialog(true)
+      }
     } catch (error) {
-      console.error("게시글 등록 실패:", error)
-      alert("게시글 등록에 실패했습니다.")
+      console.error("게시글 처리 실패:", error)
+      alert(isEditMode ? "게시글 수정에 실패했습니다." : "게시글 등록에 실패했습니다.")
+
     } finally {
+      setLoading(false)
       setShowConfirmDialog(false)
     }
   }
 
   const handleCancel = () => {
+    // 수정 모드일 때는 상세 페이지로, 생성 모드일 때는 목록으로 이동
+    const targetPath = isEditMode && editPostId ? `/community/${editPostId}` : "/community"
+
     if (formData.title || formData.description || images.length > 0) {
       setShowExitDialog(true)
     } else {
-      router.push("/community")
+      router.push(targetPath)
     }
   }
 
-  if (!isLoggedIn) {
-    router.push("/login")
-    return null
+  if (loading && !formData.title && isEditMode) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   }
 
   return (
@@ -134,8 +224,8 @@ export default function CommunityNewPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">N빵 팟 구함</h1>
-            <p className="text-muted-foreground">이웃과 재료를 나눠보세요</p>
+            <h1 className="text-2xl font-bold tracking-tight">{isEditMode ? "게시물 수정" : "나눔 팟 구함"}</h1>
+            <p className="text-muted-foreground">{isEditMode ? "나눔 게시물 정보를 수정하세요" : "이웃과 재료를 나눠보세요"}</p>
           </div>
         </div>
 
@@ -165,6 +255,7 @@ export default function CommunityNewPage() {
                         대표
                       </Badge>
                     )}
+                    {/* Prevent deletion in edit mode if needed, or allow? Existing edit page disallowed image edits */}
                     <button
                       onClick={() => removeImage(idx)}
                       className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70"
@@ -217,7 +308,12 @@ export default function CommunityNewPage() {
               </Label>
               <Textarea
                 id="description"
-                placeholder="구매한 재료, 상태, 나눔 방법 등을 자세히 적어주세요.&#10;&#10;예시:&#10;- 오늘 마트에서 구매한 신선한 양배추예요&#10;- 반 통씩 나눠서 가져가시면 됩니다&#10;- 둔산동 롯데마트 앞에서 직거래 원해요"
+                placeholder={`구매한 재료, 상태, 나눔 방법 등을 자세히 적어주세요.
+    
+    예시:
+    - 오늘 마트에서 구매한 신선한 양배추예요
+    - 반 통씩 나눠서 가져가시면 됩니다
+    - 둔산동 롯데마트 앞에서 직거래 원해요`}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={6}
@@ -229,12 +325,13 @@ export default function CommunityNewPage() {
               <Label htmlFor="price">가격</Label>
               <Input
                 id="price"
-                placeholder="예: 1,000원, 무료나눔"
+                placeholder="예: 1,000"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
               />
             </div>
 
+            {/* Place */}
             <div className="space-y-2">
               <Label htmlFor="place">거래 장소</Label>
               <div className="relative">
@@ -249,7 +346,7 @@ export default function CommunityNewPage() {
               </div>
             </div>
           </CardContent>
-        </Card>
+        </Card >
 
         {/* Action Buttons */}
         <div className="flex gap-3 mt-6">
@@ -257,14 +354,16 @@ export default function CommunityNewPage() {
             취소
           </Button>
           <Button className="flex-1 bg-[#800020] hover:bg-[#800020]/90" onClick={handleSubmit}>
-            등록하기
+            {isEditMode ? "저장하기" : "등록하기"}
           </Button>
-        </div>
-      </main>
+        </div >
+      </main >
 
+      {/* Image Preview Dialog */}
       {/* Image Preview Dialog */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
         <DialogContent className="max-w-3xl p-0">
+          <DialogTitle className="sr-only">이미지 미리보기</DialogTitle>
           {previewImage && (
             <Image
               src={previewImage || "/placeholder.svg"}
@@ -281,8 +380,10 @@ export default function CommunityNewPage() {
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>게시글 등록</AlertDialogTitle>
-            <AlertDialogDescription>게시글을 등록하시겠습니까?</AlertDialogDescription>
+            <AlertDialogTitle>{isEditMode ? "게시글 수정" : "게시글 등록"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isEditMode ? "게시글을 수정하시겠습니까?" : "게시글을 등록하시겠습니까?"}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>아니오</AlertDialogCancel>
@@ -306,13 +407,65 @@ export default function CommunityNewPage() {
             <AlertDialogCancel>취소</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => router.push("/community")}
-              className="bg-destructive hover:bg-destructive/90"
+              className="bg-[#800020] hover:bg-[#800020]/90"
             >
               나가기
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+
+      {/* Reward Dialog */}
+      <AnimatePresence>
+        {showRewardDialog && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => router.push("/community")}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-[340px] bg-white rounded-[2.5rem] p-10 shadow-[0_20px_50px_rgba(0,0,0,0.1)] text-center overflow-hidden border border-gray-50"
+            >
+              <div className="relative space-y-8">
+                <div className="space-y-3">
+                  <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-tight">나눔 팟 생성 성공!</h2>
+                  <p className="text-gray-400 text-sm font-medium">게시글 등록이 완료됐습니다.</p>
+                </div>
+
+                <div className="py-2">
+                  <StarRewardBadge
+                    amount={1}
+                    customText="1스타 적립"
+                    starSize="md"
+                    textSize="sm"
+                  />
+                </div>
+
+                <Button
+                  className="w-full h-12 rounded-xl bg-[#800020] hover:bg-[#800020]/90 text-white font-semibold text-sm transition-all active:scale-[0.98] shadow-sm"
+                  onClick={() => router.push("/community")}
+                >
+                  확인
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div >
+  )
+}
+
+export default function CommunityNewPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CommunityNewForm />
+    </Suspense>
   )
 }

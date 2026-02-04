@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Navbar } from "@/components/cook-sync/navbar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -33,7 +33,7 @@ import { Upload, ChevronLeft, ChevronRight, X, Plus, Trash2, CheckCircle2 } from
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
 import { getCookie } from "@/lib/cookie"
-import { registerRecipe, type RegisterRecipeRequest } from "@/lib/api/recipes"
+import { registerRecipe, updateRecipe, getRecipeDetail, type RegisterRecipeRequest } from "@/lib/api/recipes"
 
 interface RecipeStep {
   id: number
@@ -52,25 +52,37 @@ interface Ingredient {
 }
 
 const categoryOptions = [
-  { value: "korean", label: "한식" },
-  { value: "chinese", label: "중식" },
-  { value: "japanese", label: "일식" },
-  { value: "western", label: "양식" },
-  { value: "dessert", label: "디저트" },
-  { value: "snack", label: "분식" },
-  { value: "salad", label: "샐러드" },
-  { value: "drink", label: "음료" },
-  { value: "nightsnack", label: "야식&술안주" },
-  { value: "etc", label: "기타" },
+  { value: "밥", label: "밥" },
+  { value: "반찬", label: "반찬" },
+  { value: "국물", label: "국물" },
+  { value: "면", label: "면" },
+  { value: "디저트", label: "디저트" },
+  { value: "분식", label: "분식" },
+  { value: "샐러드", label: "샐러드" },
+  { value: "음료", label: "음료" },
+  { value: "야식&술안주", label: "야식&술안주" },
+  { value: "기타", label: "기타" },
 ]
 
 const CATEGORY_MAP: Record<string, number> = {
-  "korean": 1, "chinese": 2, "japanese": 3, "western": 4, "dessert": 5,
-  "snack": 6, "salad": 7, "drink": 8, "nightsnack": 9, "etc": 10
+  "밥": 1, "반찬": 2, "국물": 3, "면": 4, "디저트": 5,
+  "분식": 6, "샐러드": 7, "음료": 8, "기타": 9, "야식&술안주": 10
 }
 
+// Wrap in Suspense for useSearchParams
 export default function NewRecipePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <NewRecipeForm />
+    </Suspense>
+  )
+}
+
+function NewRecipeForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const recipeIdParam = searchParams.get("id")
+  const isEditMode = !!recipeIdParam
   const { isLoggedIn, addUserRecipe, isLoading } = useAuth() // ✅ Added isLoading
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
@@ -90,6 +102,72 @@ export default function NewRecipePage() {
   const [successDialogOpen, setSuccessDialogOpen] = useState(false)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [exitDialogOpen, setExitDialogOpen] = useState(false)
+
+  // ✅ Validation States
+  const [ingredientError, setIngredientError] = useState(false)
+  const [tagError, setTagError] = useState(false)
+  const [createdRecipeId, setCreatedRecipeId] = useState<number | null>(null)
+
+  // ✅ Fetch data if Edit Mode
+  useEffect(() => {
+    if (isEditMode && recipeIdParam) {
+      const fetchRecipe = async () => {
+        try {
+          const data = await getRecipeDetail(recipeIdParam)
+          if (data) {
+            setTitle(data.title)
+            setDescription(data.description)
+            setServings(String(data.servings))
+
+            // Thumbnail
+            setThumbnailPreview(data.mainImageUrl)
+            // Note: thumbnail file stays null unless user changes it
+
+            // Category (Find key by value or manual mapping needed if backend returns names.
+            // Backend returns `categoryNames`. Assuming single category for now or picking first)
+            if (data.categoryNames && data.categoryNames.length > 0) {
+              // categoryOptions values are like "밥", "반찬", etc.
+              // data.categoryNames might be ["국물"] ?
+              // Let's try to match directly.
+              setCategory(data.categoryNames[0])
+            }
+
+            // Tags
+            if (data.tags) {
+              setTags(data.tags.map(t => t.tag_name))
+            }
+
+            // Ingredients
+            if (data.ingredients) {
+              setIngredients(data.ingredients.map((ing, idx) => ({
+                id: Date.now() + idx,
+                name: ing.ingredient_name,
+                amount: ing.ingredient_amount
+              })))
+            }
+
+            // Steps
+            if (data.steps && data.steps.length > 0) {
+              setSteps(data.steps.map(s => ({
+                id: s.step_number,
+                action: "조리 순서",
+                description: s.step_description,
+                duration: s.timer_seconds,
+                image: null,
+                imagePreview: s.step_imageUrl,
+                tips: s.cooking_tip || ""
+              })).sort((a, b) => a.id - b.id))
+              setCurrentStepIndex(0)
+            }
+          }
+        } catch (e) {
+          console.error("Failed to fetch recipe for edit", e)
+          alert("레시피 정보를 불러오는데 실패했습니다.")
+        }
+      }
+      fetchRecipe()
+    }
+  }, [isEditMode, recipeIdParam])
 
   // ✅ Wait for loading
   if (isLoading) return null
@@ -160,6 +238,7 @@ export default function NewRecipePage() {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
       setTags([...tags, tagInput.trim()])
       setTagInput("")
+      setTagError(false) // 태그 추가 시 에러 해제
     }
   }
 
@@ -168,7 +247,17 @@ export default function NewRecipePage() {
   }
 
   const addIngredient = () => {
-    if (ingredientName.trim()) {
+    if (!ingredientName.trim()) return
+
+    // 이름만 있고 용량이 없으면 에러
+    if (ingredientName.trim() && !ingredientAmount.trim()) {
+      setIngredientError(true)
+      return
+    }
+
+    setIngredientError(false)
+
+    if (ingredientName.trim() && ingredientAmount.trim()) {
       const newIngredient: Ingredient = {
         id: Date.now(),
         name: ingredientName.trim(),
@@ -199,10 +288,17 @@ export default function NewRecipePage() {
   }
 
   const handleSubmitClick = () => {
+    if (tags.length === 0) {
+      setTagError(true)
+      document.getElementById("tag-section")?.scrollIntoView({ behavior: "smooth" })
+      // alert("태그를 입력해주세요.") // UI 표시로 대체
+      return
+    }
+
     if (
       !title ||
       !thumbnailPreview ||
-      steps.some((s) => !s.action || !s.description || !s.duration || !s.imagePreview)
+      steps.some((s) => !s.action || !s.description || !s.duration || (!s.imagePreview && !s.image)) // Check preview OR file
     ) {
       alert("제목, 대표 이미지, 그리고 모든 단계의 제목, 설명, 소요 시간(초), 단계 이미지는 필수입니다.")
       return
@@ -221,8 +317,7 @@ export default function NewRecipePage() {
       // 1. 데이터 매핑
       const requestData: RegisterRecipeRequest = {
         title,
-        // ✅ Blob URL 대신 placeholder URL 사용 (백엔드 URL 검증 통과용)
-        mainImageUrl: thumbnailPreview ? "https://example.com/placeholder-recipe-image.jpg" : "",
+        mainImageUrl: thumbnailPreview || "", // Use existing preview URL if no new file
         recipeDescription: description,
         cookTime: totalCookingTime,
         servings: Number(servings) || 1,
@@ -234,7 +329,8 @@ export default function NewRecipePage() {
         cholesterol: 0,
         sodium: 0,
         calcium: 0,
-        categoryIds: [CATEGORY_MAP[category] || 10], // Default 'etc'
+        // Using existing Category logic
+        categoryIds: [CATEGORY_MAP[category] || 10],
         ingredients: ingredients.map(i => ({
           ingredientName: i.name,
           ingredientAmount: i.amount
@@ -244,27 +340,59 @@ export default function NewRecipePage() {
           stepNumber: s.id,
           stepDescription: s.description,
           timerSeconds: s.duration,
-          // ✅ Blob URL 대신 placeholder URL 사용 (백엔드 URL 검증 통과용)
-          stepImageUrl: s.imagePreview ? "https://example.com/placeholder-step-image.jpg" : "",
+          stepImageUrl: s.imagePreview || "", // Use existing preview URL if no new file
           cookingTip: s.tips || null
         }))
       }
 
-      // 2. API 호출
-      await registerRecipe(requestData) // Token argument removed
+      // 2. 파일 객체 수집
+      const files: any = {
+        mainImage: thumbnail,
+        stepImages: steps.reduce((acc, step) => {
+          if (step.image) {
+            acc[step.id] = step.image
+          }
+          return acc
+        }, {} as { [key: number]: File })
+      }
 
-      // 3. 성공 처리
+      // 3. API 호출 (Update or Register)
+      let response;
+      if (isEditMode && recipeIdParam) {
+        // For Update
+        response = await updateRecipe(recipeIdParam, requestData, files)
+        // updateRecipe returns RegisterRecipeResponse according to recipes.ts types? 
+        // Let's check recipes.ts. Yes: Promise<RegisterRecipeResponse>
+        // But usually update might not return ID? 
+        // recipes.ts line 256: return apiFetch<RegisterRecipeResponse>(...)
+        alert("레시피가 수정되었습니다.")
+        router.push(`/recipes/${recipeIdParam}`)
+        return
+      } else {
+        // For Register
+        response = await registerRecipe(requestData, files)
+      }
+
+      if (response && response.recipeId) {
+        setCreatedRecipeId(response.recipeId)
+      }
+
+      // 3. 성공 처리 (Only for Create)
       setSuccessDialogOpen(true)
 
     } catch (error) {
-      console.error("Recipe registration failed:", error)
-      alert("레시피 등록에 실패했습니다.")
+      console.error("Recipe registration/update failed:", error)
+      alert("레시피 저장에 실패했습니다.")
     }
   }
 
   const handleViewRecipe = () => {
     setSuccessDialogOpen(false)
-    router.push("/recipes?type=user")
+    if (createdRecipeId) {
+      router.push(`/recipes/${createdRecipeId}`)
+    } else {
+      router.push("/recipes?type=user") // Fallback
+    }
   }
 
   const handleCancel = () => {
@@ -292,7 +420,7 @@ export default function NewRecipePage() {
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">레시피 등록</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{isEditMode ? "레시피 수정" : "레시피 등록"}</h1>
             <p className="text-muted-foreground">나만의 레시피를 공유해보세요</p>
           </div>
         </div>
@@ -306,7 +434,7 @@ export default function NewRecipePage() {
             <CardContent className="space-y-4">
               <div className="flex flex-col md:flex-row gap-6">
                 <div className="space-y-2 md:w-1/2">
-                  <Label>대표 이미지 *</Label>
+                  <Label>대표 이미지<span className="text-red-500 ml-1">*</span></Label>
                   <div className="relative">
                     <div
                       className="border-2 border-dashed rounded-xl p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors aspect-[4/3] flex items-center justify-center"
@@ -349,7 +477,7 @@ export default function NewRecipePage() {
 
                 <div className="space-y-4 md:w-1/2">
                   <div className="space-y-2">
-                    <Label htmlFor="title">레시피 제목 *</Label>
+                    <Label htmlFor="title">레시피 제목<span className="text-red-500 ml-1">*</span></Label>
                     <Input
                       id="title"
                       placeholder="예: 엄마표 김치찌개"
@@ -371,7 +499,7 @@ export default function NewRecipePage() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="category">카테고리 *</Label>
+                      <Label htmlFor="category">카테고리<span className="text-red-500 ml-1">*</span></Label>
                       <Select value={category} onValueChange={setCategory}>
                         <SelectTrigger>
                           <SelectValue placeholder="카테고리 선택" />
@@ -399,8 +527,10 @@ export default function NewRecipePage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>태그</Label>
+              <div className="space-y-2" id="tag-section">
+                <Label>
+                  태그<span className="text-red-500 ml-1">*</span>
+                </Label>
                 <div className="flex gap-2">
                   <Input
                     placeholder="태그 입력 후 추가"
@@ -412,6 +542,9 @@ export default function NewRecipePage() {
                     추가
                   </Button>
                 </div>
+                {tagError && tags.length === 0 && (
+                  <p className="text-red-500 text-sm mt-1">태그를 입력해주세요</p>
+                )}
                 {tags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     {tags.map((tag) => (
@@ -430,25 +563,33 @@ export default function NewRecipePage() {
               </div>
 
               <div className="space-y-2">
-                <Label>재료</Label>
+                <Label>
+                  재료<span className="text-red-500 ml-1">*</span>
+                </Label>
                 <div className="flex gap-2">
                   <Input
                     placeholder="재료명 (예: 김치)"
                     value={ingredientName}
                     onChange={(e) => setIngredientName(e.target.value)}
-                    className="flex-1"
+                    className="flex-[6]"
                   />
                   <Input
-                    placeholder="용량 (예: 200g)"
+                    placeholder="용량 (예: 200g, 약간, 1큰술, 1.5컵)"
                     value={ingredientAmount}
-                    onChange={(e) => setIngredientAmount(e.target.value)}
-                    className="w-32"
+                    onChange={(e) => {
+                      setIngredientAmount(e.target.value)
+                      if (e.target.value.trim()) setIngredientError(false)
+                    }}
+                    className={cn("w-32", ingredientError && "border-red-500 focus-visible:ring-red-500")}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addIngredient())}
                   />
                   <Button type="button" onClick={addIngredient} variant="outline">
                     추가
                   </Button>
                 </div>
+                {ingredientError && (
+                  <p className="text-red-500 text-sm mt-1">용량을 입력해주세요</p>
+                )}
                 {ingredients.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     {ingredients.map((ingredient) => (
@@ -485,10 +626,6 @@ export default function NewRecipePage() {
                   <span className="text-sm text-muted-foreground">
                     {currentStepIndex + 1} / {steps.length}
                   </span>
-                  <Button type="button" variant="outline" size="sm" onClick={addStep} className="gap-1 bg-transparent">
-                    <Plus className="h-4 w-4" />
-                    단계 추가
-                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -522,7 +659,7 @@ export default function NewRecipePage() {
 
                   <div className="flex flex-col md:flex-row gap-5">
                     <div className="space-y-2 md:w-1/2">
-                      <Label className="text-base">단계 이미지 *</Label>
+                      <Label className="text-base">단계 이미지<span className="text-red-500 ml-1">*</span></Label>
                       <div className="relative">
                         <div
                           className="border-2 border-dashed rounded-lg p-2 text-center cursor-pointer hover:bg-muted/50 transition-colors aspect-[4/3] flex items-center justify-center"
@@ -565,7 +702,7 @@ export default function NewRecipePage() {
 
                     <div className="space-y-4 md:w-1/2 flex flex-col">
                       <div className="space-y-2">
-                        <Label className="text-base">소요 시간 (초) *</Label>
+                        <Label className="text-base">소요 시간 (초)<span className="text-red-500 ml-1">*</span></Label>
                         <div className="flex items-center gap-2">
                           <Input
                             type="number"
@@ -581,7 +718,7 @@ export default function NewRecipePage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-base">단계 제목 *</Label>
+                        <Label className="text-base">단계 제목<span className="text-red-500 ml-1">*</span></Label>
                         <Input
                           placeholder="예: 재료 손질하기"
                           value={currentStep.action}
@@ -591,7 +728,7 @@ export default function NewRecipePage() {
                       </div>
 
                       <div className="space-y-2 flex-1 flex flex-col">
-                        <Label className="text-base">상세 설명 *</Label>
+                        <Label className="text-base">상세 설명<span className="text-red-500 ml-1">*</span></Label>
                         <Textarea
                           placeholder="이 단계에서 해야 할 일을 자세히 설명해주세요"
                           value={currentStep.description}
@@ -616,11 +753,16 @@ export default function NewRecipePage() {
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => setCurrentStepIndex((prev) => Math.min(steps.length - 1, prev + 1))}
-                  disabled={currentStepIndex === steps.length - 1}
+                  onClick={() => {
+                    if (currentStepIndex === steps.length - 1) {
+                      addStep()
+                    } else {
+                      setCurrentStepIndex((prev) => prev + 1)
+                    }
+                  }}
                   className="shrink-0"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  {currentStepIndex === steps.length - 1 ? <Plus className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </Button>
               </div>
 
@@ -652,14 +794,14 @@ export default function NewRecipePage() {
             </Button>
           </div>
         </div>
-      </main>
+      </main >
 
       {/* Confirm Submit Dialog */}
-      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+      < AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen} >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>레시피 등록</AlertDialogTitle>
-            <AlertDialogDescription>레시피를 등록하시겠습니까?</AlertDialogDescription>
+            <AlertDialogTitle>{isEditMode ? "레시피 수정" : "레시피 등록"}</AlertDialogTitle>
+            <AlertDialogDescription>{isEditMode ? "레시피를 수정하시겠습니까?" : "레시피를 등록하시겠습니까?"}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>아니오</AlertDialogCancel>
@@ -668,7 +810,7 @@ export default function NewRecipePage() {
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
+      </AlertDialog >
 
       <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
         <AlertDialogContent>
@@ -711,6 +853,6 @@ export default function NewRecipePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   )
 }

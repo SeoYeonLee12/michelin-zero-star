@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import * as React from "react"
 import { RecipeCard } from "@/components/cook-sync/recipe-card"
 
 import { useState, useEffect } from "react"
@@ -39,7 +39,7 @@ const foodCategories = [
 
 const ITEMS_PER_PAGE = 20
 
-export default function RecipesPage() {
+function RecipesContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -66,7 +66,7 @@ export default function RecipesPage() {
   const [searchInput, setSearchInput] = useState(searchWordParam || "")
   const [showLoginDialog, setShowLoginDialog] = useState(false)
 
-  const { isLoggedIn, toggleLikeRecipe, isRecipeLiked } = useAuth()
+  const { isLoggedIn, toggleLikeRecipe, isRecipeLiked, user } = useAuth()
 
   // API 데이터 상태
   const [recipes, setRecipes] = useState<RecipeListItem[]>([])
@@ -156,7 +156,14 @@ export default function RecipesPage() {
   const handleHeartClick = (e: React.MouseEvent, recipe: RecipeListItem) => {
     e.preventDefault()
     e.stopPropagation()
-    toggleLikeRecipe(String(recipe.recipeId))
+    e.stopPropagation()
+    toggleLikeRecipe({
+      id: String(recipe.recipeId),
+      title: recipe.title,
+      image: recipe.mainImageUrl || "/placeholder.svg",
+      author: recipe.nickName,
+      savedAt: new Date().toISOString(),
+    })
   }
 
   // 페이지네이션 번호 생성
@@ -254,13 +261,13 @@ export default function RecipesPage() {
                 onClick={() => handleCategoryClick(category.name)}
                 className={cn(
                   "flex flex-col items-center gap-2 min-w-[72px] p-3 rounded-xl transition-all",
-                  categoryParam === category.name ? "bg-[#800020]/10 ring-inset ring-2 ring-[#800020]" : "hover:bg-muted",
+                  categoryParam === category.name ? "bg-[#800020]/10 ring-inset ring-2 ring-[#800020]" : "hover:opacity-80",
                 )}
               >
                 <div
                   className={cn(
                     "w-14 h-14 rounded-full flex items-center justify-center text-2xl transition-all",
-                    categoryParam === category.name ? "bg-[#800020] shadow-lg scale-105" : "bg-muted",
+                    categoryParam === category.name ? "bg-[#800020] shadow-lg scale-105" : "bg-transparent",
                   )}
                 >
                   {category.icon}
@@ -334,7 +341,7 @@ export default function RecipesPage() {
                   servings: 0,
                   difficulty: "초보",
                   steps: [],
-                  isUserRecipe: isUserRecipePage
+                  isUserRecipe: !!(user?.nickname && recipe.nickName === user.nickname)
                 }}
                 // showAuthor가 true면 카드에서 닉네임 표시 (RecipeCard 수정 필요)
                 showAuthor={isUserRecipePage}
@@ -378,7 +385,7 @@ export default function RecipesPage() {
                   "min-w-[40px] h-10 rounded-lg text-base font-medium transition-all",
                   pageParam === page
                     ? "border-2 border-[#800020] text-[#800020] bg-white"
-                    : "text-gray-500 hover:bg-gray-100",
+                    : "text-gray-500 hover:text-gray-900",
                 )}
               >
                 {page}
@@ -460,5 +467,13 @@ export default function RecipesPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function RecipesPage() {
+  return (
+    <React.Suspense fallback={<div>Loading...</div>}>
+      <RecipesContent />
+    </React.Suspense>
   )
 }

@@ -8,16 +8,17 @@ import { Navbar } from "@/components/cook-sync/navbar"
 import { AccessDenied } from "@/components/cook-sync/access-denied"
 import { ScrollToTop } from "@/components/cook-sync/scroll-to-top"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Plus, Search, ChevronLeft, ChevronRight, Heart } from "lucide-react"
+import { Plus, Search, ChevronLeft, ChevronRight, Heart, CheckCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 
 import { useEffect } from "react"
-import { getNearbyPosts, getPostList } from "@/lib/api/market"
+import { getNearbyPosts, getPostList, getMyPostList } from "@/lib/api/market"
 
 const initialShares: any[] = [] // 더미 데이터 제거 (타입 유지를 위해 빈 배열)
 
@@ -30,30 +31,18 @@ export default function CommunityPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
   const [hideCompleted, setHideCompleted] = useState(false)
-
-  // 로그인 체크
-  if (!isLoggedIn) {
-    return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <Navbar />
-        <AccessDenied type="login" />
-      </div>
-    )
-  }
-
-  // 동네 인증 체크
-  if (!user?.location) {
-    return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <Navbar />
-        <AccessDenied type="location" />
-      </div>
-    )
-  }
-
   // API 연동: 게시글 목록 상태
   const [posts, setPosts] = useState<any[]>([])
+  const [myPostIds, setMyPostIds] = useState<Set<number>>(new Set())
   const [viewMode, setViewMode] = useState<"nearby" | "all">("nearby")
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      getMyPostList(0, 100).then(res => {
+        setMyPostIds(new Set(res.content.map(p => p.id)))
+      }).catch(err => console.error("Failed to fetch my posts", err))
+    }
+  }, [isLoggedIn])
 
   useEffect(() => {
     async function fetchPosts() {
@@ -75,6 +64,26 @@ export default function CommunityPage() {
       fetchPosts()
     }
   }, [isLoggedIn, user?.location, viewMode])
+
+  // 로그인 체크
+  if (!isLoggedIn) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Navbar />
+        <AccessDenied type="login" />
+      </div>
+    )
+  }
+
+  // 동네 인증 체크
+  if (!user?.location) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Navbar />
+        <AccessDenied type="location" />
+      </div>
+    )
+  }
 
 
 
@@ -100,8 +109,8 @@ export default function CommunityPage() {
     timeAgo: post.timeAgo,
     likes: 0,
     chatCount: post.chatCount,
-    status: (post.status === "SELLING" ? "available" : "completed") as "available" | "completed",
-    isMyPost: false,
+    status: (post.status === "SOLD" || post.status === "COMPLETED" ? "completed" : "available") as "available" | "completed",
+    isMyPost: myPostIds.has(post.id),
   }))
 
   const filteredShares = allShares.filter((share) => {
@@ -244,9 +253,15 @@ export default function CommunityPage() {
                   fill
                   className="object-cover transition-transform group-hover:scale-105"
                 />
+                {share.isMyPost && (
+                  <div className="absolute top-2 left-2 z-10">
+                    <Badge className="bg-[#800020] text-white hover:bg-[#800020]">내 나눔</Badge>
+                  </div>
+                )}
                 {share.status === "completed" && (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">거래 완료</span>
+                  <div className="absolute inset-0 bg-black/60 z-10 flex flex-col items-center justify-center text-white">
+                    <CheckCircle className="w-8 h-8 mb-2" />
+                    <span className="text-lg font-bold">거래 완료</span>
                   </div>
                 )}
               </div>
@@ -261,8 +276,14 @@ export default function CommunityPage() {
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <span>{share.place}</span>
                 <span>·</span>
-                <span>끌올 {share.timeAgo}</span>
+                <span>{share.timeAgo}</span>
               </div>
+
+              {share.isMyPost && (
+                <div className="absolute top-2 left-2 bg-[#800020] text-white text-[10px] px-2 py-0.5 rounded-full font-medium z-10 shadow-sm">
+                  내 나눔글
+                </div>
+              )}
             </div>
           ))}
         </div>

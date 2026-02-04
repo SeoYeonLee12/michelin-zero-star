@@ -61,8 +61,14 @@ export default function EditRecipePage() {
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState("")
-  const [ingredients, setIngredients] = useState<string[]>([])
-  const [ingredientInput, setIngredientInput] = useState("")
+  // ✅ Ingredient Interface match
+  const [ingredients, setIngredients] = useState<{ name: string, amount: string }[]>([])
+  const [ingredientName, setIngredientName] = useState("")
+  const [ingredientAmount, setIngredientAmount] = useState("")
+
+  // ✅ Validation States
+  const [ingredientError, setIngredientError] = useState(false)
+  const [tagError, setTagError] = useState(false)
   const [steps, setSteps] = useState<RecipeStep[]>([
     { id: 1, action: "", description: "", duration: 60, image: null, imagePreview: null, tips: "" },
   ])
@@ -82,8 +88,23 @@ export default function EditRecipePage() {
       setCategory(recipe.category)
       setServings(String(recipe.servings))
       setThumbnailPreview(recipe.thumbnail)
+      setThumbnailPreview(recipe.thumbnail)
       setTags(recipe.tags)
-      setIngredients(recipe.steps[0]?.ingredients || [])
+
+      // ✅ Handle legacy data (string[]) or {name, amount}[]
+      if (recipe.ingredients) {
+        setIngredients(recipe.ingredients.map((i: any) => {
+          if (typeof i === 'string') return { name: i, amount: "" }
+          return { name: i.name, amount: i.amount }
+        }))
+      } else {
+        // Fallback legacy (steps[0].ingredients)
+        const stepIngs = (recipe.steps[0] as any)?.ingredients || []
+        setIngredients(stepIngs.map((i: any) => {
+          if (typeof i === 'string') return { name: i, amount: "" }
+          return { name: i.name, amount: i.amount }
+        }))
+      }
       setSteps(
         recipe.steps.map((step) => ({
           id: step.id,
@@ -151,6 +172,7 @@ export default function EditRecipePage() {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
       setTags([...tags, tagInput.trim()])
       setTagInput("")
+      setTagError(false)
     }
   }
 
@@ -159,19 +181,34 @@ export default function EditRecipePage() {
   }
 
   const addIngredient = () => {
-    if (ingredientInput.trim() && !ingredients.includes(ingredientInput.trim())) {
-      setIngredients([...ingredients, ingredientInput.trim()])
-      setIngredientInput("")
+    if (!ingredientName.trim()) return
+
+    if (ingredientName.trim() && !ingredientAmount.trim()) {
+      setIngredientError(true)
+      return
+    }
+    setIngredientError(false)
+
+    if (ingredientName.trim() && ingredientAmount.trim()) {
+      setIngredients([...ingredients, { name: ingredientName.trim(), amount: ingredientAmount.trim() }])
+      setIngredientName("")
+      setIngredientAmount("")
     }
   }
 
-  const removeIngredient = (ingredient: string) => {
-    setIngredients(ingredients.filter((i) => i !== ingredient))
+  const removeIngredient = (index: number) => {
+    setIngredients(ingredients.filter((_, i) => i !== index))
   }
 
   const totalCookingTime = steps.reduce((acc, step) => acc + step.duration, 0)
 
   const handleSubmitClick = () => {
+    if (tags.length === 0) {
+      setTagError(true)
+      // UI scroll optional
+      return
+    }
+
     if (
       !title ||
       !thumbnailPreview ||
@@ -198,9 +235,9 @@ export default function EditRecipePage() {
         description: step.description,
         duration: step.duration,
         imagePreview: step.imagePreview,
-        ingredients: ingredients,
         tips: step.tips,
       })),
+      ingredients: ingredients, // Pass objects
     })
     router.push("/mypage")
   }
@@ -231,7 +268,7 @@ export default function EditRecipePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>대표 이미지 *</Label>
+                <Label>대표 이미지<span className="text-red-500 ml-1">*</span></Label>
                 <div
                   className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer hover:bg-muted/50 transition-colors min-h-[240px] flex items-center justify-center"
                   onClick={() => document.getElementById("thumbnail-input")?.click()}
@@ -259,7 +296,7 @@ export default function EditRecipePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="title">레시피 제목 *</Label>
+                <Label htmlFor="title">레시피 제목<span className="text-red-500 ml-1">*</span></Label>
                 <Input
                   id="title"
                   placeholder="예: 엄마표 김치찌개"
@@ -280,7 +317,7 @@ export default function EditRecipePage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="category">카테고리 *</Label>
+                  <Label htmlFor="category">카테고리<span className="text-red-500 ml-1">*</span></Label>
                   <Select value={category} onValueChange={setCategory}>
                     <SelectTrigger>
                       <SelectValue placeholder="카테고리 선택" />
@@ -308,7 +345,9 @@ export default function EditRecipePage() {
 
               {/* Tags */}
               <div className="space-y-2">
-                <Label>태그</Label>
+                <Label>
+                  태그<span className="text-red-500 ml-1">*</span>
+                </Label>
                 <div className="flex gap-2">
                   <Input
                     placeholder="태그 입력 후 추가"
@@ -320,6 +359,9 @@ export default function EditRecipePage() {
                     추가
                   </Button>
                 </div>
+                {tagError && tags.length === 0 && (
+                  <p className="text-red-500 text-sm mt-1">태그를 입력해주세요</p>
+                )}
                 {tags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     {tags.map((tag) => (
@@ -339,27 +381,42 @@ export default function EditRecipePage() {
 
               {/* Ingredients */}
               <div className="space-y-2">
-                <Label>재료</Label>
+                <Label>
+                  재료<span className="text-red-500 ml-1">*</span>
+                </Label>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="예: 김치 200g, 돼지고기 100g"
-                    value={ingredientInput}
-                    onChange={(e) => setIngredientInput(e.target.value)}
+                    placeholder="재료명 (예: 김치)"
+                    value={ingredientName}
+                    onChange={(e) => setIngredientName(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Input
+                    placeholder="용량 (예: 200g)"
+                    value={ingredientAmount}
+                    onChange={(e) => {
+                      setIngredientAmount(e.target.value)
+                      if (e.target.value.trim()) setIngredientError(false)
+                    }}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addIngredient())}
+                    className={cn("w-32", ingredientError && "border-red-500 focus-visible:ring-red-500")}
                   />
                   <Button type="button" onClick={addIngredient} variant="outline">
                     추가
                   </Button>
                 </div>
+                {ingredientError && (
+                  <p className="text-red-500 text-sm mt-1">용량을 입력해주세요</p>
+                )}
                 {ingredients.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {ingredients.map((ingredient) => (
+                    {ingredients.map((ingredient, idx) => (
                       <span
-                        key={ingredient}
+                        key={idx}
                         className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted text-foreground text-sm"
                       >
-                        {ingredient}
-                        <button onClick={() => removeIngredient(ingredient)} className="hover:text-red-500">
+                        {ingredient.name} {ingredient.amount && `(${ingredient.amount})`}
+                        <button onClick={() => removeIngredient(idx)} className="hover:text-red-500">
                           <X className="h-3 w-3" />
                         </button>
                       </span>
@@ -422,7 +479,7 @@ export default function EditRecipePage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>단계 이미지 *</Label>
+                    <Label>단계 이미지<span className="text-red-500 ml-1">*</span></Label>
                     <div
                       className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => document.getElementById(`step-image-${currentStep.id}`)?.click()}
@@ -450,7 +507,7 @@ export default function EditRecipePage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>단계 제목 *</Label>
+                    <Label>단계 제목<span className="text-red-500 ml-1">*</span></Label>
                     <Input
                       placeholder="예: 재료 손질하기"
                       value={currentStep.action}
@@ -459,7 +516,7 @@ export default function EditRecipePage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>상세 설명 *</Label>
+                    <Label>상세 설명<span className="text-red-500 ml-1">*</span></Label>
                     <Textarea
                       placeholder="이 단계에서 해야 할 일을 자세히 설명해주세요"
                       value={currentStep.description}
@@ -469,7 +526,7 @@ export default function EditRecipePage() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>소요 시간 (초) *</Label>
+                      <Label>소요 시간 (초)<span className="text-red-500 ml-1">*</span></Label>
                       <Input
                         type="number"
                         value={currentStep.duration}

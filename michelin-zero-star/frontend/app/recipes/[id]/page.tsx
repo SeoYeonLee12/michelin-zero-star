@@ -8,13 +8,13 @@ import { RecipeDetailView } from "@/components/cook-sync/recipe-detail-view"
 import { StepCookMode } from "@/components/cook-sync/step-cook-mode"
 import { CompleteCookDialog } from "@/components/cook-sync/complete-cook-dialog"
 import { Button } from "@/components/ui/button"
-import { leftoverRecipes } from "@/lib/dummy-data"
-import { getRecipeDetail, BackendRecipeResponse, getCookingModeDetails, CookingModeResponse, completeCooking } from "@/lib/api/recipes"
+import { getRecipeDetail, BackendRecipeResponse, getCookingModeDetails, CookingModeResponse, completeCooking, getRecipeList, RecipeListItem } from "@/lib/api/recipes"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import type { Recipe } from "@/lib/types"
 import { useAuth } from "@/lib/auth-context"
 import { NewRecipeContent } from "@/components/cook-sync/new-recipe-content"
 import { getCookie } from "@/lib/cookie"
+import { cn } from "@/lib/utils"
 
 type ViewState = "detail" | "cooking"
 
@@ -32,6 +32,48 @@ export default function RecipeDetailPage() {
   const [viewState, setViewState] = React.useState<ViewState>("detail")
   const [currentStepIndex, setCurrentStepIndex] = React.useState(0)
   const [showCompleteDialog, setShowCompleteDialog] = React.useState(false)
+  const [recommendedRecipes, setRecommendedRecipes] = React.useState<Recipe[]>([])
+
+  // Fetch random chef recipes for recommendations
+  React.useEffect(() => {
+    async function loadRecommendations() {
+      try {
+        const response = await getRecipeList({
+          recipeType: "CHEF",
+          sort: "RATING",
+          size: 20
+        })
+
+        // Shuffle and pick 3
+        const shuffled = [...response.recipes].sort(() => 0.5 - Math.random())
+        const selected = shuffled.slice(0, 3).map(item => ({
+          id: item.recipeId.toString(),
+          name: item.title,
+          thumbnail: item.mainImageUrl,
+          averageRating: item.averageRating,
+          isLiked: item.isScrapped,
+          hashtags: [item.nickName],
+          tags: item.tags?.map(t => t.tag_name) || [],
+          duration: 30, // Default placeholder
+          difficulty: "중급",
+          servings: 2,
+          steps: []
+        }))
+
+        setRecommendedRecipes(selected)
+      } catch (error) {
+        console.error("Failed to load recommendations:", error)
+        setRecommendedRecipes([])
+      }
+    }
+
+    loadRecommendations()
+  }, [])
+
+  // ✅ 화면 상단으로 스크롤 리셋 (상세 <-> 요리모드 전환 시)
+  React.useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [viewState])
 
   // [추가] 백엔드 데이터를 기존 프론트엔드 Recipe 타입으로 변환하는 매퍼 함수
   const mapBackendToFrontend = (data: BackendRecipeResponse): Recipe => {
@@ -50,6 +92,8 @@ export default function RecipeDetailPage() {
         protein: data.protein,
         fat: data.saturatedFat,
         sodium: data.sodium,
+        cholesterol: data.cholesterol,
+        calcium: data.calcium,
       },
       description: data.description,
       ingredients: data.ingredients.map(i => ({
@@ -146,6 +190,7 @@ export default function RecipeDetailPage() {
     setShowCompleteDialog(true)
   }
 
+
   const handleBack = () => {
     if (viewState === "cooking") {
       setViewState("detail")
@@ -180,7 +225,10 @@ export default function RecipeDetailPage() {
       <Navbar />
 
       <main className="flex-1">
-        <div className="container mx-auto max-w-6xl px-4 py-8">
+        <div className={cn(
+          "container mx-auto max-w-6xl px-4 transition-all duration-300",
+          viewState === "cooking" ? "py-2" : "py-8"
+        )}>
           {/* View State: Detail */}
           {viewState === "detail" && (
             <motion.div
@@ -212,13 +260,6 @@ export default function RecipeDetailPage() {
               transition={{ duration: 0.5, type: "spring", stiffness: 100, damping: 15 }}
               className="space-y-6"
             >
-              <div className="flex items-center gap-2 mb-4">
-                <Button variant="ghost" size="sm" onClick={handleBack}>
-                  <ArrowLeft className="h-4 w-4 mr-1" />
-                  돌아가기
-                </Button>
-              </div>
-
               <StepCookMode
                 recipeId={Number(recipeId)}
                 steps={cookingData.steps.map(step => ({
@@ -236,6 +277,7 @@ export default function RecipeDetailPage() {
                 onStepChange={setCurrentStepIndex}
                 onComplete={handleCompleteCooking}
                 recipeName={cookingData.title}
+                onBack={handleBack}
               />
             </motion.div>
           )}
@@ -247,7 +289,7 @@ export default function RecipeDetailPage() {
         open={showCompleteDialog}
         onOpenChange={setShowCompleteDialog}
         completedRecipe={recipe}
-        leftoverRecipes={leftoverRecipes}
+        leftoverRecipes={recommendedRecipes}
         onSelectLeftover={handleSelectLeftover}
       />
     </div>

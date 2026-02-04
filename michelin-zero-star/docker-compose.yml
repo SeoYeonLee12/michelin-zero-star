@@ -19,6 +19,7 @@ services:
       - DB_NAME=${PROD_DB_NAME}
       - DB_USER=${PROD_DB_USER}
       - DB_PW=${PROD_DB_PASSWORD}
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
       - AI_SERVER_URL=http://ai-serving:8000
 
       # [중요] OAuth2 로그인 후 리다이렉트될 프론트엔드 도메인
@@ -89,7 +90,7 @@ services:
 
   #===============================================#
   # 4. AI / Search Engine (Elasticsearch)
-  #===============================================#
+  #===============================================#`
   elasticsearch:
     build:
       context: .
@@ -166,8 +167,10 @@ services:
     environment:
       - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
-      # [중요] 배포 환경의 프론트엔드가 바라볼 API 주소 (HTTPS)
-      - NEXT_PUBLIC_API_BASE_URL=https://i14b208.p.ssafy.io/api/v1
+      # [Hybrid Merge] Localhost value with Remote Variable Name
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api/v1
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -176,7 +179,7 @@ services:
       - mzs-network
     depends_on:
       - backend
-    command: npm run dev -- -H 0.0.0.0 -p 3000
+    command: npm run dev -- --webpack -H 0.0.0.0 -p 3000
 
 #===============================================#
 # Network & Volume Definition

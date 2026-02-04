@@ -95,19 +95,7 @@ export function RecipeCard({ recipe, isLiked, onHeartClick, onEdit, onDelete, on
             )
           })()
         )}
-        <div className="absolute top-2 right-2">
-          <Button
-            size="icon"
-            variant="secondary"
-            className="h-7 w-7 rounded-full bg-white/80 backdrop-blur hover:bg-white"
-            onClick={(e) => {
-              e.stopPropagation()
-              onHeartClick?.(e, recipe)
-            }}
-          >
-            <Heart className={`h-4 w-4 ${isLiked ? "fill-red-500 text-red-500" : ""}`} />
-          </Button>
-        </div>
+        {/* Heart button removed */}
         {recipe.isUserRecipe && (
           <Badge className="absolute bottom-2 left-2 bg-[#800020] text-white border-0 text-xs">
             내 레시피
@@ -153,7 +141,7 @@ export function RecipeCard({ recipe, isLiked, onHeartClick, onEdit, onDelete, on
           </div>
         ) : null}
       </div>
-      <div className="p-3">
+      <div className="pt-3 pb-2 px-0">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-base leading-tight line-clamp-2">{recipe.name}</h3>
