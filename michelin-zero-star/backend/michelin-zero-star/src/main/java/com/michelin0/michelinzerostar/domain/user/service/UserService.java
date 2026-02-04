@@ -43,6 +43,7 @@ public class UserService {
     private final AuthService authService;
     private final KakaoMapService kakaoMapService;
 
+    // 사용자 위치 인증/업데이트
     @Transactional
     public String updateUserLocation(String email, BigDecimal latitude, BigDecimal longitude) {
         User user = userRepository.findByEmail(email)
@@ -66,11 +67,13 @@ public class UserService {
         return addressInfo.dongName();
     }
 
+    // 회원 탈퇴
     @Transactional
     public void deleteUser(String accessToken, String email, SocialProvider provider) {
         User user = userRepository.findByEmailAndSocialProvider(email, provider)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
 
+        // 소셜 유저라면 소셜 연동 해제 시도
         if (!provider.equals(SocialProvider.LOCAL)) {
             String socialToken = redisUtil.getData("SocialToken:" + email);
 
@@ -82,23 +85,62 @@ public class UserService {
             }
         }
 
-        user.withdraw();
+        user.withdraw(); // Soft Delete 등 탈퇴 처리
 
+        // 리프레시 토큰 삭제
         if (redisUtil.getRefreshToken(email) != null) {
             redisUtil.deleteRefreshToken(email);
         }
 
+        // 액세스 토큰 블랙리스트 처리
         Long expiration = jwtTokenProvider.getExpiration(accessToken);
         redisUtil.setBlackList(accessToken, expiration);
     }
 
+    // 내 정보 조회
+    @Transactional(readOnly = true)
+    public UserResponseDto getUser(String email, SocialProvider provider) {
+        User user = userRepository.findByEmailAndSocialProvider(email, provider)
+                .orElseThrow(() -> new IllegalArgumentException("해당 유저가 없습니다."));
+
+        UserProfile profile = userProfileRepository.findById(user.getId())
+                .orElse(null);
+
+        // 관심 카테고리 조회
+        List<UserFavoriteCategory> favoriteCategories = userFavoriteCategoryRepository.findAllByUserId(user.getId());
+
+        List<String> categoryNames = favoriteCategories.stream()
+                .map(favorite -> favorite.getCategory().getCategoryName())
+                .collect(Collectors.toList());
+
+        // 프로필 정보가 있는 경우와 없는 경우 분기 (Builder)
+        UserResponseDto.UserResponseDtoBuilder builder = UserResponseDto.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .name(user.getName())
+                .nickname(user.getNickname())
+                .profileImageUrl(user.getProfileImageUrl())
+                .role(user.getRole())
+                .totalStar(user.getTotalStar())
+                .socialProvider(user.getSocialProvider())
+                .categories(categoryNames);
+
+        if (profile != null) {
+            builder.location(profile.getLocationAddress())
+                    .isVerified(profile.isVerified());
+        }
+
+        return builder.build();
+    }
+
+    // 내 정보 수정
     @Transactional
-    public void updateUser(String email, SocialProvider provider, UserUpdateRequestDto requestDto) {
+    public UserResponseDto updateUser(String email, SocialProvider provider, UserUpdateRequestDto requestDto) {
         User user = userRepository.findByEmailAndSocialProvider(email, provider)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
 
+        // 닉네임 변경 및 중복 체크
         String newNickName = requestDto.getNickname();
-
         if (newNickName != null && !newNickName.isBlank()) {
             if (newNickName.equals(user.getNickname())) {
                 throw new GlobalException(AuthErrorCode.SAME_AS_OLD_NICKNAME);
@@ -108,10 +150,12 @@ public class UserService {
             }
         }
 
+        // 프로필 업데이트 (닉네임, 이미지 등)
         user.updateProfile(null, requestDto.getNickname(), requestDto.getProfileImageUrl());
 
+        // 관심 카테고리 업데이트
         if (requestDto.getCategories() != null) {
-            userFavoriteCategoryRepository.deleteByUserId(user.getId());
+            userFavoriteCategoryRepository.deleteByUserId(user.getId()); // 기존 카테고리 삭제
 
             for (String categoryName : requestDto.getCategories()) {
                 Category category = categoryRepository.findByCategoryName(categoryName)
@@ -126,6 +170,7 @@ public class UserService {
             }
         }
 
+        // 비밀번호 변경 (로컬 유저만 해당)
         if (provider == SocialProvider.LOCAL
                 && requestDto.getNewPassword() != null
                 && !requestDto.getNewPassword().isBlank()) {
@@ -149,48 +194,19 @@ public class UserService {
             String encodedPassword = passwordEncoder.encode(requestDto.getNewPassword());
             user.updatePassword(encodedPassword);
         }
-    }
 
-    @Transactional(readOnly = true)
-    public UserResponseDto getUser(String email, SocialProvider provider) {
-        User user = userRepository.findByEmailAndSocialProvider(email, provider)
-                .orElseThrow(() -> new IllegalArgumentException("해당 유저가 없습니다."));
-
-        UserProfile profile = userProfileRepository.findById(user.getId())
-                .orElse(null);
-
-        List<UserFavoriteCategory> favoriteCategories = userFavoriteCategoryRepository.findAllByUserId(user.getId());
-
-        List<String> categoryNames = favoriteCategories.stream()
-                .map(favorite -> favorite.getCategory().getCategoryName())
+        // 업데이트된 카테고리 목록 조회
+        List<String> categories = userFavoriteCategoryRepository.findAllByUserId(user.getId()).stream()
+                .map(ufc -> ufc.getCategory().getCategoryName())
                 .collect(Collectors.toList());
 
-        if (profile != null) {
-            return UserResponseDto.builder()
-                    .id(user.getId())
-                    .email(user.getEmail())
-                    .name(user.getName())
-                    .nickname(user.getNickname())
-                    .profileImageUrl(user.getProfileImageUrl())
-                    .role(user.getRole())
-                    .totalStar(user.getTotalStar())
-                    .socialProvider(user.getSocialProvider())
-                    .location(profile.getLocationAddress())
-                    .isVerified(profile.isVerified())
-                    .categories(categoryNames)
-                    .build();
-        }
-
+        // 응답 DTO 반환
         return UserResponseDto.builder()
                 .id(user.getId())
                 .email(user.getEmail())
-                .name(user.getName())
                 .nickname(user.getNickname())
                 .profileImageUrl(user.getProfileImageUrl())
-                .role(user.getRole())
-                .totalStar(user.getTotalStar())
-                .socialProvider(user.getSocialProvider())
-                .categories(categoryNames)
+                .categories(categories) // ★ 업데이트된 카테고리 목록 포함
                 .build();
     }
 }

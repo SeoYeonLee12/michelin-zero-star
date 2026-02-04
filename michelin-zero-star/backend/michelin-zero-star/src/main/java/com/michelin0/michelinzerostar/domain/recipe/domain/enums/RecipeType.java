@@ -7,8 +7,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum RecipeType {
 
-    USER("user", "레시피 도서관"),
-    CHEF("chef", "레시피 연구소");
+    USER("user", "레시피 연구소"),
+    CHEF("chef", "레시피 도서관");
 
     private final String type;
     private final String displayName;

@@ -1,3 +1,4 @@
+// michelin-zero-star\frontend\lib\api\auth.ts
 import { apiFetch } from "./client"
 
 export type JoinRequest = {

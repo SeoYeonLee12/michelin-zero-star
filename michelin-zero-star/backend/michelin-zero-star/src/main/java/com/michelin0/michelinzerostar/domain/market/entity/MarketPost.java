@@ -2,7 +2,19 @@ package com.michelin0.michelinzerostar.domain.market.entity;
 
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.global.domain.SoftDeleteDomain;
-import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,23 +48,22 @@ public class MarketPost extends SoftDeleteDomain {
     @Column(columnDefinition = "TEXT")
     private String content;
 
-    private int price;
+    @Column(nullable = false)
+    private Integer price; // 0원일 경우 '나눔'으로 처리
 
     @Enumerated(EnumType.STRING)
     private PostStatus status;
 
     private String meetingPlace;
 
-    private String locationText; // 동 이름
-    private String locationCode; // 행정동 코드
+    private String locationText;
+    private String locationCode;
 
     @Column(precision = 10, scale = 8)
     private BigDecimal latitude;
 
     @Column(precision = 11, scale = 8)
     private BigDecimal longitude;
-
-    private String category;
 
     private int chatCount;
 
@@ -63,13 +74,12 @@ public class MarketPost extends SoftDeleteDomain {
     private List<MarketPostImage> images = new ArrayList<>();
 
     @Builder
-    public MarketPost(User writer, String title, String content, int price, String meetingPlace,
-            String locationText, String locationCode, BigDecimal latitude, BigDecimal longitude,
-            String category) {
+    public MarketPost(User writer, String title, String content, Integer price, String meetingPlace,
+            String locationText, String locationCode, BigDecimal latitude, BigDecimal longitude) {
         this.writer = writer;
         this.title = title;
         this.content = content;
-        this.price = price;
+        this.price = (price == null) ? 0 : price;
         this.meetingPlace = meetingPlace;
         this.status = PostStatus.SELLING;
         this.chatCount = 0;
@@ -79,7 +89,6 @@ public class MarketPost extends SoftDeleteDomain {
         this.locationCode = locationCode;
         this.latitude = latitude;
         this.longitude = longitude;
-        this.category = category;
     }
 
     public void increaseLikeCount() {
@@ -92,15 +101,17 @@ public class MarketPost extends SoftDeleteDomain {
         }
     }
 
-    public void update(String title, String content, int price, String meetingPlace, String category) {
-        this.title = title;
-        this.content = content;
-        this.price = price;
-        this.meetingPlace = meetingPlace;
-        this.category = category;
+    public void increaseChatCount() {
+        this.chatCount++;
     }
 
-    // 상태 변경 메서드
+    public void update(String title, String content, Integer price, String meetingPlace) {
+        this.title = title;
+        this.content = content;
+        this.price = (price == null) ? 0 : price;
+        this.meetingPlace = meetingPlace;
+    }
+
     public void updateStatus(PostStatus status) {
         this.status = status;
     }
