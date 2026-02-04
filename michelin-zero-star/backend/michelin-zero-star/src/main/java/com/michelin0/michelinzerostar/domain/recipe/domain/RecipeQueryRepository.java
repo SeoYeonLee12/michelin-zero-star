@@ -9,6 +9,8 @@ import static com.michelin0.michelinzerostar.domain.recipe.domain.QRecipeTag.rec
 import static com.michelin0.michelinzerostar.domain.recipescrap.domain.QRecipeScrap.recipeScrap;
 import static com.michelin0.michelinzerostar.domain.user.entity.QUser.user;
 
+import com.michelin0.michelinzerostar.domain.category.domain.QCategory;
+import com.michelin0.michelinzerostar.domain.category.domain.QRecipeCategory;
 import com.michelin0.michelinzerostar.domain.recipe.domain.enums.RecipeSortType;
 import com.michelin0.michelinzerostar.domain.recipe.domain.enums.RecipeType;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModeProjection;
@@ -259,11 +261,13 @@ public class RecipeQueryRepository {
         if (!StringUtils.hasText(categoryName)) {
             return null;
         }
+        QRecipeCategory subRecipeCategory = new QRecipeCategory("subRecipeCategory");
+        QCategory subCategory = new QCategory("subCategory");
         return recipe.recipeId.in(
-                JPAExpressions.select(recipeCategory.recipe.recipeId)
-                        .from(recipeCategory)
-                        .join(recipeCategory.category, category)
-                        .where(category.categoryName.eq(categoryName))
+                JPAExpressions.select(subRecipeCategory.recipe.recipeId)
+                        .from(subRecipeCategory)
+                        .join(subRecipeCategory.category, subCategory)
+                        .where(subCategory.categoryName.eq(categoryName))
         );
     }
 
