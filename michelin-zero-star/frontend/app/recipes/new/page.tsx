@@ -34,6 +34,8 @@ import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
 import { getCookie } from "@/lib/cookie"
 import { registerRecipe, updateRecipe, getRecipeDetail, type RegisterRecipeRequest } from "@/lib/api/recipes"
+import { StarRewardBadge } from "@/components/cook-sync/star-reward-badge"
+import { AnimatePresence, motion } from "framer-motion"
 
 interface RecipeStep {
   id: number
@@ -83,7 +85,7 @@ function NewRecipeForm() {
   const searchParams = useSearchParams()
   const recipeIdParam = searchParams.get("id")
   const isEditMode = !!recipeIdParam
-  const { isLoggedIn, addUserRecipe, isLoading } = useAuth() // ✅ Added isLoading
+  const { isLoggedIn, addUserRecipe, isLoading, earnStars } = useAuth() // ✅ Added isLoading
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [category, setCategory] = useState("")
@@ -102,6 +104,7 @@ function NewRecipeForm() {
   const [successDialogOpen, setSuccessDialogOpen] = useState(false)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [exitDialogOpen, setExitDialogOpen] = useState(false)
+  const [showRewardDialog, setShowRewardDialog] = useState(false)
 
   // ✅ Validation States
   const [ingredientError, setIngredientError] = useState(false)
@@ -288,6 +291,12 @@ function NewRecipeForm() {
   }
 
   const handleSubmitClick = () => {
+    if (ingredients.length === 0) {
+      setIngredientError(true)
+      alert("재료를 최소 1개 이상 입력해주세요.")
+      return
+    }
+
     if (tags.length === 0) {
       setTagError(true)
       document.getElementById("tag-section")?.scrollIntoView({ behavior: "smooth" })
@@ -378,7 +387,9 @@ function NewRecipeForm() {
       }
 
       // 3. 성공 처리 (Only for Create)
-      setSuccessDialogOpen(true)
+      earnStars(1.0, "recipe")
+      // setSuccessDialogOpen(true) // 기존 Dialog 대신 보상 Dialog 사용
+      setShowRewardDialog(true)
 
     } catch (error) {
       console.error("Recipe registration/update failed:", error)
@@ -702,22 +713,43 @@ function NewRecipeForm() {
 
                     <div className="space-y-4 md:w-1/2 flex flex-col">
                       <div className="space-y-2">
-                        <Label className="text-base">소요 시간 (초)<span className="text-red-500 ml-1">*</span></Label>
+                        <Label className="text-base">소요 시간 (분/초)<span className="text-red-500 ml-1">*</span></Label>
                         <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            value={currentStep.duration}
-                            onChange={(e) =>
-                              updateStep(currentStep.id, "duration", e.target.value ? Number.parseInt(e.target.value) : "")
-                            }
-                            placeholder="예: 120"
-                            className="text-base flex-1"
-                          />
-                          <span className="text-sm text-muted-foreground whitespace-nowrap">초</span>
+                          <div className="flex-1 flex items-center gap-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={Math.floor((currentStep.duration || 0) / 60)}
+                              onChange={(e) => {
+                                const newMinutes = e.target.value ? Math.max(0, parseInt(e.target.value)) : 0
+                                const currentSeconds = (currentStep.duration || 0) % 60
+                                updateStep(currentStep.id, "duration", newMinutes * 60 + currentSeconds)
+                              }}
+                              placeholder="분"
+                              className="text-base"
+                            />
+                            <span className="text-sm text-muted-foreground whitespace-nowrap">분</span>
+                          </div>
+                          <div className="flex-1 flex items-center gap-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              max="59"
+                              value={(currentStep.duration || 0) % 60}
+                              onChange={(e) => {
+                                const newSeconds = e.target.value ? Math.max(0, parseInt(e.target.value)) : 0
+                                const currentMinutes = Math.floor((currentStep.duration || 0) / 60)
+                                updateStep(currentStep.id, "duration", currentMinutes * 60 + newSeconds)
+                              }}
+                              placeholder="초"
+                              className="text-base"
+                            />
+                            <span className="text-sm text-muted-foreground whitespace-nowrap">초</span>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="space-y-2">
+                      {/* <div className="space-y-2">
                         <Label className="text-base">단계 제목<span className="text-red-500 ml-1">*</span></Label>
                         <Input
                           placeholder="예: 재료 손질하기"
@@ -725,7 +757,7 @@ function NewRecipeForm() {
                           onChange={(e) => updateStep(currentStep.id, "action", e.target.value)}
                           className="text-base"
                         />
-                      </div>
+                      </div> */}
 
                       <div className="space-y-2 flex-1 flex flex-col">
                         <Label className="text-base">상세 설명<span className="text-red-500 ml-1">*</span></Label>
@@ -853,6 +885,59 @@ function NewRecipeForm() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Reward Dialog */}
+      <AnimatePresence>
+        {showRewardDialog && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={handleViewRecipe}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-[340px] bg-white rounded-[2.5rem] p-10 shadow-[0_20px_50px_rgba(0,0,0,0.1)] text-center overflow-hidden border border-gray-50"
+            >
+              <div className="relative space-y-6">
+                <div className="space-y-3">
+                  <h2 className="text-2xl font-bold text-gray-900 tracking-tight leading-tight">레시피 등록 성공!</h2>
+                  <p className="text-gray-400 text-sm font-medium">나만의 레시피가 등록되었습니다.</p>
+                </div>
+
+                <div className="py-2">
+                  <StarRewardBadge
+                    amount={1}
+                    customText="1 스타 적립"
+                    starSize="md"
+                    textSize="sm"
+                  />
+                </div>
+
+                <div className="flex gap-3 mt-1">
+                  <Button
+                    variant="outline"
+                    className="flex-1 bg-transparent"
+                    onClick={() => setShowRewardDialog(false)}
+                  >
+                    계속 등록하기
+                  </Button>
+                  <Button
+                    className="flex-1 bg-[#800020] hover:bg-[#800020]/90"
+                    onClick={handleViewRecipe}
+                  >
+                    내 레시피 보기
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div >
   )
 }

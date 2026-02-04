@@ -23,7 +23,7 @@ import { getNearbyPosts, getPostList, getMyPostList } from "@/lib/api/market"
 const initialShares: any[] = [] // 더미 데이터 제거 (타입 유지를 위해 빈 배열)
 
 
-const ITEMS_PER_PAGE = 10
+const ITEMS_PER_PAGE = 20
 
 export default function CommunityPage() {
   const router = useRouter()

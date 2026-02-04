@@ -349,7 +349,9 @@ export default function CommunityDetailPage() {
             </div>
 
             <div>
-              <p className="text-2xl font-bold text-[#800020]">{post.price.toLocaleString()}원</p>
+              <p className="text-2xl font-bold text-[#800020]">
+                {post.price === 0 ? "무료 나눔" : `${post.price.toLocaleString()}원`}
+              </p>
             </div>
 
             <div className="flex items-center gap-2 text-muted-foreground">

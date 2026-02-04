@@ -259,7 +259,9 @@ export default function MyPage() {
                       </Button>
                     </div>
                     <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
-                      {user?.bio || "매일 조금씩 요리 실력을 키워가고 있어요!"}
+                      {user?.categories && user.categories.length > 0
+                        ? `${user.categories.join(", ")} 100스타에 도전 중!`
+                        : "깨어나라 봉인된 셰프여"}
                     </p>
                   </div>
                 </div>
