@@ -362,17 +362,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         lastMessageTime: r.lastMessageAt,
         unreadCount: r.unreadCount || 0
       }));
-      setConversations(mapped);
-      // ❌ [CRITICAL FIX] 모든 방을 구독하지 않음!
-      // mapped.forEach(room => subscribeToRoom(room.id)); 
+      // 중복 제거 (Backend issue guard)
+      const unique = Array.from(new Map(mapped.map(item => [item.id, item])).values());
+      setConversations(unique);
     } catch (error) { console.error(error); }
   }
 
   const connectWebSocket = (token: string) => {
     if (stompClient.current) disconnectWebSocket();
-    console.log("🔌 Connecting WebSocket...");
+
+    // WS URL 동적 생성
+    const getWsUrl = () => {
+      const envUrl = process.env.NEXT_PUBLIC_WS_URL
+      if (envUrl) return envUrl
+
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL
+      let baseUrl = apiBase || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8080")
+
+      if (baseUrl.startsWith("http://")) {
+        baseUrl = baseUrl.replace("http://", "ws://")
+      } else if (baseUrl.startsWith("https://")) {
+        baseUrl = baseUrl.replace("https://", "wss://")
+      } else if (baseUrl.startsWith("/")) {
+        baseUrl = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + baseUrl
+      } else if (!baseUrl.startsWith("ws://") && !baseUrl.startsWith("wss://")) {
+        baseUrl = "ws://" + baseUrl
+      }
+
+      if (baseUrl.endsWith("/")) baseUrl = baseUrl.slice(0, -1)
+      return `${baseUrl}/ws-stomp`
+    }
+
+    const wsUrl = getWsUrl()
+    console.log("🔌 Connecting WebSocket to:", wsUrl);
+
     const client = new Client({
-      brokerURL: process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080/ws-stomp",
+      brokerURL: wsUrl,
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 5000,
       onConnect: () => {

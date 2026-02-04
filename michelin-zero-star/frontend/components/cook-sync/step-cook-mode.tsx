@@ -311,8 +311,37 @@ export function StepCookMode({
   // 1. 소켓 연결
   React.useEffect(() => {
     const token = getGlobalAccessToken()
+
+    // WS URL 동적 생성
+    const getWsUrl = () => {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL
+      // API Base가 있으면 그것을 기반으로, 없으면 현재 window origin 사용
+      let baseUrl = apiBase || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8080")
+
+      // http/https -> ws/wss 변환
+      if (baseUrl.startsWith("http://")) {
+        baseUrl = baseUrl.replace("http://", "ws://")
+      } else if (baseUrl.startsWith("https://")) {
+        baseUrl = baseUrl.replace("https://", "wss://")
+      } else if (baseUrl.startsWith("/")) {
+        // 상대 경로인 경우
+        baseUrl = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + baseUrl
+      } else {
+        // 프로토콜이 없는 경우 (예: localhost:8080)
+        baseUrl = "ws://" + baseUrl
+      }
+
+      // 끝에 슬래시 제거
+      if (baseUrl.endsWith("/")) baseUrl = baseUrl.slice(0, -1)
+
+      return `${baseUrl}/ws-stomp`
+    }
+
+    const wsUrl = getWsUrl()
+    console.log("[STOMP] Connecting to:", wsUrl)
+
     const client = new Client({
-      brokerURL: "ws://localhost:8080/ws-stomp", // Backend defaults to port 8080, endpoint defined in WebSocketConfig
+      brokerURL: wsUrl,
       connectHeaders: {
         Authorization: `Bearer ${token}`,
       },
