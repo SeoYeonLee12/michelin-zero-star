@@ -1,3 +1,4 @@
+// lib/auth-context.tsx
 "use client"
 
 import * as React from "react"
@@ -6,8 +7,8 @@ import { getMe, updateProfile as updateProfileAPI, withdrawUser } from "./api/us
 import { login as loginAPI, signup as signupAPI, logout as logoutAPI } from "./api/auth"
 import { verifyLocation } from "./api/user"
 import { setCookie, getCookie, removeCookie } from "./cookie"
-import { setGlobalAccessToken, getGlobalAccessToken } from "./api/client" // ✅ Import
-import { refreshAccessToken } from "./api/auth" // ✅ Import
+import { setGlobalAccessToken, getGlobalAccessToken } from "./api/client"
+import { refreshAccessToken } from "./api/auth"
 
 // ✅ 개발 환경에서 mock 사용 여부
 const USE_MOCK_API = false
@@ -111,12 +112,16 @@ interface UserPost {
 type LikedPost = UserPost & { savedAt: string }
 
 interface AuthContextType {
-  isLoading: boolean // ✅ Added
+  isLoading: boolean
   user: User | null
   isLoggedIn: boolean
   login: (email: string, password: string) => Promise<void>
   signup: (data: { name: string; nickname: string; email: string; password: string }) => Promise<void>
   logout: () => void
+
+  // ✅ [추가] 소셜 로그인 처리 함수 (액세스 토큰 주입)
+  onSocialLogin: (accessToken: string) => Promise<void>
+
   updateProfile: (data: Partial<User> & { currentPassword?: string; newPassword?: string; newPasswordConfirm?: string }) => Promise<void>
   updateLocation: (latitude: number, longitude: number) => Promise<string>
   likedRecipes: LikedRecipe[]
@@ -151,7 +156,7 @@ const AuthContext = React.createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   console.log("[AuthProvider] render")
-  const [isLoading, setIsLoading] = React.useState(true) // ✅ Added
+  const [isLoading, setIsLoading] = React.useState(true)
   const [user, setUser] = React.useState<User | null>(null)
 
   const [likedRecipes, setLikedRecipes] = React.useState<LikedRecipe[]>([])
@@ -189,8 +194,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // 성공 시: 메모리에 액세스 토큰 설정
         setGlobalAccessToken(refreshRes.accessToken)
         console.log("[AuthProvider] Silent Login Success")
-        // 3. 최신 유저 정보 동기화 하하하
-        // 3. 최신 유저 정보 동기화 하하하
+
+        // 3. 최신 유저 정보 동기화
         const me = await getMe()
         const recoveredUser: User = {
           id: String(me.id),
@@ -229,6 +234,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       initAuth()
     }
 
+    // --- Legacy LocalStorage Data Loading (기존 코드 유지) ---
     const savedLikedRecipes = safeJsonParse<LikedRecipe[]>(localStorage.getItem("cooksync_liked_recipes"), [])
     if (savedLikedRecipes.length) setLikedRecipes(savedLikedRecipes)
 
@@ -252,13 +258,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (rawLikedPosts.every((x) => typeof x === "string")) {
         const ids = rawLikedPosts as string[]
         normalizedLikedPosts = ids
-          .map((id) => savedUserPosts.find((p) => p.id === id))
-          .filter(Boolean)
-          .map((p) => ({ ...(p as UserPost), savedAt: nowIso }))
+        .map((id) => savedUserPosts.find((p) => p.id === id))
+        .filter(Boolean)
+        .map((p) => ({ ...(p as UserPost), savedAt: nowIso }))
       } else if (rawLikedPosts.every((x) => typeof x === "object" && x !== null)) {
         normalizedLikedPosts = (rawLikedPosts as any[])
-          .filter((p) => typeof p.id === "string")
-          .map((p) => ({ ...(p as UserPost), savedAt: typeof p.savedAt === "string" ? p.savedAt : nowIso }))
+        .filter((p) => typeof p.id === "string")
+        .map((p) => ({ ...(p as UserPost), savedAt: typeof p.savedAt === "string" ? p.savedAt : nowIso }))
       }
     }
     if (normalizedLikedPosts.length) setLikedPosts(normalizedLikedPosts)
@@ -312,6 +318,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // 참고: 리프레시 토큰은 백엔드가 Set-Cookie 헤더로(HttpOnly) 설정해주어야 함.
 
+    // 3. 내 정보 조회
     const me = await getMe()
 
     const newUser: User = {
@@ -333,6 +340,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setUser(newUser)
     localStorage.setItem("cooksync_user", JSON.stringify(newUser))
+  }
+
+  // ✅ [추가] 소셜 로그인 처리 함수
+  const onSocialLogin = async (accessToken: string) => {
+    try {
+      // 1. 외부(Callback URL)에서 받은 액세스 토큰 설정
+      setGlobalAccessToken(accessToken)
+
+      // 2. 내 정보 조회 (토큰 유효성 검증 겸용)
+      const me = await getMe()
+
+      const newUser: User = {
+        id: String(me.id),
+        name: me.name ?? "",
+        nickname: me.nickname ?? "",
+        email: me.email ?? "", // 소셜 로그인의 경우 API가 이메일을 제공하지 않을 수 있음 (대비용)
+        profileImage: me.profileImage,
+        level: me.level ?? "",
+        bio: me.bio ?? "",
+        location: me.location,
+        latitude: me.latitude,
+        longitude: me.longitude,
+        locationCode: me.locationCode,
+        stars: me.stars ?? 0,
+        todayStars: me.todayStars ?? 0,
+        lastStarDate: me.lastStarDate ?? new Date().toISOString().split("T")[0],
+      }
+
+      setUser(newUser)
+      localStorage.setItem("cooksync_user", JSON.stringify(newUser))
+      console.log("✅ 소셜 로그인 성공 및 유저 정보 업데이트 완료")
+    } catch (error) {
+      console.error("소셜 로그인 처리 실패:", error)
+      setGlobalAccessToken(null)
+      throw error
+    }
   }
 
   const signup = async (data: { name: string; nickname: string; email: string; password: string }) => {
@@ -437,8 +480,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLikedRecipes((prev) => {
       const isAlreadyLiked = prev.some((r) => r.id === recipe.id)
       const updated = isAlreadyLiked
-        ? prev.filter((r) => r.id !== recipe.id)
-        : [...prev, { ...recipe, savedAt: new Date().toISOString().split("T")[0].replace(/-/g, ".") }]
+          ? prev.filter((r) => r.id !== recipe.id)
+          : [...prev, { ...recipe, savedAt: new Date().toISOString().split("T")[0].replace(/-/g, ".") }]
       localStorage.setItem("cooksync_liked_recipes", JSON.stringify(updated))
       return updated
     })
@@ -611,19 +654,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider
-      value={{
-        isLoading, // ✅ Added
-        user, isLoggedIn: !!user, login, signup, logout, updateProfile, updateLocation,
-        likedRecipes, toggleLikeRecipe, isRecipeLiked, conversations, sendMessage, getMessages,
-        deleteConversation, userRecipes, addUserRecipe, updateUserRecipe, deleteUserRecipe,
-        userPosts, addUserPost, updateUserPost, deleteUserPost, likedPosts, toggleLikePost,
-        isPostLiked, earnStars, getStarLevel, completedRecipes, markRecipeAsCompleted,
-        reviewedRecipes, markRecipeAsReviewed, hasUserReviewedRecipe, withdraw,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+      <AuthContext.Provider
+          value={{
+            isLoading, // ✅ Added
+            user,
+            isLoggedIn: !!user,
+            login,
+            signup,
+            logout,
+            onSocialLogin, // ✅ [추가] Provide function
+            updateProfile,
+            updateLocation,
+            likedRecipes, toggleLikeRecipe, isRecipeLiked, conversations, sendMessage, getMessages,
+            deleteConversation, userRecipes, addUserRecipe, updateUserRecipe, deleteUserRecipe,
+            userPosts, addUserPost, updateUserPost, deleteUserPost, likedPosts, toggleLikePost,
+            isPostLiked, earnStars, getStarLevel, completedRecipes, markRecipeAsCompleted,
+            reviewedRecipes, markRecipeAsReviewed, hasUserReviewedRecipe, withdraw,
+          }}
+      >
+        {children}
+      </AuthContext.Provider>
   )
 }
 

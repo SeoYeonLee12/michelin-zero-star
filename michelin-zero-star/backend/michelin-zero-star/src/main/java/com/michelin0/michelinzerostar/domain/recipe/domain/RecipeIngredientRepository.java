@@ -1,12 +1,16 @@
 package com.michelin0.michelinzerostar.domain.recipe.domain;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public interface RecipeIngredientRepository extends JpaRepository<RecipeIngredient, Long> {
 
-    void deleteAllBy(Long recipeId);
+    @Modifying
+    @Transactional
+    void deleteAllByRecipeRecipeId(Long recipeId);
 
-    void deleteByRecipe(Recipe Recipe);
+    void deleteByRecipe(Recipe recipe);
 }

@@ -20,8 +20,6 @@ public class MarketPostUpdateRequest {
     @Min(value = 0, message = "가격은 0원 이상이어야 합니다.")
     private Integer price;
 
+    @NotBlank(message = "거래 장소는 필수 입력값입니다.")
     private String meetingPlace;
-
-    @NotBlank(message = "카테고리는 필수 입력값입니다.")
-    private String category;
 }

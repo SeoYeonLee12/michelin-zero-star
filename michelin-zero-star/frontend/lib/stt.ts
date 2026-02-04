@@ -10,8 +10,12 @@ export async function startSttOnce(opts: {
 }): Promise<SttController> {
   const { token, region, onFinal, onError } = opts
 
-  const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(token, region)
-  speechConfig.speechRecognitionLanguage = "ko-KR"
+ // const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(token, region)
+  //speechConfig.speechRecognitionLanguage = "ko-KR"
+
+  const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(token, region)
+
+  speechConfig.speechRecognitionLanguage = process.env.NEXT_PUBLIC_SPEECH_LANG || "ko-KR"
 
   const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput()
   const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig)
