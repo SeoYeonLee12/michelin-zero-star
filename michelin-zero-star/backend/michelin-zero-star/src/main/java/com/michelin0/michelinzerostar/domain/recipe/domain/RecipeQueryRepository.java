@@ -68,7 +68,7 @@ public class RecipeQueryRepository {
                 .select(category.categoryName)
                 .from(recipeCategory)
                 .join(recipeCategory.category, category)
-                .where(recipeCategory.recipe.recipeId.eq(recipe.recipeId))
+                .where(recipeCategory.recipe.recipeId.eq(recipeId))
                 .fetch();
 
         List<RecipeTagProjection> tags = queryFactory
