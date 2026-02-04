@@ -257,17 +257,28 @@ public class RecipeQueryRepository {
         }
     }
 
+//     private BooleanExpression eqCategory(String categoryName) {
+//         if (!StringUtils.hasText(categoryName)) {
+//             return null;
+//         }
+//         QRecipeCategory subRecipeCategory = new QRecipeCategory("subRecipeCategory");
+//         QCategory subCategory = new QCategory("subCategory");
+//         return recipe.recipeId.in(
+//                 JPAExpressions.select(subRecipeCategory.recipe.recipeId)
+//                         .from(subRecipeCategory)
+//                         .join(subRecipeCategory.category, subCategory)
+//                         .where(subCategory.categoryName.eq(categoryName))
+//         );
+//     }
     private BooleanExpression eqCategory(String categoryName) {
         if (!StringUtils.hasText(categoryName)) {
             return null;
         }
-        QRecipeCategory subRecipeCategory = new QRecipeCategory("subRecipeCategory");
-        QCategory subCategory = new QCategory("subCategory");
         return recipe.recipeId.in(
-                JPAExpressions.select(subRecipeCategory.recipe.recipeId)
-                        .from(subRecipeCategory)
-                        .join(subRecipeCategory.category, subCategory)
-                        .where(subCategory.categoryName.eq(categoryName))
+                JPAExpressions.select(recipeCategory.recipe.recipeId)
+                        .from(recipeCategory)
+                        .join(recipeCategory.category, category)
+                        .where(category.categoryName.eq(categoryName))
         );
     }
 
