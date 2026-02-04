@@ -5,6 +5,7 @@ type ApiErrorPayload = {
   message?: string
   error?: string
   status?: number
+  validationErrors?: Record<string, string>
 }
 
 // ✅ 메모리 내 액세스 토큰 (브라우저 새로고침 시 초기화됨 -> Silent Refresh로 복구 필요)
@@ -128,12 +129,21 @@ export async function apiFetch<T = unknown>(
 
   if (!res.ok) {
     const payload = (parsed ?? {}) as ApiErrorPayload
-    const message =
+    let message =
       payload.message ||
       payload.error ||
       (typeof parsed === "string" ? parsed : "") ||
       raw ||
       `Request failed (${res.status})`
+
+    if (payload.validationErrors) {
+      const details = Object.entries(payload.validationErrors)
+        .map(([field, msg]) => `${field}: ${msg}`)
+        .join("\n")
+      if (details) {
+        message += `\n${details}`
+      }
+    }
 
     throw new Error(message)
   }

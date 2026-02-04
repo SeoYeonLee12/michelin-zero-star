@@ -39,7 +39,7 @@ export default function SignupPage() {
     { label: "8자 이상", met: formData.password.length >= 8 },
     { label: "영문 포함", met: /[a-zA-Z]/.test(formData.password) },
     { label: "숫자 포함", met: /\d/.test(formData.password) },
-    { label: "특수기호 포함", met: /[!@#$%^&*(),.?":{}|<>]/.test(formData.password) },
+    { label: "특수기호 (@$!%*#?&) 포함", met: /[@$!%*#?&]/.test(formData.password) },
   ]
 
   const allRequirementsMet = passwordRequirements.every((req) => req.met)
@@ -89,8 +89,9 @@ export default function SignupPage() {
         password: formData.password,
       })
       router.push("/")
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
+      alert(error.message || "회원가입에 실패했습니다.")
     } finally {
       setIsLoading(false)
     }
@@ -208,9 +209,7 @@ export default function SignupPage() {
                   className={`h-12 ${nicknameError ? "border-destructive" : ""}`}
                 />
                 {nicknameError && <p className="text-xs text-destructive">{nicknameError}</p>}
-                {!nicknameError && formData.nickname && (
-                  <p className="text-xs text-green-600">사용 가능한 닉네임입니다</p>
-                )}
+
               </div>
             </div>
 

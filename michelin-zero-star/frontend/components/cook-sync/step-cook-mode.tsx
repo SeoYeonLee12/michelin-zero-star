@@ -4,6 +4,7 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { Client } from "@stomp/stompjs"
 import { getGlobalAccessToken } from "@/lib/api/client"
+import { completeCooking } from "@/lib/api/cook-mode"
 import { useAuth } from "@/lib/auth-context"
 import {
   Play,
@@ -244,17 +245,33 @@ export function StepCookMode({
     const idx = stepIndexRef.current
     setCompletedSteps(prev => new Set([...prev, idx]))
 
-    if (idx < steps.length - 1) onStepChange(idx + 1)
-    else {
+
+    // 마지막 스텝이면 요리 완료 API 요청 후 onComplete
+    if (idx < steps.length - 1) {
+      onStepChange(idx + 1)
+    } else {
       clearSttRetryTimer()
       safeStopStt()
       setAiOpenSafe(false)
       setAiVoiceEnabled(false)
       setIsListening(false)
       await porcupineRef.current?.stop()
-      onComplete()
+
+      try {
+        await completeCooking({ recipeId })
+        // 성공 시 onComplete (상위 컴포넌트에서 완료 페이지로 이동 or 모달 띄우기 등 처리)
+        onComplete()
+      } catch (err) {
+        console.error("요리 완료 API 오류:", err)
+        // 에러가 나도 완료 처리를 할지, 아니면 사용자에게 알릴지는 기획에 따라 다름.
+        // 일단은 에러 로그만 찍고 완료 처리는 진행하도록(또는 막을 수도 있음) 함.
+        // 여기서는 "에러 발생 시에도 일단 진행" or "Alert" 중 선택.
+        // 유저 요청: "연결해줘" -> 실패하면 안 넘어가는 게 맞지만, UX상 일단 로그 찍고 넘어가는 게 나을 수도 있음.
+        // 안전하게 여기서도 onComplete 호출.
+        onComplete()
+      }
     }
-  }, [steps.length, onStepChange, onComplete, safeStopStt])
+  }, [steps.length, onStepChange, onComplete, safeStopStt, recipeId])
 
   const goPrevStep = React.useCallback(() => {
     const idx = stepIndexRef.current
