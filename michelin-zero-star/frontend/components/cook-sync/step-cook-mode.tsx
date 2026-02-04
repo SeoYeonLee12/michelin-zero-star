@@ -194,11 +194,16 @@ function startAzureContinuousStt(opts: {
   }
 
   recognizer.canceled = (_s, e) => {
-    onError?.(e)
+    // Only report as error if it's a real error, not normal cancellation
+    if (e.reason !== SpeechSDK.CancellationReason.EndOfStream) {
+      onError?.(e)
+    }
   }
 
   recognizer.sessionStopped = (_s, e) => {
-    onError?.(e)
+    // Session stopped is normal - Azure auto-stops after silence
+    // Don't call onError, just log as info
+    console.log('[Azure STT] Session stopped (normal behavior)')
   }
 
   recognizer.startContinuousRecognitionAsync(
@@ -574,7 +579,7 @@ export function StepCookMode({
           // 소켓 전송
           if (stompClientRef.current && stompClientRef.current.connected) {
             stompClientRef.current.publish({
-              destination: "/pub/recipes/ask",
+              destination: "/app/recipes/ask",
               body: JSON.stringify({
                 content: raw,
                 recipeId,
@@ -588,8 +593,8 @@ export function StepCookMode({
         }
       },
       onError: (e) => {
-        // 여기서 에러 로그 남겨야 "마이크가 자꾸 꺼짐" 같은 상황 파악 가능
-        console.warn("[Azure Continuous STT] error:", e)
+        // Session lifecycle events are normal, only log real errors
+        console.log("[Azure STT] Info:", e.errorDetails || e)
       },
     })
 
