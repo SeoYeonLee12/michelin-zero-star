@@ -78,12 +78,14 @@ public class SecurityConfig {
                 .headers(headers -> headers.frameOptions(
                         HeadersConfigurer.FrameOptionsConfig::sameOrigin)) // H2 Console 등을 위해 필요
                 .sessionManagement(
-                        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // JWT 사용하므로 세션 끔
+                        session -> session.sessionCreationPolicy(
+                                SessionCreationPolicy.STATELESS)) // JWT 사용하므로 세션 끔
 
                 // 요청별 권한 설정
                 .authorizeHttpRequests(auth -> auth
                         // [정적 리소스]
-                        .requestMatchers("/css/**", "/images/**", "/js/**", "/favicon.*", "/*/icon-*").permitAll()
+                        .requestMatchers("/css/**", "/images/**", "/js/**", "/favicon.*",
+                                "/*/icon-*").permitAll()
 
                         // [Swagger UI & API Docs]
                         .requestMatchers(
@@ -137,15 +139,19 @@ public class SecurityConfig {
                             log.error("인증 실패 (401) - URL: {}", request.getRequestURI());
                             response.setContentType("application/json;charset=UTF-8");
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            ErrorResponse errorResponse = ErrorResponse.from(AuthErrorCode.AUTHENTICATION_FAILED);
-                            response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
+                            ErrorResponse errorResponse = ErrorResponse.from(
+                                    AuthErrorCode.AUTHENTICATION_FAILED);
+                            response.getWriter()
+                                    .write(objectMapper.writeValueAsString(errorResponse));
                         })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
                             log.error("권한 없음 (403) - URL: {}", request.getRequestURI());
                             response.setContentType("application/json;charset=UTF-8");
                             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                            ErrorResponse errorResponse = ErrorResponse.from(AuthErrorCode.ACCESS_DENIED);
-                            response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
+                            ErrorResponse errorResponse = ErrorResponse.from(
+                                    AuthErrorCode.ACCESS_DENIED);
+                            response.getWriter()
+                                    .write(objectMapper.writeValueAsString(errorResponse));
                         })
                 );
 
@@ -157,14 +163,19 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOriginPatterns(Arrays.asList(
-                "http://localhost:3000",          // 프론트 로컬
-                "http://localhost:8080",          // 백엔드 로컬
-                "https://i14b208.p.ssafy.io",     // 배포 서버 프론트
-                "https://www.i14b208.p.ssafy.io"  // (선택) www 서브도메인
+        // [수정 전] 특정 도메인만 허용되어 있어서, 로컬 파일(html) 실행 시 막힘
+        /* configuration.setAllowedOriginPatterns(Arrays.asList(
+                "http://localhost:3000",
+                "http://localhost:8080",
+                "http://localhost:8081",
+                "https://i14b208.p.ssafy.io"
         ));
+        */
 
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        // [수정 후] 테스트를 위해 "모든 주소(*)" 허용으로 변경
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+        configuration.setAllowedMethods(
+                Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(Collections.singletonList("*"));
         configuration.setAllowCredentials(true);
         configuration.setExposedHeaders(Arrays.asList("Authorization", "Set-Cookie"));

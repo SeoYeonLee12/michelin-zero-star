@@ -6,12 +6,14 @@ import com.michelin0.michelinzerostar.domain.aichatmessage.application.command.R
 import com.michelin0.michelinzerostar.domain.aichatmessage.presentation.dto.ChatMessage;
 import com.michelin0.michelinzerostar.domain.aichatmessage.presentation.dto.ChatSaveMessageRequest;
 import com.michelin0.michelinzerostar.domain.auth.UserPrincipal;
+import com.michelin0.michelinzerostar.global.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 @Controller
@@ -22,6 +24,7 @@ public class AiChatController {
     private final SimpMessagingTemplate messageTemplate;
     private final RedisChataService redisChataService;
     private final AiChatMessageService aiChatMessageService;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @MessageMapping("/hello")
     public void greeting(ChatMessage message) {
@@ -37,16 +40,34 @@ public class AiChatController {
 
     @MessageMapping("/recipes/ask")
     public void saveUserMessage(
-            @Payload ChatSaveMessageRequest request
-//            @AuthenticationPrincipal UserPrincipal principal
+            @Payload ChatSaveMessageRequest request,
+            @Header("Authorization") String token
     ) {
-        Long currentUserId = 2L;
+        String resolvedToken = extractToken(token);
+        UserPrincipal user = getUserFromToken(resolvedToken);
         RecipeChatbotCommand command = new RecipeChatbotCommand(
-                currentUserId,
+                user.getId(),
                 request.recipeId(),
                 request.content(),
                 request.currentStepNumber()
         );
         aiChatMessageService.askRecipe(command);
+    }
+
+    private String extractToken(String token) {
+        if (token != null && token.startsWith("Bearer ")) {
+            return token.substring(7);
+        }
+        return token;
+    }
+
+    private UserPrincipal getUserFromToken(String token) {
+        try {
+            Authentication authentication = jwtTokenProvider.getAuthentication(token);
+            return (UserPrincipal) authentication.getPrincipal();
+        } catch (Exception e) {
+            log.error("토큰 인증 실패: {}", e.getMessage());
+            throw new RuntimeException("인증 정보가 유효하지 않습니다.");
+        }
     }
 }

@@ -41,4 +41,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         return null;
     }
+
+    // [추가됨] 소켓 연결 요청(Handshake)은 이 필터를 거치지 않도록 설정
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        String path = request.getRequestURI();
+        // "/ws/connect"로 시작하는 경로는 JWT 검사를 건너뜁니다.
+        return path.startsWith("/ws/connect");
+    }
 }
