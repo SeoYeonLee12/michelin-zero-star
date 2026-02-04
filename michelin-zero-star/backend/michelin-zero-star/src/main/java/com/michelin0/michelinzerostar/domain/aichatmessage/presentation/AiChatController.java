@@ -1,13 +1,15 @@
 package com.michelin0.michelinzerostar.domain.aichatmessage.presentation;
 
 import com.michelin0.michelinzerostar.domain.aichatmessage.application.AiChatMessageService;
-import com.michelin0.michelinzerostar.domain.aichatmessage.application.RedisChataService;
+import com.michelin0.michelinzerostar.domain.aichatmessage.application.RedisChatService;
 import com.michelin0.michelinzerostar.domain.aichatmessage.application.command.RecipeChatbotCommand;
 import com.michelin0.michelinzerostar.domain.aichatmessage.application.result.ChatHistoryResult;
 import com.michelin0.michelinzerostar.domain.aichatmessage.presentation.dto.ChatMessage;
 import com.michelin0.michelinzerostar.domain.aichatmessage.presentation.dto.ChatSaveMessageRequest;
+import com.michelin0.michelinzerostar.domain.aichatmessage.presentation.dto.CommonChatMassageRequest;
 import com.michelin0.michelinzerostar.domain.auth.UserPrincipal;
 import com.michelin0.michelinzerostar.global.security.jwt.JwtTokenProvider;
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +32,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class AiChatController {
 
     private final SimpMessagingTemplate messageTemplate;
-    private final RedisChataService redisChataService;
+    private final RedisChatService redisChataService;
     private final AiChatMessageService aiChatMessageService;
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -48,7 +50,7 @@ public class AiChatController {
 
     @MessageMapping("/recipes/ask")
     public void saveUserMessage(
-            @Payload ChatSaveMessageRequest request,
+            @Payload @Valid ChatSaveMessageRequest request,
             @Header("Authorization") String token
     ) {
         String resolvedToken = extractToken(token);
@@ -84,6 +86,16 @@ public class AiChatController {
                 .toList();
         return ResponseEntity.status(HttpStatus.OK)
                 .body(AIChatListResponse.of(response, nextCursorId, hasNext));
+    }
+
+    @MessageMapping("/common/ask")
+    public void askCommonMessage(
+            @Payload @Valid CommonChatMassageRequest request,
+            @Header("Authorization") String token
+    ) {
+        String resolvedToken = extractToken(token);
+        UserPrincipal user = getUserFromToken(resolvedToken);
+
     }
 
 

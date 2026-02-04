@@ -1,11 +1,13 @@
 package com.michelin0.michelinzerostar.domain.aichatmessage.domain;
 
 import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.AiTransferClient;
+import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiCommonChatbotResponse;
 import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiRecipeChatbotResponse;
 import com.michelin0.michelinzerostar.domain.recipe.domain.Recipe;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeStep;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeStepRepository;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
+import com.michelin0.michelinzerostar.domain.user.repository.UserFavoriteCategoryRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +26,7 @@ public class RecipeAiService {
     private final AiTransferClient aiTransferClient;
     private final RecipeStepRepository recipeStepRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final UserFavoriteCategoryRepository userFavoriteCategoryRepository;
 
     //TODO: 응답 필요할 시 변경 근데 아직은 모르겠는데 꼭 바꿔야될 거 같기는 함.(Future 타입으로)
     @Async
@@ -52,6 +55,18 @@ public class RecipeAiService {
         aiChatMessageRepository.save(aiChatMessage);
 
         applicationEventPublisher.publishEvent(new AiResponseArrivedEvent(aiChatMessage));
+    }
+
+    @Async
+    public void processCommonChatBotAI(User user, String content) {
+        List<String> userFavoriteCategories =
+                userFavoriteCategoryRepository.findCategoryNamesByUser(user);
+        AiCommonChatbotResponse response = aiTransferClient.transferData(
+                user,
+                content,
+                userFavoriteCategories
+        );
+        applicationEventPublisher.publishEvent();
     }
 
 }

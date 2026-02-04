@@ -1,5 +1,7 @@
 package com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure;
 
+import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiCommonChatbotRequest;
+import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiCommonChatbotResponse;
 import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiRecipeChatbotRequest;
 import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiRecipeChatbotResponse;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeStep;
@@ -36,5 +38,23 @@ public class AiTransferClient {
                 .body(request)
                 .retrieve()
                 .body(AiRecipeChatbotResponse.class);
+    }
+
+    public AiCommonChatbotResponse transferData(
+            User user,
+            String content,
+            List<String> favoriteCategories
+    ) {
+        AiCommonChatbotRequest request = AiCommonChatbotRequest.of(
+                user,
+                content,
+                favoriteCategories
+        );
+        log.info("Complete Transfer");
+        return aiRestClient.post()
+                .uri("/api/chat/search")
+                .body(request)
+                .retrieve()
+                .body(AiCommonChatbotResponse.class);
     }
 }

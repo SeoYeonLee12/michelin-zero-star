@@ -7,12 +7,12 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class RedisChataService {
+public class RedisChatService {
 
     private final RedisTemplate<String, Object> redisTemplate;
 
-    public void saveMessage(String roomId, ChatMessage message) {
-        String key = "chat:room:" + roomId;
+    public void saveMessage(String userId, ChatMessage message) {
+        String key = "chat:global:user:" + userId;
         redisTemplate.opsForList().rightPush(key, message);
     }
 }
