@@ -66,21 +66,7 @@ export function CompleteCookDialog({
 
   const isCompletedRecipeLiked = isRecipeLiked(completedRecipe.id)
 
-  const handleLikeRecipe = (recipe: Recipe) => {
-    if (!isLoggedIn) return
-    const wasLiked = isRecipeLiked(recipe.id)
-    toggleLikeRecipe({
-      id: recipe.id,
-      title: recipe.name,
-      image: recipe.thumbnail || "/placeholder.svg",
-      author: recipe.hashtags?.[0] || "미슐랭 0스타",
-      savedAt: new Date().toISOString(),
-    })
-    if (!wasLiked) {
-      setScrapFeedback("스크랩했습니다")
-      setTimeout(() => setScrapFeedback(null), 2000)
-    }
-  }
+
 
   const handleLikeCompletedRecipe = () => {
     if (!isLoggedIn) return
@@ -99,6 +85,7 @@ export function CompleteCookDialog({
       setTimeout(() => setScrapFeedback(null), 2000)
     }
   }
+
 
   const handleSubmitReview = () => {
     if (rating === 0 || !isLoggedIn) return
@@ -330,7 +317,13 @@ export function CompleteCookDialog({
                         )}
                         onClick={(e) => {
                           e.stopPropagation()
-                          handleLikeRecipe(recipe)
+                          toggleLikeRecipe({
+                            id: recipe.id,
+                            title: recipe.name,
+                            image: recipe.thumbnail || "/placeholder.svg",
+                            author: typeof recipe.author === "object" ? recipe.author?.name || "" : String(recipe.author || ""),
+                            savedAt: "",
+                          })
                         }}
                       >
                         <Heart

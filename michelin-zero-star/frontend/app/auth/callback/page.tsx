@@ -1,11 +1,11 @@
 // frontend/app/auth/callback/page.tsx
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { setGlobalAccessToken } from "@/lib/api/client";
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const router = useRouter();
   const sp = useSearchParams();
 
@@ -22,4 +22,12 @@ export default function AuthCallbackPage() {
   }, [router, sp]);
 
   return null;
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense>
+      <AuthCallbackContent />
+    </Suspense>
+  );
 }

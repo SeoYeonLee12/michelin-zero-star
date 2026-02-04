@@ -1,7 +1,7 @@
 "use client"
 import { usePathname, useSearchParams, useRouter } from "next/navigation"
 import type React from "react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, Suspense } from "react"
 import {
   Bell,
   User,
@@ -68,7 +68,15 @@ function getNotificationIcon(type: string) {
   }
 }
 
-export function Navbar({ onLogoClick }: NavbarProps) {
+export function Navbar(props: NavbarProps) {
+  return (
+    <Suspense fallback={<header className="sticky top-0 z-50 w-full border-b bg-background/95 h-16" />}>
+      <NavbarContent {...props} />
+    </Suspense>
+  )
+}
+
+function NavbarContent({ onLogoClick }: NavbarProps) {
   const { user, isLoggedIn, logout, conversations } = useAuth()
   const router = useRouter()
   const [notificationOpen, setNotificationOpen] = useState(false)
@@ -374,7 +382,7 @@ export function Navbar({ onLogoClick }: NavbarProps) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full h-9 w-9">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user?.profileImage || "/placeholder.svg"} />
+                    <AvatarImage src={user?.profileImageUrl || "/placeholder.svg"} />
                     <AvatarFallback>{user?.name?.charAt(0) || <User className="h-4 w-4" />}</AvatarFallback>
                   </Avatar>
                 </Button>

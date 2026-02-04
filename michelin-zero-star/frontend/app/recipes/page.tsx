@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import * as React from "react"
 import { RecipeCard } from "@/components/cook-sync/recipe-card"
 
 import { useState, useEffect } from "react"
@@ -39,7 +39,7 @@ const foodCategories = [
 
 const ITEMS_PER_PAGE = 20
 
-export default function RecipesPage() {
+function RecipesContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -66,7 +66,7 @@ export default function RecipesPage() {
   const [searchInput, setSearchInput] = useState(searchWordParam || "")
   const [showLoginDialog, setShowLoginDialog] = useState(false)
 
-  const { isLoggedIn, toggleLikeRecipe, isRecipeLiked } = useAuth()
+  const { isLoggedIn, toggleLikeRecipe, isRecipeLiked, user } = useAuth()
 
   // API 데이터 상태
   const [recipes, setRecipes] = useState<RecipeListItem[]>([])
@@ -156,7 +156,14 @@ export default function RecipesPage() {
   const handleHeartClick = (e: React.MouseEvent, recipe: RecipeListItem) => {
     e.preventDefault()
     e.stopPropagation()
-    toggleLikeRecipe(String(recipe.recipeId))
+    e.stopPropagation()
+    toggleLikeRecipe({
+      id: String(recipe.recipeId),
+      title: recipe.title,
+      image: recipe.mainImageUrl || "/placeholder.svg",
+      author: recipe.nickName,
+      savedAt: new Date().toISOString(),
+    })
   }
 
   // 페이지네이션 번호 생성
@@ -334,7 +341,7 @@ export default function RecipesPage() {
                   servings: 0,
                   difficulty: "초보",
                   steps: [],
-                  isUserRecipe: isUserRecipePage
+                  isUserRecipe: !!(user?.nickname && recipe.nickName === user.nickname)
                 }}
                 // showAuthor가 true면 카드에서 닉네임 표시 (RecipeCard 수정 필요)
                 showAuthor={isUserRecipePage}
@@ -460,5 +467,13 @@ export default function RecipesPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function RecipesPage() {
+  return (
+    <React.Suspense fallback={<div>Loading...</div>}>
+      <RecipesContent />
+    </React.Suspense>
   )
 }

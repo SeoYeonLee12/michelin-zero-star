@@ -43,8 +43,8 @@ public class MarketPost extends SoftDeleteDomain {
 
     private String meetingPlace;
 
-    private String locationText; // 동 이름
-    private String locationCode; // 행정동 코드
+    private String locationText;
+    private String locationCode;
 
     @Column(precision = 10, scale = 8)
     private BigDecimal latitude;
@@ -92,15 +92,17 @@ public class MarketPost extends SoftDeleteDomain {
         }
     }
 
-    public void update(String title, String content, int price, String meetingPlace, String category) {
+    public void increaseChatCount() {
+        this.chatCount++;
+    }
+
+    public void update(String title, String content, int price, String meetingPlace) {
         this.title = title;
         this.content = content;
         this.price = price;
         this.meetingPlace = meetingPlace;
-        this.category = category;
     }
 
-    // 상태 변경 메서드
     public void updateStatus(PostStatus status) {
         this.status = status;
     }

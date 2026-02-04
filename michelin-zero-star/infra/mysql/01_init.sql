@@ -1,6 +1,5 @@
 -- [1] 외래 키 검사 비활성화
-SET
-FOREIGN_KEY_CHECKS = 0;
+SET FOREIGN_KEY_CHECKS = 0;
 
 -- [2] 테이블 초기화 (DROP)
 DROP TABLE IF EXISTS ai_chat_message;
@@ -37,7 +36,7 @@ CREATE TABLE users
     role              VARCHAR(50)  NOT NULL DEFAULT 'USER',
     social_provider   VARCHAR(50) NULL,
     social_id         VARCHAR(255) NULL,
-    total_star DOUBLE NOT NULL DEFAULT 0.0,
+    total_star        DOUBLE NOT NULL DEFAULT 0.0,
     deleted_at        TIMESTAMP NULL,
     created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP
@@ -62,7 +61,7 @@ CREATE TABLE star_history
     star_history_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     users_id        BIGINT    NOT NULL,
     type            ENUM('COOK_COMPLETE', 'RECIPE_REGISTER') NOT NULL,
-    amount DOUBLE NOT NULL,
+    amount          DOUBLE NOT NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_star_user FOREIGN KEY (users_id) REFERENCES users (users_id)
@@ -100,13 +99,13 @@ CREATE TABLE recipes
     review_count   INT          NOT NULL DEFAULT 0,
     average_rating DOUBLE NOT NULL DEFAULT 0.0,
     recipe_type    ENUM('USER', 'CHEF') NOT NULL DEFAULT 'USER',
-    calories DOUBLE NOT NULL DEFAULT 0.0,
-    carbohydrate DOUBLE NOT NULL DEFAULT 0.0,
-    protein DOUBLE NOT NULL DEFAULT 0.0,
-    saturated_fat DOUBLE NOT NULL DEFAULT 0.0,
-    cholesterol DOUBLE NOT NULL DEFAULT 0.0,
-    sodium DOUBLE NOT NULL DEFAULT 0.0,
-    calcium DOUBLE NOT NULL DEFAULT 0.0,
+    calories       DOUBLE NOT NULL DEFAULT 0.0,
+    carbohydrate   DOUBLE NOT NULL DEFAULT 0.0,
+    protein        DOUBLE NOT NULL DEFAULT 0.0,
+    saturated_fat  DOUBLE NOT NULL DEFAULT 0.0,
+    cholesterol    DOUBLE NOT NULL DEFAULT 0.0,
+    sodium         DOUBLE NOT NULL DEFAULT 0.0,
+    calcium        DOUBLE NOT NULL DEFAULT 0.0,
     created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at     TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
     deleted_at     TIMESTAMP NULL,
@@ -175,7 +174,7 @@ CREATE TABLE recipe_reviews
     recipe_reviews_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     users_id          BIGINT    NOT NULL,
     recipes_id        BIGINT    NOT NULL,
-    rating DOUBLE NOT NULL DEFAULT 0.0,
+    rating            DOUBLE NOT NULL DEFAULT 0.0,
     content           TEXT      NOT NULL,
     created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
@@ -209,8 +208,6 @@ CREATE TABLE market_posts
     category        VARCHAR(50) NULL,
 
     chat_count      INT            NOT NULL DEFAULT 0,
-
-    -- ★ [추가됨] 좋아요 개수 컬럼
     like_count      INT            NOT NULL DEFAULT 0,
 
     latitude        DECIMAL(10, 8) NOT NULL,
@@ -241,8 +238,6 @@ CREATE TABLE market_likes
     updated_at      TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_ml_user FOREIGN KEY (users_id) REFERENCES users (users_id),
     CONSTRAINT fk_ml_post FOREIGN KEY (post_id) REFERENCES market_posts (market_posts_id),
-
-    -- ★ [추가됨] 한 유저가 같은 게시글에 좋아요를 중복으로 누를 수 없도록 방지
     CONSTRAINT uk_market_likes_user_post UNIQUE (users_id, post_id)
 ) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -262,14 +257,24 @@ CREATE TABLE market_comments
 
 CREATE TABLE chat_rooms
 (
-    chat_rooms_id   BIGINT AUTO_INCREMENT PRIMARY KEY,
-    post_id         BIGINT    NOT NULL,
-    seller_id       BIGINT    NOT NULL,
-    buyer_id        BIGINT    NOT NULL,
-    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
-    last_message    TEXT NULL,
-    last_message_at TIMESTAMP NULL,
+    chat_rooms_id    BIGINT AUTO_INCREMENT PRIMARY KEY,
+    post_id          BIGINT    NOT NULL,
+    seller_id        BIGINT    NOT NULL,
+    buyer_id         BIGINT    NOT NULL,
+
+    -- ★ [추가됨] 입장 시간 (나갔다 들어왔을 때 이전 대화 안 보이게 하기 위함)
+    seller_joined_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    buyer_joined_at  TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+
+    -- ★ [추가됨] 퇴장 여부 (상대방이 나가도 내 목록엔 남아야 하므로)
+    is_seller_left   TINYINT(1) NOT NULL DEFAULT 0,
+    is_buyer_left    TINYINT(1) NOT NULL DEFAULT 0,
+
+    last_message     TEXT NULL,
+    last_message_at  TIMESTAMP NULL,
+    created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
+
     CONSTRAINT fk_cr_post FOREIGN KEY (post_id) REFERENCES market_posts (market_posts_id),
     CONSTRAINT fk_cr_seller FOREIGN KEY (seller_id) REFERENCES users (users_id),
     CONSTRAINT fk_cr_buyer FOREIGN KEY (buyer_id) REFERENCES users (users_id)
@@ -285,7 +290,7 @@ CREATE TABLE chat_messages
     is_read          TINYINT(1) NOT NULL DEFAULT 0,
     created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_cm_room FOREIGN KEY (room_id) REFERENCES chat_rooms (chat_rooms_id),
+    CONSTRAINT fk_cm_room FOREIGN KEY (room_id) REFERENCES chat_rooms (chat_rooms_id) ON DELETE CASCADE,
     CONSTRAINT fk_cm_sender FOREIGN KEY (users_id) REFERENCES users (users_id)
 ) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -293,10 +298,7 @@ CREATE TABLE ai_chat_message
 (
     ai_chat_message_id  BIGINT AUTO_INCREMENT PRIMARY KEY,
     users_id            BIGINT    NOT NULL,
-
-    -- ★ [수정됨] ON DELETE SET NULL이 동작하려면 컬럼이 NULL 허용이어야 함
     recipes_id          BIGINT NULL,
-
     sender_type         ENUM('USER', 'AI') NOT NULL,
     content             TEXT      NOT NULL,
     recommended_recipes JSON NULL,
@@ -312,5 +314,4 @@ CREATE INDEX idx_ai_chat_user_date ON ai_chat_message (users_id, created_at);
 CREATE INDEX idx_ai_chat_user_recipe ON ai_chat_message (users_id, recipes_id);
 
 -- [4] 외래 키 검사 다시 활성화
-SET
-FOREIGN_KEY_CHECKS = 1;
+SET FOREIGN_KEY_CHECKS = 1;

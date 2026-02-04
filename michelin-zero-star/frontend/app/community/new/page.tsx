@@ -3,8 +3,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Navbar } from "@/components/cook-sync/navbar"
 import { ScrollToTop } from "@/components/cook-sync/scroll-to-top"
@@ -33,7 +32,14 @@ import { compressImage } from "@/lib/image-utils"
 import { StarRewardBadge } from "@/components/cook-sync/star-reward-badge"
 import { AnimatePresence, motion } from "framer-motion"
 
-export default function CommunityNewPage() {
+// URL을 File 객체로 변환하는 헬퍼 함수
+async function urlToFile(url: string, filename: string, mimeType: string): Promise<File> {
+  const res = await fetch(url)
+  const blob = await res.blob()
+  return new File([blob], filename, { type: mimeType })
+}
+
+function CommunityNewForm() {
   const router = useRouter()
   const { isLoggedIn, addUserPost, earnStars } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -44,12 +50,15 @@ export default function CommunityNewPage() {
     price: "",
     place: "",
   })
-  const [images, setImages] = useState<string[]>([])
-  const [files, setFiles] = useState<File[]>([]) // ✅ API 전송용 File 객체 저장
+  const [images, setImages] = useState<string[]>([]) // 미리보기용 URL 리스트 (기존 URL + 새 파일 blob URL)
+  const [files, setFiles] = useState<File[]>([]) // 새로 업로드된 파일 객체들
+  const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]) // 처음에 불러온 기존 이미지 URL들 (수정 시 비교용)
+
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showExitDialog, setShowExitDialog] = useState(false)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [showRewardDialog, setShowRewardDialog] = useState(false)
+  const [loading, setLoading] = useState(false)
   // Edit Mode Logic
   const searchParams = useSearchParams()
   const editPostId = searchParams.get("edit")
@@ -62,7 +71,8 @@ export default function CommunityNewPage() {
           const post = await getPostDetail(editPostId)
           if (post) {
             // 본인 게시글인지 확인 (API에 owner 필드가 있다고 가정)
-            if (post.isOwner === false) { // owner 필드가 boolean이고 false면
+            const hasAuthority = post.isOwner || (post as any).owner;
+            if (!hasAuthority) {
               alert("수정 권한이 없습니다.")
               router.push("/community")
               return
@@ -115,66 +125,23 @@ export default function CommunityNewPage() {
   }
 
   const removeImage = (index: number) => {
-    // files 배열은 '새로 추가된 파일'만 가지고 있으므로 인덱스 매칭이 어려울 수 있음.
-    // 하지만 images 배열과 files 배열을 동기화하는 로직이 필요함.
-    // 기존 로직: addImage 시 images에 previewUrl, files에 File 객체 추가
-    // 수정 시: images에 기존Url 있음, files 비어있음 using useEffect
+    // images 배열에서 해당 인덱스의 이미지를 제거
+    const newImages = images.filter((_, i) => i !== index)
+    setImages(newImages)
 
-    // 로직 수정: 
-    // files State는 "새로 추가된 파일"만 관리하는게 아니라, images 배열의 인덱스와 1:1 매칭되어야 삭제 시 편함?
-    // 아니면, removeImage 시 images[index]를 보고 data URL이면 files에서도 제거, http URL이면 existing URL 제거?
-
-    // 간편한 방법: 
-    // images: [url1, url2, data:base64...] -> 화면 표시용
-    // files: [null, null, File...] -> 인덱스 맞춰서? 복잡함.
-
-    // 현행 유지하되 삭제 로직 개선:
-    // images 배열에서 제거. 
-    // 만약 제거된 이미지가 '새로 추가된 이미지'(data: startsWith)라면 files 배열에서도 해당 파일을 찾아 제거해야 하는데,
-    // files 배열은 순수 File 객체들만 모여있어서 매칭이 어려움.
-
-    // 개선안: 
-    // 'files' state에는 "새로 추가된 파일들"을 리스트로 관리.
-    // 'images' state에는 "화면에 보여질 소스들" 관리.
-    // 삭제 시:
-    // 1. images[index] 제거 -> setImages
-    // 2. 만약 images[index]가 blob/base64 라면(새 파일), files 배열에서 해당 File을 제거해야 함.
-    //    이때 어떤 File인지 알기 위해, addImage 시점에 식별자나 순서를 맞춰야 함.
-
-    // => 가장 확실한 방법: 
-    // files 배열을 사용하지 않고, images와 짝이 맞는 (imageSource, fileObject | null) 형태의 상태 관리? 
-    // 너무 큰수정.
-
-    // 차선책:
-    // files는 그냥 "새로 추가할 파일들의 큐" 처럼 쓴다? No, 삭제가 되어야 함.
-
-    // 현재 코드의 removeImage 로직: 
-    // setImages((prev) => prev.filter((_, i) => i !== index))  <-- 이건 OK
-    // setFiles((prev) => prev.filter((_, i) => i !== index))    <-- 이건 문제 있음. 
-    // files는 처음에 빈 배열이고, images는 3개(기존)일 수 있음. index가 안 맞음.
-
-    const targetImage = images[index]
-
-    setImages((prev) => prev.filter((_, i) => i !== index))
-
-    // 새로 추가된 이미지인 경우에만 files에서 제거
-    if (targetImage.startsWith("data:")) {
-      // files 배열에서 해당 이미지를 찾아야 함. 
-      // 하지만 base64 만으로 File 객체를 찾기 어려움 (중복 가능성).
-      // 따라서, files 배열을 "images 배열의 순서와 동일하게" 관리하거나 (null로 채움),
-      // 애초에 { preview: string, file: File | null }[] 형태로 관리하는게 맞음.
-
-      // 시간 관계상, files 배열을 재구성합니다.
-      // files 배열에서 삭제할 인덱스를 찾아야 하는데, 
-      // images 배열 순회하며 "새 이미지"의 인덱스를 카운트해서 files 내 인덱스를 찾음.
-
-      let newImageCount = 0
-      for (let i = 0; i < index; i++) {
-        if (images[i].startsWith("data:")) {
-          newImageCount++
-        }
+    // 만약 제거된 이미지가 기존 이미지였다면 existingImageUrls에서도 제거
+    const removedImageUrl = images[index]
+    if (!removedImageUrl.startsWith("data:")) {
+      setExistingImageUrls((prev) => prev.filter((url) => url !== removedImageUrl))
+    } else {
+      // 제거된 이미지가 새로 추가된 이미지(data URL)였다면, files 배열에서도 제거
+      // files 배열은 새로 추가된 이미지들의 File 객체를 순서대로 가지고 있음.
+      // images 배열에서 data URL인 것들만 필터링하여 files 배열의 인덱스를 찾음.
+      const newImageUrlsInImages = images.filter((url) => url.startsWith("data:"))
+      const removedNewImageIndex = newImageUrlsInImages.indexOf(removedImageUrl)
+      if (removedNewImageIndex !== -1) {
+        setFiles((prev) => prev.filter((_, i) => i !== removedNewImageIndex))
       }
-      setFiles((prev) => prev.filter((_, i) => i !== newImageCount))
     }
   }
 
@@ -225,7 +192,9 @@ export default function CommunityNewPage() {
     } catch (error) {
       console.error("게시글 처리 실패:", error)
       alert(isEditMode ? "게시글 수정에 실패했습니다." : "게시글 등록에 실패했습니다.")
+
     } finally {
+      setLoading(false)
       setShowConfirmDialog(false)
     }
   }
@@ -241,9 +210,8 @@ export default function CommunityNewPage() {
     }
   }
 
-  if (!isLoggedIn) {
-    router.push("/login")
-    return null
+  if (loading && !formData.title && isEditMode) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   }
 
   return (
@@ -357,24 +325,28 @@ export default function CommunityNewPage() {
               <Label htmlFor="price">가격</Label>
               <Input
                 id="price"
-                placeholder="예: 1,000원, 무료나눔"
+                placeholder="예: 1,000"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
               />
             </div>
 
-            <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="place"
-                placeholder="예: 둔산동 롯데마트 앞"
-                value={formData.place}
-                onChange={(e) => setFormData({ ...formData, place: e.target.value })}
-                className="pl-10"
-              />
+            {/* Place */}
+            <div className="space-y-2">
+              <Label htmlFor="place">거래 장소</Label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="place"
+                  placeholder="예: 둔산동 롯데마트 앞"
+                  value={formData.place}
+                  onChange={(e) => setFormData({ ...formData, place: e.target.value })}
+                  className="pl-10"
+                />
+              </div>
             </div>
           </CardContent>
-        </Card>
+        </Card >
 
         {/* Action Buttons */}
         <div className="flex gap-3 mt-6">
@@ -384,8 +356,8 @@ export default function CommunityNewPage() {
           <Button className="flex-1 bg-[#800020] hover:bg-[#800020]/90" onClick={handleSubmit}>
             {isEditMode ? "저장하기" : "등록하기"}
           </Button>
-        </div>
-      </main>
+        </div >
+      </main >
 
       {/* Image Preview Dialog */}
       {/* Image Preview Dialog */}
@@ -433,10 +405,6 @@ export default function CommunityNewPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>취소</AlertDialogCancel>
-            {/* <AlertDialogAction
-              onClick={() => router.push("/community")}
-              className="bg-destructive hover:bg-destructive/90"
-            > */}
             <AlertDialogAction
               onClick={() => router.push("/community")}
               className="bg-[#800020] hover:bg-[#800020]/90"
@@ -491,5 +459,13 @@ export default function CommunityNewPage() {
         )}
       </AnimatePresence>
     </div >
+  )
+}
+
+export default function CommunityNewPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CommunityNewForm />
+    </Suspense>
   )
 }

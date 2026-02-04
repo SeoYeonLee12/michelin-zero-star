@@ -36,15 +36,14 @@ function tryParseJson(text: string) {
 }
 
 /**
- * 상대경로("/api/v1/...")로 호출해도 백엔드로 보내기 위한 base URL
+ * URL 변환 함수 - 상대 경로는 그대로 반환 (next.config.mjs rewrites가 처리)
  */
 function resolveUrl(url: string): string {
+  // 절대 URL은 그대로 반환
   if (/^https?:\/\//i.test(url)) return url
-  const base = process.env.NEXT_PUBLIC_BACKEND_URL
-  if (!base) return url
 
-  if (url.startsWith("/")) return `${base}${url}`
-  return `${base}/${url}`
+  // 상대 경로는 그대로 반환 → next.config.mjs rewrites가 백엔드로 프록시
+  return url
 }
 
 // Interceptor 무한 루프 방지용 옵션 추가

@@ -19,6 +19,7 @@ services:
       - DB_NAME=${PROD_DB_NAME}
       - DB_USER=${PROD_DB_USER}
       - DB_PW=${PROD_DB_PASSWORD}
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
       - AI_SERVER_URL=http://ai-serving:8000
 
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
@@ -86,7 +87,7 @@ services:
 
   #===============================================#
   # 4. AI / Search Engine (Elasticsearch)
-  #===============================================#
+  #===============================================#`
   elasticsearch:
     build:
       context: .
@@ -164,8 +165,9 @@ services:
       - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
       # 브라우저(로컬 PC)에서 접근해야 하므로 localhost 사용 및 /api/v1 추가
-      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api/v1
+      - NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
       - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
     volumes:
       - ./frontend:/app
       - /app/node_modules

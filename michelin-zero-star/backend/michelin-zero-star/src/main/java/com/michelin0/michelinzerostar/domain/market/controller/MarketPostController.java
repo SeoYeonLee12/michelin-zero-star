@@ -7,9 +7,13 @@ import com.michelin0.michelinzerostar.domain.market.dto.request.MarketPostUpdate
 import com.michelin0.michelinzerostar.domain.market.dto.response.MarketPostDetailResponse;
 import com.michelin0.michelinzerostar.domain.market.dto.response.MarketPostListResponse;
 import com.michelin0.michelinzerostar.domain.market.service.MarketPostService;
-import jakarta.validation.Valid; // ★ Import 필수
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -40,6 +44,16 @@ public class MarketPostController {
         return ResponseEntity.ok(marketPostService.findAllPosts());
     }
 
+    // ★ [내가 쓴 게시물 조회] API
+    @GetMapping("/posts/me")
+    public ResponseEntity<Page<MarketPostListResponse>> getMyPosts(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+
+        Page<MarketPostListResponse> myPosts = marketPostService.getMyPosts(userPrincipal.getId(), pageable);
+        return ResponseEntity.ok(myPosts);
+    }
+
     // 내 근처 게시글 조회
     @GetMapping("/posts/nearby")
     public ResponseEntity<List<MarketPostListResponse>> getNearbyPosts(
@@ -61,14 +75,15 @@ public class MarketPostController {
         return ResponseEntity.ok(marketPostService.getPostDetail(postId, userId));
     }
 
-    // 게시글 내용 수정
-    @PutMapping("/posts/{postId}")
+    // 게시글 내용 수정 (이미지 포함)
+    @PutMapping(value = "/posts/{postId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<String> updatePost(
             @PathVariable Long postId,
-            @RequestBody @Valid MarketPostUpdateRequest request,
+            @RequestPart(value = "post") @Valid MarketPostUpdateRequest request,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        marketPostService.updatePost(postId, userPrincipal.getId(), request);
+        marketPostService.updatePost(postId, userPrincipal.getId(), request, images);
         return ResponseEntity.ok("게시글이 업데이트 되었습니다.");
     }
 

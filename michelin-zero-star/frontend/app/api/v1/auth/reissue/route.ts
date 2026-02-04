@@ -25,7 +25,21 @@ export async function POST(request: NextRequest) {
         })
 
         // 3. 백엔드 응답 처리
-        const data = await response.json()
+        const rawText = await response.text()
+        let data
+        try {
+            data = JSON.parse(rawText)
+        } catch (jsonError) {
+            console.error("[Reissue] Non-JSON response:", rawText)
+
+            // 리프레시 실패 시 쿠키 삭제
+            cookieStore.delete("refreshToken")
+
+            return NextResponse.json(
+                { message: rawText || "토큰 재발급 실패" },
+                { status: response.status || 401 }
+            )
+        }
 
         if (!response.ok) {
             // 리프레시 실패 시 쿠키 삭제

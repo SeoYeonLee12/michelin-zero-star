@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import type { LocationRequestDto } from "./types"
-import { getMe, updateProfile as updateProfileAPI, withdrawUser } from "./api/user"
+import { getMe, updateProfile as updateProfileAPI, withdrawUser, type UpdateProfileRequest } from "./api/user"
 import { login as loginAPI, signup as signupAPI, logout as logoutAPI } from "./api/auth"
 import { verifyLocation } from "./api/user"
 import { setCookie, getCookie, removeCookie } from "./cookie"
@@ -33,7 +33,7 @@ interface User {
   name: string
   nickname: string
   email: string
-  profileImage?: string
+  profileImageUrl?: string
   level: string
   bio: string
   location?: string
@@ -41,8 +41,10 @@ interface User {
   longitude?: number
   locationCode?: string
   stars: number
+  totalStar: number // ✅ User 인터페이스에 totalStar 추가
   todayStars: number
   lastStarDate: string
+  categories?: string[]
 }
 
 interface LikedRecipe {
@@ -78,6 +80,7 @@ interface UserRecipe {
   id: string
   title: string
   description: string
+  category?: string
   servings: number
   thumbnail: string
   tags: string[]
@@ -117,7 +120,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>
   signup: (data: { name: string; nickname: string; email: string; password: string }) => Promise<void>
   logout: () => void
-  updateProfile: (data: Partial<User> & { currentPassword?: string; newPassword?: string; newPasswordConfirm?: string }) => Promise<void>
+  updateProfile: (data: UpdateProfileRequest) => Promise<void>
   updateLocation: (latitude: number, longitude: number) => Promise<string>
   likedRecipes: LikedRecipe[]
   toggleLikeRecipe: (recipe: LikedRecipe) => void
@@ -197,16 +200,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: me.name ?? "",
           nickname: me.nickname ?? "",
           email: me.email ?? (savedUser?.email ?? ""),
-          profileImage: me.profileImage,
+          profileImageUrl: me.profileImageUrl, // ✅ Corrected 
           level: me.level ?? "",
           bio: me.bio ?? "",
           location: me.location,
           latitude: me.latitude,
           longitude: me.longitude,
           locationCode: me.locationCode,
-          stars: me.stars ?? 0,
-          todayStars: me.todayStars ?? 0,
-          lastStarDate: me.lastStarDate ?? new Date().toISOString().split("T")[0],
+          stars: me.stars ?? (me as any).stars ?? 0,
+          totalStar: me.totalStar ?? (me as any).total_star ?? 0,
+          todayStars: me.todayStars ?? (me as any).today_stars ?? 0,
+          lastStarDate: me.lastStarDate ?? (me as any).last_star_date ?? new Date().toISOString().split("T")[0],
         }
         setUser(recoveredUser)
         localStorage.setItem("cooksync_user", JSON.stringify(recoveredUser))
@@ -229,39 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       initAuth()
     }
 
-    const savedLikedRecipes = safeJsonParse<LikedRecipe[]>(localStorage.getItem("cooksync_liked_recipes"), [])
-    if (savedLikedRecipes.length) setLikedRecipes(savedLikedRecipes)
 
-    const savedConversations = safeJsonParse<Conversation[]>(localStorage.getItem("cooksync_conversations"), [])
-    if (savedConversations.length) setConversations(savedConversations)
-
-    const savedMessages = safeJsonParse<Message[]>(localStorage.getItem("cooksync_messages"), [])
-    if (savedMessages.length) setMessages(savedMessages)
-
-    const savedUserRecipes = safeJsonParse<UserRecipe[]>(localStorage.getItem("cooksync_user_recipes"), [])
-    if (savedUserRecipes.length) setUserRecipes(savedUserRecipes)
-
-    const savedUserPosts = safeJsonParse<UserPost[]>(localStorage.getItem("cooksync_user_posts"), [])
-    if (savedUserPosts.length) setUserPosts(savedUserPosts)
-
-    const rawLikedPosts = safeJsonParse<unknown>(localStorage.getItem("cooksync_liked_posts"), [])
-    const nowIso = new Date().toISOString()
-    let normalizedLikedPosts: LikedPost[] = []
-
-    if (Array.isArray(rawLikedPosts)) {
-      if (rawLikedPosts.every((x) => typeof x === "string")) {
-        const ids = rawLikedPosts as string[]
-        normalizedLikedPosts = ids
-          .map((id) => savedUserPosts.find((p) => p.id === id))
-          .filter(Boolean)
-          .map((p) => ({ ...(p as UserPost), savedAt: nowIso }))
-      } else if (rawLikedPosts.every((x) => typeof x === "object" && x !== null)) {
-        normalizedLikedPosts = (rawLikedPosts as any[])
-          .filter((p) => typeof p.id === "string")
-          .map((p) => ({ ...(p as UserPost), savedAt: typeof p.savedAt === "string" ? p.savedAt : nowIso }))
-      }
-    }
-    if (normalizedLikedPosts.length) setLikedPosts(normalizedLikedPosts)
 
     const userId = savedUser?.id ?? null
     const completedKey = storageKey("cooksync_completed_recipes", userId)
@@ -281,11 +253,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!userId) {
       setCompletedRecipes(new Set())
       setReviewedRecipes(new Set())
+      setLikedRecipes([])
+      setConversations([])
+      setMessages([])
+      setUserRecipes([])
+      setUserPosts([])
+      setLikedPosts([])
       return
     }
 
     const completedKey = storageKey("cooksync_completed_recipes", userId)
     const reviewedKey = storageKey("cooksync_reviewed_recipes", userId)
+    const likedRecipesKey = storageKey("cooksync_liked_recipes", userId)
+    const conversationsKey = storageKey("cooksync_conversations", userId)
+    const messagesKey = storageKey("cooksync_messages", userId)
+    const userRecipesKey = storageKey("cooksync_user_recipes", userId)
+    const userPostsKey = storageKey("cooksync_user_posts", userId)
+    const likedPostsKey = storageKey("cooksync_liked_posts", userId)
+
     const legacyCompleted = safeJsonParse<string[]>(localStorage.getItem("cooksync_completed_recipes"), [])
     const legacyReviewed = safeJsonParse<string[]>(localStorage.getItem("cooksync_reviewed_recipes"), [])
     const completed = safeJsonParse<string[]>(localStorage.getItem(completedKey), legacyCompleted)
@@ -293,6 +278,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setCompletedRecipes(new Set(completed))
     setReviewedRecipes(new Set(reviewed))
+
+    // Load other user-specific data
+    if (localStorage.getItem(likedRecipesKey)) setLikedRecipes(safeJsonParse<LikedRecipe[]>(localStorage.getItem(likedRecipesKey), []))
+    if (localStorage.getItem(conversationsKey)) setConversations(safeJsonParse<Conversation[]>(localStorage.getItem(conversationsKey), []))
+    if (localStorage.getItem(messagesKey)) setMessages(safeJsonParse<Message[]>(localStorage.getItem(messagesKey), []))
+    if (localStorage.getItem(userRecipesKey)) setUserRecipes(safeJsonParse<UserRecipe[]>(localStorage.getItem(userRecipesKey), []))
+    if (localStorage.getItem(userPostsKey)) setUserPosts(safeJsonParse<UserPost[]>(localStorage.getItem(userPostsKey), []))
+
+    // Liked Posts with migration logic
+    const savedUserPosts = safeJsonParse<UserPost[]>(localStorage.getItem(userPostsKey), [])
+    const rawLikedPosts = safeJsonParse<unknown>(localStorage.getItem(likedPostsKey), [])
+    const nowIso = new Date().toISOString()
+    let normalizedLikedPosts: LikedPost[] = []
+
+    if (Array.isArray(rawLikedPosts)) {
+      if (rawLikedPosts.length > 0) {
+        if (rawLikedPosts.every((x) => typeof x === "string")) {
+          const ids = rawLikedPosts as string[]
+          normalizedLikedPosts = ids
+            .map((id) => savedUserPosts.find((p) => p.id === id))
+            .filter(Boolean)
+            .map((p) => ({ ...(p as UserPost), savedAt: nowIso }))
+        } else if (rawLikedPosts.every((x) => typeof x === "object" && x !== null)) {
+          normalizedLikedPosts = (rawLikedPosts as any[])
+            .filter((p) => typeof p.id === "string")
+            .map((p) => ({ ...(p as UserPost), savedAt: typeof p.savedAt === "string" ? p.savedAt : nowIso }))
+        }
+      }
+    }
+    setLikedPosts(normalizedLikedPosts)
+
 
     if (!localStorage.getItem(completedKey) && legacyCompleted.length) {
       localStorage.setItem(completedKey, JSON.stringify(legacyCompleted))
@@ -319,16 +335,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name: me.name ?? "",
       nickname: me.nickname ?? "",
       email: me.email ?? email,
-      profileImage: me.profileImage,
+      profileImageUrl: me.profileImageUrl, // ✅ Corrected
       level: me.level ?? "",
       bio: me.bio ?? "",
       location: me.location,
       latitude: me.latitude,
       longitude: me.longitude,
       locationCode: me.locationCode,
-      stars: me.stars ?? 0,
-      todayStars: me.todayStars ?? 0,
-      lastStarDate: me.lastStarDate ?? new Date().toISOString().split("T")[0],
+      stars: me.stars ?? (me as any).stars ?? 0,
+      totalStar: me.totalStar ?? (me as any).total_star ?? 0,
+      todayStars: me.todayStars ?? (me as any).today_stars ?? 0,
+      lastStarDate: me.lastStarDate ?? (me as any).last_star_date ?? new Date().toISOString().split("T")[0],
     }
 
     setUser(newUser)
@@ -371,23 +388,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const updateProfile = async (data: Partial<User> & { currentPassword?: string; newPassword?: string; newPasswordConfirm?: string }) => {
+  const updateProfile = async (data: UpdateProfileRequest) => {
     if (user) {
       try {
-        // Only send fields that actually changed
-        const updatePayload: any = {}
-        if (data.nickname && data.nickname !== user.nickname) {
-          updatePayload.nickname = data.nickname
-        }
-        if (data.currentPassword) updatePayload.currentPassword = data.currentPassword
-        if (data.newPassword) updatePayload.newPassword = data.newPassword
-        if (data.newPasswordConfirm) updatePayload.newPasswordConfirm = data.newPasswordConfirm
+        // ✅ 변경된 필드만 전송 (Optimization & Error Prevention)
+        const payload: UpdateProfileRequest = {}
 
-        await updateProfileAPI(updatePayload)
-        const { currentPassword, newPassword, newPasswordConfirm, ...safeData } = data
-        const updatedUser = { ...user, ...safeData }
-        setUser(updatedUser)
-        localStorage.setItem("cooksync_user", JSON.stringify(updatedUser))
+        // 1. Nickname Check
+        if (data.nickname && data.nickname !== user.nickname) {
+          payload.nickname = data.nickname
+        }
+
+        // 2. Profile Image Check
+        // data.profileImageUrl comes from preview. user.profileImageUrl is current.
+        // If data has it, check if different. If undefined, ignore.
+        if (data.profileImageUrl && data.profileImageUrl !== user.profileImageUrl) {
+          payload.profileImageUrl = data.profileImageUrl
+        }
+        // Note: If user removes image, logic might need 'null', but current UI doesn't support removal easily.
+
+        // 3. Categories Check
+        if (data.categories) {
+          const currentCats = new Set(user.categories || [])
+          const newCats = new Set(data.categories)
+          // Simple equality check for sets
+          const isSame = currentCats.size === newCats.size && [...currentCats].every(c => newCats.has(c))
+          if (!isSame) {
+            payload.categories = data.categories // Send full list if changed
+          }
+        }
+
+        // 4. Password Check
+        if (data.newPassword) {
+          payload.currentPassword = data.currentPassword
+          payload.newPassword = data.newPassword
+          payload.newPasswordConfirm = data.newPasswordConfirm
+        }
+
+        // 🔄 Payload가 비어있지 않을 때만 요청 전송
+        if (Object.keys(payload).length > 0) {
+          await updateProfileAPI(payload)
+
+          // Optimistic Update is tricky with partial updates.
+          // Best to re-fetch me after successful update to be sure.
+
+          const me = await getMe()
+          const newUser: User = {
+            ...user, // Base on current state
+            ...me,   // Overwrite with fresh data
+            id: String(me.id),
+            // ✅ Star mapping fix for updateProfile
+            stars: me.stars ?? (me as any).stars ?? 0,
+            totalStar: me.totalStar ?? (me as any).total_star ?? 0,
+            todayStars: me.todayStars ?? (me as any).today_stars ?? 0,
+            lastStarDate: me.lastStarDate ?? (me as any).last_star_date ?? new Date().toISOString().split("T")[0],
+          }
+
+          setUser(newUser)
+          localStorage.setItem("cooksync_user", JSON.stringify(newUser))
+        } else {
+          console.log("No changes detected, skipping API call.")
+        }
 
       } catch (error) {
         console.error("프로필 수정 실패:", error)
@@ -439,7 +500,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const updated = isAlreadyLiked
         ? prev.filter((r) => r.id !== recipe.id)
         : [...prev, { ...recipe, savedAt: new Date().toISOString().split("T")[0].replace(/-/g, ".") }]
-      localStorage.setItem("cooksync_liked_recipes", JSON.stringify(updated))
+      if (user?.id) localStorage.setItem(storageKey("cooksync_liked_recipes", user.id), JSON.stringify(updated))
       return updated
     })
   }
@@ -460,7 +521,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setMessages((prev) => {
       const updated = [...prev, newMessage]
-      localStorage.setItem("cooksync_messages", JSON.stringify(updated))
+      if (user?.id) localStorage.setItem(storageKey("cooksync_messages", user.id), JSON.stringify(updated))
       return updated
     })
 
@@ -475,7 +536,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           lastMessage: content, lastMessageTime: new Date().toISOString(), unreadCount: 0,
         })
       }
-      localStorage.setItem("cooksync_conversations", JSON.stringify(updated))
+      if (user?.id) localStorage.setItem(storageKey("cooksync_conversations", user.id), JSON.stringify(updated))
       return updated
     })
   }
@@ -485,12 +546,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const deleteConversation = (recipientId: string) => {
     setMessages(prev => {
       const updated = prev.filter(m => m.recipientId !== recipientId)
-      localStorage.setItem("cooksync_messages", JSON.stringify(updated))
+      if (user?.id) localStorage.setItem(storageKey("cooksync_messages", user.id), JSON.stringify(updated))
       return updated
     })
     setConversations(prev => {
       const updated = prev.filter(c => c.recipientId !== recipientId)
-      localStorage.setItem("cooksync_conversations", JSON.stringify(updated))
+      if (user?.id) localStorage.setItem(storageKey("cooksync_conversations", user.id), JSON.stringify(updated))
       return updated
     })
   }
@@ -500,7 +561,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const newRecipe = { ...recipe, id: newId, createdAt: new Date().toISOString() }
     setUserRecipes(prev => {
       const updated = [newRecipe, ...prev]
-      localStorage.setItem("cooksync_user_recipes", JSON.stringify(updated))
+      if (user?.id) localStorage.setItem(storageKey("cooksync_user_recipes", user.id), JSON.stringify(updated))
       return updated
     })
     earnStars(1, "recipe")
@@ -510,7 +571,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateUserRecipe = (id: string, recipe: Partial<Omit<UserRecipe, "id" | "createdAt">>) => {
     setUserRecipes(prev => {
       const updated = prev.map(r => r.id === id ? { ...r, ...recipe } : r)
-      localStorage.setItem("cooksync_user_recipes", JSON.stringify(updated))
+      if (user?.id) localStorage.setItem(storageKey("cooksync_user_recipes", user.id), JSON.stringify(updated))
       return updated
     })
   }
@@ -518,7 +579,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const deleteUserRecipe = (id: string) => {
     setUserRecipes(prev => {
       const updated = prev.filter(r => r.id !== id)
-      localStorage.setItem("cooksync_user_recipes", JSON.stringify(updated))
+      if (user?.id) localStorage.setItem(storageKey("cooksync_user_recipes", user.id), JSON.stringify(updated))
       return updated
     })
   }
@@ -527,7 +588,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const newPost: UserPost = { ...post, id: `user-post-${Date.now()}`, createdAt: new Date().toISOString(), status: "available", likes: 0 }
     setUserPosts(prev => {
       const updated = [newPost, ...prev]
-      localStorage.setItem("cooksync_user_posts", JSON.stringify(updated))
+      if (user?.id) localStorage.setItem(storageKey("cooksync_user_posts", user.id), JSON.stringify(updated))
       return updated
     })
   }
@@ -535,7 +596,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateUserPost = (id: string, post: Partial<Omit<UserPost, "id" | "createdAt">>) => {
     setUserPosts(prev => {
       const updated = prev.map(p => p.id === id ? { ...p, ...post } : p)
-      localStorage.setItem("cooksync_user_posts", JSON.stringify(updated))
+      if (user?.id) localStorage.setItem(storageKey("cooksync_user_posts", user.id), JSON.stringify(updated))
       return updated
     })
   }
@@ -543,7 +604,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const deleteUserPost = (id: string) => {
     setUserPosts(prev => {
       const updated = prev.filter(p => p.id !== id)
-      localStorage.setItem("cooksync_user_posts", JSON.stringify(updated))
+      if (user?.id) localStorage.setItem(storageKey("cooksync_user_posts", user.id), JSON.stringify(updated))
       return updated
     })
   }
@@ -554,7 +615,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLikedPosts(prev => {
       const isLiked = prev.some(p => p.id === post.id)
       const updated = isLiked ? prev.filter(p => p.id !== post.id) : [...prev, { ...post, savedAt: new Date().toISOString() }]
-      localStorage.setItem("cooksync_liked_posts", JSON.stringify(updated))
+      if (user?.id) localStorage.setItem(storageKey("cooksync_liked_posts", user.id), JSON.stringify(updated))
       return updated
     })
   }
