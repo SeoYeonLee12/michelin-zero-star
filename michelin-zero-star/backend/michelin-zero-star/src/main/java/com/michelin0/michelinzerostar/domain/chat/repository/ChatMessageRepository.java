@@ -10,16 +10,18 @@ import org.springframework.data.repository.query.Param;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
-    // 내가 나갔다가 다시 들어오면 joinedAt이 갱신되어 이전 메시지는 안 보임
-    List<ChatMessage> findByChatRoomIdAndCreatedAtAfterOrderByCreatedAt(Long chatRoomId,
-            LocalDateTime joinedAt);
+    // [시간 필터링] 내 입장 시간(joinedAt)보다 '같거나 이후'에 생성된 메시지만 조회
+    List<ChatMessage> findByChatRoomIdAndCreatedAtGreaterThanEqualOrderByCreatedAtAsc(Long chatRoomId, LocalDateTime joinedAt);
 
+    // [안 읽은 메시지 개수] 내 입장 시간 이후의 메시지 중에서만 카운트
+    @Query("SELECT COUNT(m) FROM ChatMessage m WHERE m.chatRoom.id = :roomId AND m.sender.id != :userId AND m.isRead = false AND m.createdAt >= :joinedAt")
+    int countUnreadMessages(@Param("roomId") Long roomId, @Param("userId") Long userId, @Param("joinedAt") LocalDateTime joinedAt);
+
+    // [읽음 처리 - Bulk Update]
     @Modifying(clearAutomatically = true)
     @Query("UPDATE ChatMessage m SET m.isRead = true WHERE m.chatRoom.id = :roomId AND m.sender.id != :userId AND m.isRead = false")
     void bulkUpdateReadStatus(@Param("roomId") Long roomId, @Param("userId") Long userId);
 
-    // 안 읽은 개수 셀 때도 내 입장 시간 이후 것만 세야 함
-    @Query("SELECT COUNT(m) FROM ChatMessage m WHERE m.chatRoom.id = :roomId AND m.sender.id != :userId AND m.isRead = false AND m.createdAt > :joinedAt")
-    int countUnreadMessages(@Param("roomId") Long roomId, @Param("userId") Long userId,
-            @Param("joinedAt") LocalDateTime joinedAt);
+    // ★ [추가됨] 방 완전 삭제 시 해당 방의 메시지 전체 삭제 (ChatService에서 호출)
+    void deleteAllByChatRoomId(Long chatRoomId);
 }

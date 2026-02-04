@@ -98,6 +98,11 @@ export async function apiFetch<T = unknown>(
         console.log("[apiFetch] Silent Refresh Success. Retrying original request.")
         setGlobalAccessToken(newAccessToken)
 
+        // ✅ 토큰 갱신 이벤트 발생 (AuthContext에서 감지하여 WS 재연결)
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("cooksync:token-refreshed", { detail: { token: newAccessToken } }));
+        }
+
         // 새 토큰으로 재시도
         const newHeaders = new Headers(fetchOptions.headers || {})
         newHeaders.set("Authorization", `Bearer ${newAccessToken}`)

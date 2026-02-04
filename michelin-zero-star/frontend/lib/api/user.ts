@@ -15,6 +15,7 @@ export type MeResponse = {
   stars?: number
   todayStars?: number
   lastStarDate?: string
+  isVerified?: boolean
 }
 
 export function getMe() {

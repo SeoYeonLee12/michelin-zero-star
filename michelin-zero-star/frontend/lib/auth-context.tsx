@@ -1,684 +1,396 @@
-// lib/auth-context.tsx
 "use client"
 
 import * as React from "react"
-import type { LocationRequestDto } from "./types"
-import { getMe, updateProfile as updateProfileAPI, withdrawUser } from "./api/user"
-import { login as loginAPI, signup as signupAPI, logout as logoutAPI } from "./api/auth"
-import { verifyLocation } from "./api/user"
-import { setCookie, getCookie, removeCookie } from "./cookie"
+import { Client, IMessage } from "@stomp/stompjs"
+import { getMe, updateProfile as updateProfileAPI, verifyLocation } from "./api/user"
+import { login as loginAPI, logout as logoutAPI, refreshAccessToken } from "./api/auth"
 import { setGlobalAccessToken, getGlobalAccessToken } from "./api/client"
-import { refreshAccessToken } from "./api/auth"
-
-// ✅ 개발 환경에서 mock 사용 여부
-const USE_MOCK_API = false
-const FIXED_LATITUDE = 36.3549777
-const FIXED_LONGITUDE = 127.2983403
+import {
+  getChatRooms,
+  getChatMessages,
+  createOrEnterChatRoom,
+  leaveChatRoom,
+  type ChatRoomDto,
+  type ChatMessageDto
+} from "./api/chat"
+import { toast } from "@/components/ui/use-toast"
 
 function safeJsonParse<T>(value: string | null, fallback: T): T {
   if (!value) return fallback
-  try {
-    return JSON.parse(value) as T
-  } catch {
-    return fallback
-  }
-}
-
-function storageKey(base: string, userId?: string | null): string {
-  return userId ? `${base}:${userId}` : base
+  try { return JSON.parse(value) as T } catch { return fallback }
 }
 
 // --- Interfaces ---
-interface User {
-  id: string
-  name: string
-  nickname: string
-  email: string
-  profileImage?: string
-  level: string
-  bio: string
-  location?: string
-  latitude?: number
-  longitude?: number
-  locationCode?: string
-  stars: number
-  todayStars: number
-  lastStarDate: string
-}
-
-interface LikedRecipe {
-  id: string
-  title: string
-  image: string
-  author: string
-  savedAt: string
-}
-
-interface Message {
-  id: string
-  recipientId: string
-  recipientName: string
-  recipientAvatar?: string
-  content: string
-  timestamp: string
-  isRead: boolean
-  isSentByMe: boolean
-}
-
-interface Conversation {
-  id: string
-  recipientId: string
-  recipientName: string
-  recipientAvatar?: string
-  lastMessage: string
-  lastMessageTime: string
-  unreadCount: number
-}
-
-interface UserRecipe {
-  id: string
-  title: string
-  description: string
-  servings: number
-  thumbnail: string
-  tags: string[]
-  ingredients: {
-    name: string
-    amount: string
-  }[]
-  steps: {
-    id: number
-    action: string
-    description: string
-    duration: number
-    imagePreview: string | null
-    tips: string
-  }[]
-  createdAt: string
-}
-
-interface UserPost {
-  id: string
-  title: string
-  description: string
-  price: string
-  image: string
-  place: string
-  likes: number
-  createdAt: string
-  status: "available" | "completed"
-}
-
-type LikedPost = UserPost & { savedAt: string }
+interface User { id: string; name: string; nickname: string; email: string; profileImage?: string; level: string; bio: string; location?: string; latitude?: number; longitude?: number; locationCode?: string; stars: number; todayStars: number; lastStarDate: string; isVerified?: boolean; }
+interface Message { id: string; roomId: string; senderId: string; senderName: string; content: string; timestamp: string; isRead: boolean; isSentByMe: boolean; imageUrl?: string; }
+interface Conversation { id: string; recipientId: string; recipientName: string; recipientAvatar?: string; lastMessage: string; lastMessageTime: string; unreadCount: number; postTitle?: string; postThumbnail?: string; }
 
 interface AuthContextType {
-  isLoading: boolean
-  user: User | null
-  isLoggedIn: boolean
-  login: (email: string, password: string) => Promise<void>
-  signup: (data: { name: string; nickname: string; email: string; password: string }) => Promise<void>
-  logout: () => void
-
-  // ✅ [추가] 소셜 로그인 처리 함수 (액세스 토큰 주입)
-  onSocialLogin: (accessToken: string) => Promise<void>
-
-  updateProfile: (data: Partial<User> & { currentPassword?: string; newPassword?: string; newPasswordConfirm?: string }) => Promise<void>
-  updateLocation: (latitude: number, longitude: number) => Promise<string>
-  likedRecipes: LikedRecipe[]
-  toggleLikeRecipe: (recipe: LikedRecipe) => void
-  isRecipeLiked: (recipeId: string) => boolean
-  conversations: Conversation[]
-  sendMessage: (recipientId: string, recipientName: string, recipientAvatar: string, content: string) => void
-  getMessages: (recipientId: string) => Message[]
-  deleteConversation: (recipientId: string) => void
-  userRecipes: UserRecipe[]
-  addUserRecipe: (recipe: Omit<UserRecipe, "id" | "createdAt">) => string
-  updateUserRecipe: (id: string, recipe: Partial<Omit<UserRecipe, "id" | "createdAt">>) => void
-  deleteUserRecipe: (id: string) => void
-  userPosts: UserPost[]
-  addUserPost: (post: Omit<UserPost, "id" | "createdAt" | "status" | "likes">) => void
-  updateUserPost: (id: string, post: Partial<Omit<UserPost, "id" | "createdAt">>) => void
-  deleteUserPost: (id: string) => void
-  likedPosts: LikedPost[]
-  toggleLikePost: (postOrEvent: React.MouseEvent | UserPost, maybePost?: UserPost) => void
-  isPostLiked: (postId: string) => boolean
-  earnStars: (amount: number, reason: "cook" | "recipe") => boolean
-  getStarLevel: () => number
-  completedRecipes: Set<string>
-  markRecipeAsCompleted: (recipeId: string) => void
-  reviewedRecipes: Set<string>
-  markRecipeAsReviewed: (recipeId: string) => void
-  hasUserReviewedRecipe: (recipeId: string) => boolean
-  withdraw: () => Promise<void>
+  isLoading: boolean; user: User | null; isLoggedIn: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (data: any) => Promise<void>;
+  logout: () => void;
+  updateProfile: (data: any) => Promise<void>;
+  conversations: Conversation[];
+  currentMessages: Message[];
+  enterChatRoom: (roomId: string) => Promise<void>;
+  exitChatRoom: () => void;
+  startChatFromPost: (postId: number) => Promise<string>;
+  sendMessage: (roomId: string, content: string) => void;
+  deleteConversation: (roomId: string) => Promise<void>;
+  updateLocation: (lat: number, lng: number) => Promise<string>;
 }
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  console.log("[AuthProvider] render")
   const [isLoading, setIsLoading] = React.useState(true)
   const [user, setUser] = React.useState<User | null>(null)
-
-  const [likedRecipes, setLikedRecipes] = React.useState<LikedRecipe[]>([])
   const [conversations, setConversations] = React.useState<Conversation[]>([])
-  const [messages, setMessages] = React.useState<Message[]>([])
-  const [userRecipes, setUserRecipes] = React.useState<UserRecipe[]>([])
-  const [userPosts, setUserPosts] = React.useState<UserPost[]>([])
-  const [likedPosts, setLikedPosts] = React.useState<LikedPost[]>([])
-  const [completedRecipes, setCompletedRecipes] = React.useState<Set<string>>(new Set())
-  const [reviewedRecipes, setReviewedRecipes] = React.useState<Set<string>>(new Set())
+  const [currentMessages, setCurrentMessages] = React.useState<Message[]>([])
 
-  // ✅ Prevent double-execution in Strict Mode (Token Rotation Safety)
+  const stompClient = React.useRef<Client | null>(null)
+  const subscriptions = React.useRef<Map<string, any>>(new Map())
   const isAuthInitialized = React.useRef(false)
+  const currentRoomIdRef = React.useRef<string | null>(null)
 
-  // Initial load from storage & Silent Refresh
-  React.useEffect(() => {
-    console.log("[AuthProvider] useEffect start")
+  // 🛠️ 1. 내 ID 판별 함수 (String 비교로 엄격하게 관리)
+  const getCurrentUserId = (): string | null => {
+    const savedUserRaw = sessionStorage.getItem("cooksync_user")
+    if (savedUserRaw) {
+      try { return String(JSON.parse(savedUserRaw).id); } catch { return null; }
+    }
+    return user?.id ? String(user.id) : null;
+  }
 
-    // 1. LocalStorage에서 사용자 정보(껍데기) 복구 (Synchronous)
-    const savedUserRaw = localStorage.getItem("cooksync_user")
-    const savedUser = safeJsonParse<User | null>(savedUserRaw, null)
-    if (savedUser) {
-      setUser(savedUser)
+  const sendReadSignal = (roomId: string) => {
+    const myId = getCurrentUserId();
+    const token = getGlobalAccessToken();
+    if (!stompClient.current?.connected || !token || !myId) return;
+
+    console.log(`👀 [SendRead] Room=${roomId}, MyID=${myId}`);
+    stompClient.current.publish({
+      destination: "/pub/chat/read",
+      body: JSON.stringify({ roomId: Number(roomId), readerId: Number(myId) }),
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  const subscribeToRoom = (roomId: string) => {
+    if (!stompClient.current?.connected) return;
+
+    // 이미 구독 중이라면 해제 후 재구독 (중복 방지)
+    if (subscriptions.current.has(roomId)) {
+      subscriptions.current.get(roomId).unsubscribe();
+      subscriptions.current.delete(roomId);
     }
 
-    const initAuth = async () => {
-      // 0. Cleanup Legacy Data (User confusion prevention)
-      localStorage.removeItem("cooksync_access_token")
+    const myId = getCurrentUserId();
+    console.log(`📡 [Subscribe] Room ${roomId} Start. MyID=${myId}`);
 
-      // 2. Silent Refresh 시도 (쿠키에 있는 리프레시 토큰으로 액세스 토큰 발급)
-      try {
-        console.log("[AuthProvider] Attempting Silent Login...")
-        const refreshRes = await refreshAccessToken() // ✅ Refreshed Token
+    const msgSub = stompClient.current.subscribe(`/sub/chat/room/${roomId}`, (message: IMessage) => {
+      const body = JSON.parse(message.body) as ChatMessageDto;
+      const isCurrentRoom = String(currentRoomIdRef.current) === String(roomId);
 
-        // 성공 시: 메모리에 액세스 토큰 설정
-        setGlobalAccessToken(refreshRes.accessToken)
-        console.log("[AuthProvider] Silent Login Success")
+      if (isCurrentRoom) {
+        const msgSenderId = String(body.senderId);
+        const isMe = myId === msgSenderId;
 
-        // 3. 최신 유저 정보 동기화
-        const me = await getMe()
-        const recoveredUser: User = {
-          id: String(me.id),
-          name: me.name ?? "",
-          nickname: me.nickname ?? "",
-          email: me.email ?? (savedUser?.email ?? ""),
-          profileImage: me.profileImage,
-          level: me.level ?? "",
-          bio: me.bio ?? "",
-          location: me.location,
-          latitude: me.latitude,
-          longitude: me.longitude,
-          locationCode: me.locationCode,
-          stars: me.stars ?? 0,
-          todayStars: me.todayStars ?? 0,
-          lastStarDate: me.lastStarDate ?? new Date().toISOString().split("T")[0],
+        const newMsg: Message = {
+          id: String(body.messageId),
+          roomId: roomId,
+          senderId: msgSenderId,
+          senderName: body.senderNickname,
+          content: body.content,
+          imageUrl: body.imageUrl,
+          timestamp: body.sendTime,
+          isRead: body.read,
+          isSentByMe: isMe
         }
-        setUser(recoveredUser)
-        localStorage.setItem("cooksync_user", JSON.stringify(recoveredUser))
 
+        setCurrentMessages((prev) => {
+          if (prev.some((m) => String(m.id) === String(newMsg.id))) return prev;
+
+          // 임시 메시지 대체 (중복 방지 및 깜빡임 최소화)
+          const tempIndex = prev.findIndex(m => m.isSentByMe && m.content.trim() === newMsg.content.trim() && String(m.id).startsWith("temp-"));
+          if (tempIndex !== -1) {
+            console.log(`🔄 [Replace] TempMsg -> ServerMsg: ${newMsg.id}`);
+            const newArr = [...prev];
+            newArr[tempIndex] = newMsg;
+            return newArr;
+          }
+          return [...prev, newMsg];
+        });
+
+        // 내가 보낸 게 아니고, 화면이 보고 있다면 읽음 처리
+        if (!isMe && document.visibilityState === "visible") {
+          sendReadSignal(roomId);
+        }
+      }
+
+      // 대화 목록 업데이트 (마지막 메시지 등)
+      setConversations(prev => prev.map(c => {
+        if (c.id === roomId) {
+          const isViewing = String(currentRoomIdRef.current) === String(roomId);
+          return {
+            ...c,
+            lastMessage: body.content,
+            lastMessageTime: body.sendTime,
+            // 보고 있으면 0, 아니면 +1 (Global Topic과 겹치지 않게 주의하지만, Current Room 구독은 Active Room일 때만 하므로 안전)
+            unreadCount: isViewing ? 0 : c.unreadCount + 1
+          };
+        }
+        return c;
+      }))
+    });
+
+    const readSub = stompClient.current.subscribe(`/sub/chat/room/${roomId}/read`, (message: IMessage) => {
+      try {
+        const body = JSON.parse(message.body);
+        const readerId = String(body.readerId);
+        const myIdInSub = getCurrentUserId(); // Closure 안에서 최신값 get
+
+        console.log(`📖 [ReadRecv] Room=${body.roomId}, Reader=${readerId}, MyID=${myIdInSub}`);
+
+        // 🛠️ 3. 본인의 읽음 신호 무시: 상대방이 읽었을 때만 '1' 제거
+        if (String(currentRoomIdRef.current) === String(body.roomId)) {
+          if (readerId !== myIdInSub) {
+            console.log("✅ Opponent Read -> Marking messages as read.");
+            setCurrentMessages(prev => prev.map(msg => ({ ...msg, isRead: true })));
+          } else {
+            console.log("🚫 My Read Signal -> Ignoring UI update.");
+          }
+        }
+      } catch (e) { console.error(e); }
+    });
+
+    subscriptions.current.set(roomId, { unsubscribe: () => { msgSub.unsubscribe(); readSub.unsubscribe(); subscriptions.current.delete(roomId); } });
+  }
+
+  // 🛠️ 4. 실시간 알림 로직 (다른 화면에서도 즉시 뱃지 업데이트)
+  const subscribeToUserTopic = () => {
+    if (!stompClient.current?.connected || subscriptions.current.has("user-global")) return;
+    const myId = getCurrentUserId();
+    if (!myId) return;
+
+    console.log(`🔔 [Subscribe-Global] User Topic: /sub/chat/user/${myId}`);
+
+    const sub = stompClient.current.subscribe(`/sub/chat/user/${myId}`, (message: IMessage) => {
+      const body = JSON.parse(message.body) as ChatMessageDto;
+      const roomId = String(body.roomId);
+
+      // 현재 보고 있는 방이 '아닐 때'만 처리
+      // (보고 있는 방은 subscribeToRoom에서 처리함)
+      if (String(currentRoomIdRef.current) !== roomId) {
+        console.log(`🔔 [Global-Notif] Msg for Room ${roomId}`);
+
+        toast({
+          title: `${body.senderNickname}님의 메시지`,
+          description: body.content.length > 20 ? body.content.substring(0, 20) + "..." : body.content,
+        });
+
+        setConversations(prev => {
+          const exists = prev.some(c => c.id === roomId);
+          if (!exists) { fetchConversations(); return prev; }
+
+          return prev.map(c => c.id === roomId ? {
+            ...c,
+            unreadCount: c.unreadCount + 1, // 여기서만 증가
+            lastMessage: body.content,
+            lastMessageTime: body.sendTime
+          } : c);
+        });
+      } else {
+        console.log(`🔕 [Global-Notif] Ignored because user is in Room ${roomId}`);
+      }
+    });
+    subscriptions.current.set("user-global", sub);
+  }
+
+  const fetchConversations = async () => {
+    try {
+      const rooms = await getChatRooms()
+      const mapped = rooms.map(r => ({
+        id: String(r.chatRoomId),
+        recipientId: String(r.otherUserId),
+        recipientName: r.otherUserNickname,
+        recipientAvatar: r.otherUserProfileImage,
+        lastMessage: r.lastMessage || "대화가 시작되었습니다.",
+        lastMessageTime: r.lastMessageAt,
+        unreadCount: r.unreadCount || 0
+      }));
+      setConversations(mapped);
+      // ❌ [CRITICAL FIX] 모든 방을 구독하지 않음!
+      // mapped.forEach(room => subscribeToRoom(room.id)); 
+    } catch (error) { console.error(error); }
+  }
+
+  const connectWebSocket = (token: string) => {
+    if (stompClient.current) disconnectWebSocket();
+    console.log("🔌 Connecting WebSocket...");
+    const client = new Client({
+      brokerURL: process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080/ws-stomp",
+      connectHeaders: { Authorization: `Bearer ${token}` },
+      reconnectDelay: 5000,
+      onConnect: () => {
+        console.log("🟢 WebSocket Connected!");
+        subscribeToUserTopic();
+        fetchConversations();
+
+        // 재연결 시 현재 방이 있다면 다시 구독
+        if (currentRoomIdRef.current) {
+          subscribeToRoom(currentRoomIdRef.current);
+        }
+      },
+      onDisconnect: () => {
+        console.log("🔴 WebSocket Disconnected");
+      }
+    })
+    client.activate();
+    stompClient.current = client;
+  }
+
+  React.useEffect(() => {
+    const savedUserRaw = sessionStorage.getItem("cooksync_user")
+    if (savedUserRaw) setUser(JSON.parse(savedUserRaw))
+    const initAuth = async () => {
+      try {
+        const refreshRes = await refreshAccessToken()
+        setGlobalAccessToken(refreshRes.accessToken)
+        const me = await getMe()
+        updateUserStruct(me)
+        connectWebSocket(refreshRes.accessToken)
       } catch (error) {
-        console.warn("[AuthProvider] Silent Login Failed (No valid session):", error)
-        // 세션 만료됨 -> 로그아웃 처리
-        setUser(null)
-        setGlobalAccessToken(null)
-        localStorage.removeItem("cooksync_user")
-        // 쿠키는 JS에서 삭제 불가(HttpOnly)하므로 놔둠 (서버가 401 줄 것임)
-      } finally {
-        setIsLoading(false) // ✅ Loading Finished
-      }
+        setUser(null); setGlobalAccessToken(null); sessionStorage.removeItem("cooksync_user");
+      } finally { setIsLoading(false) }
     }
+    if (!isAuthInitialized.current) { isAuthInitialized.current = true; initAuth(); }
 
-    // ✅ Run only once
-    if (!isAuthInitialized.current) {
-      isAuthInitialized.current = true
-      initAuth()
-    }
+    // 이벤트 리스너: 토큰 갱신 시 재연결
+    const handleRefresh = (e: any) => {
+      const newToken = e.detail?.token;
+      if (newToken) connectWebSocket(newToken);
+    };
+    if (typeof window !== 'undefined') window.addEventListener("cooksync:token-refreshed", handleRefresh);
 
-    // --- Legacy LocalStorage Data Loading (기존 코드 유지) ---
-    const savedLikedRecipes = safeJsonParse<LikedRecipe[]>(localStorage.getItem("cooksync_liked_recipes"), [])
-    if (savedLikedRecipes.length) setLikedRecipes(savedLikedRecipes)
-
-    const savedConversations = safeJsonParse<Conversation[]>(localStorage.getItem("cooksync_conversations"), [])
-    if (savedConversations.length) setConversations(savedConversations)
-
-    const savedMessages = safeJsonParse<Message[]>(localStorage.getItem("cooksync_messages"), [])
-    if (savedMessages.length) setMessages(savedMessages)
-
-    const savedUserRecipes = safeJsonParse<UserRecipe[]>(localStorage.getItem("cooksync_user_recipes"), [])
-    if (savedUserRecipes.length) setUserRecipes(savedUserRecipes)
-
-    const savedUserPosts = safeJsonParse<UserPost[]>(localStorage.getItem("cooksync_user_posts"), [])
-    if (savedUserPosts.length) setUserPosts(savedUserPosts)
-
-    const rawLikedPosts = safeJsonParse<unknown>(localStorage.getItem("cooksync_liked_posts"), [])
-    const nowIso = new Date().toISOString()
-    let normalizedLikedPosts: LikedPost[] = []
-
-    if (Array.isArray(rawLikedPosts)) {
-      if (rawLikedPosts.every((x) => typeof x === "string")) {
-        const ids = rawLikedPosts as string[]
-        normalizedLikedPosts = ids
-        .map((id) => savedUserPosts.find((p) => p.id === id))
-        .filter(Boolean)
-        .map((p) => ({ ...(p as UserPost), savedAt: nowIso }))
-      } else if (rawLikedPosts.every((x) => typeof x === "object" && x !== null)) {
-        normalizedLikedPosts = (rawLikedPosts as any[])
-        .filter((p) => typeof p.id === "string")
-        .map((p) => ({ ...(p as UserPost), savedAt: typeof p.savedAt === "string" ? p.savedAt : nowIso }))
-      }
-    }
-    if (normalizedLikedPosts.length) setLikedPosts(normalizedLikedPosts)
-
-    const userId = savedUser?.id ?? null
-    const completedKey = storageKey("cooksync_completed_recipes", userId)
-    const reviewedKey = storageKey("cooksync_reviewed_recipes", userId)
-    const legacyCompleted = safeJsonParse<string[]>(localStorage.getItem("cooksync_completed_recipes"), [])
-    const legacyReviewed = safeJsonParse<string[]>(localStorage.getItem("cooksync_reviewed_recipes"), [])
-    const savedCompletedRecipes = safeJsonParse<string[]>(localStorage.getItem(completedKey), legacyCompleted)
-    const savedReviewedRecipes = safeJsonParse<string[]>(localStorage.getItem(reviewedKey), legacyReviewed)
-
-    if (savedCompletedRecipes.length) setCompletedRecipes(new Set(savedCompletedRecipes))
-    if (savedReviewedRecipes.length) setReviewedRecipes(new Set(savedReviewedRecipes))
+    return () => {
+      disconnectWebSocket();
+      if (typeof window !== 'undefined') window.removeEventListener("cooksync:token-refreshed", handleRefresh);
+    };
   }, [])
 
-  // User-scoped data loading
-  React.useEffect(() => {
-    const userId = user?.id ?? null
-    if (!userId) {
-      setCompletedRecipes(new Set())
-      setReviewedRecipes(new Set())
-      return
-    }
-
-    const completedKey = storageKey("cooksync_completed_recipes", userId)
-    const reviewedKey = storageKey("cooksync_reviewed_recipes", userId)
-    const legacyCompleted = safeJsonParse<string[]>(localStorage.getItem("cooksync_completed_recipes"), [])
-    const legacyReviewed = safeJsonParse<string[]>(localStorage.getItem("cooksync_reviewed_recipes"), [])
-    const completed = safeJsonParse<string[]>(localStorage.getItem(completedKey), legacyCompleted)
-    const reviewed = safeJsonParse<string[]>(localStorage.getItem(reviewedKey), legacyReviewed)
-
-    setCompletedRecipes(new Set(completed))
-    setReviewedRecipes(new Set(reviewed))
-
-    if (!localStorage.getItem(completedKey) && legacyCompleted.length) {
-      localStorage.setItem(completedKey, JSON.stringify(legacyCompleted))
-    }
-    if (!localStorage.getItem(reviewedKey) && legacyReviewed.length) {
-      localStorage.setItem(reviewedKey, JSON.stringify(legacyReviewed))
-    }
-  }, [user?.id])
-
-  // --- Auth Actions ---
-  const login = async (email: string, password: string) => {
-    // 1. 로그인 요청
-    const tokenRes = await loginAPI({ email, password })
-
-    // 2. 액세스 토큰을 메모리에 저장 (쿠키 저장 X)
-    setGlobalAccessToken(tokenRes.accessToken)
-
-    // 참고: 리프레시 토큰은 백엔드가 Set-Cookie 헤더로(HttpOnly) 설정해주어야 함.
-
-    // 3. 내 정보 조회
-    const me = await getMe()
-
-    const newUser: User = {
-      id: String(me.id),
-      name: me.name ?? "",
-      nickname: me.nickname ?? "",
-      email: me.email ?? email,
-      profileImage: me.profileImage,
-      level: me.level ?? "",
-      bio: me.bio ?? "",
-      location: me.location,
-      latitude: me.latitude,
-      longitude: me.longitude,
-      locationCode: me.locationCode,
-      stars: me.stars ?? 0,
-      todayStars: me.todayStars ?? 0,
-      lastStarDate: me.lastStarDate ?? new Date().toISOString().split("T")[0],
-    }
-
-    setUser(newUser)
-    localStorage.setItem("cooksync_user", JSON.stringify(newUser))
+  const disconnectWebSocket = () => {
+    if (stompClient.current) { stompClient.current.deactivate(); stompClient.current = null; }
+    subscriptions.current.forEach(sub => sub.unsubscribe?.());
+    subscriptions.current.clear();
   }
 
-  // ✅ [추가] 소셜 로그인 처리 함수
-  const onSocialLogin = async (accessToken: string) => {
-    try {
-      // 1. 외부(Callback URL)에서 받은 액세스 토큰 설정
-      setGlobalAccessToken(accessToken)
+  const enterChatRoom = async (roomId: string) => {
+    if (!roomId || roomId === "undefined") return;
 
-      // 2. 내 정보 조회 (토큰 유효성 검증 겸용)
-      const me = await getMe()
-
-      const newUser: User = {
-        id: String(me.id),
-        name: me.name ?? "",
-        nickname: me.nickname ?? "",
-        email: me.email ?? "", // 소셜 로그인의 경우 API가 이메일을 제공하지 않을 수 있음 (대비용)
-        profileImage: me.profileImage,
-        level: me.level ?? "",
-        bio: me.bio ?? "",
-        location: me.location,
-        latitude: me.latitude,
-        longitude: me.longitude,
-        locationCode: me.locationCode,
-        stars: me.stars ?? 0,
-        todayStars: me.todayStars ?? 0,
-        lastStarDate: me.lastStarDate ?? new Date().toISOString().split("T")[0],
+    // 이전 방 구독 해제 (중복 방지)
+    if (currentRoomIdRef.current && currentRoomIdRef.current !== roomId) {
+      console.log(`👋 Leaving Room ${currentRoomIdRef.current}`);
+      if (subscriptions.current.has(currentRoomIdRef.current)) {
+        subscriptions.current.get(currentRoomIdRef.current).unsubscribe();
+        subscriptions.current.delete(currentRoomIdRef.current);
       }
-
-      setUser(newUser)
-      localStorage.setItem("cooksync_user", JSON.stringify(newUser))
-      console.log("✅ 소셜 로그인 성공 및 유저 정보 업데이트 완료")
-    } catch (error) {
-      console.error("소셜 로그인 처리 실패:", error)
-      setGlobalAccessToken(null)
-      throw error
     }
+
+    currentRoomIdRef.current = roomId;
+    const myId = getCurrentUserId();
+    try {
+      const msgs = await getChatMessages(Number(roomId));
+      if (String(currentRoomIdRef.current) !== String(roomId)) return;
+
+      setCurrentMessages(msgs.map(m => ({
+        id: String(m.messageId), roomId: roomId, senderId: String(m.senderId), senderName: m.senderNickname,
+        content: m.content, imageUrl: m.imageUrl, timestamp: m.sendTime, isRead: m.read,
+        isSentByMe: String(m.senderId) === myId
+      })));
+
+      sendReadSignal(roomId);
+      setConversations(prev => prev.map(c => c.id === roomId ? { ...c, unreadCount: 0 } : c));
+
+      // ✅ [CRITICAL] 여기서만 방 구독 (Single Active Room)
+      subscribeToRoom(roomId);
+    } catch (e) { console.error(e); }
   }
 
-  const signup = async (data: { name: string; nickname: string; email: string; password: string }) => {
-    try {
-      // 1. 회원가입 API 호출 (백엔드는 성공 메시지 문자열만 반환)
-      await signupAPI({
-        name: data.name,
-        nickname: data.nickname,
-        email: data.email,
-        password: data.password,
-      })
-
-      console.log("✅ 회원가입 성공. 자동 로그인을 진행합니다.")
-
-      // 2. 로그인 API 호출 (여기서 진짜 토큰을 받아오고 유저 상태를 갱신함)
-      await login(data.email, data.password)
-
-    } catch (error) {
-      console.error("❌ 회원가입/로그인 실패:", error)
-      throw error
+  const exitChatRoom = () => {
+    if (currentRoomIdRef.current) {
+      console.log(`🚪 Exit Chat Room: ${currentRoomIdRef.current}`);
+      if (subscriptions.current.has(currentRoomIdRef.current)) {
+        subscriptions.current.get(currentRoomIdRef.current).unsubscribe();
+        subscriptions.current.delete(currentRoomIdRef.current);
+      }
     }
+    currentRoomIdRef.current = null;
+  }
+
+  const sendMessage = (roomId: string, content: string) => {
+    const token = getGlobalAccessToken();
+    const myId = getCurrentUserId();
+    if (!stompClient.current?.connected || !token || !myId) return;
+    const tempMsg: Message = { id: `temp-${Date.now()}`, roomId, senderId: myId, senderName: user?.nickname || "나", content, timestamp: new Date().toISOString(), isRead: false, isSentByMe: true };
+    setCurrentMessages(prev => [...prev, tempMsg]);
+    stompClient.current.publish({ destination: "/pub/chat/message", body: JSON.stringify({ roomId: Number(roomId), content }), headers: { Authorization: `Bearer ${token}` } });
+  }
+
+  const updateUserStruct = (me: any) => {
+    const newUser: User = { id: String(me.id), name: me.name, nickname: me.nickname, email: me.email, profileImage: me.profileImage, level: me.level, bio: me.bio, stars: me.stars, todayStars: me.todayStars, lastStarDate: me.lastStarDate };
+    setUser(newUser);
+    sessionStorage.setItem("cooksync_user", JSON.stringify(newUser));
+    return newUser;
+  }
+
+  const login = async (email: string, password: string) => {
+    const res = await loginAPI({ email, password });
+    setGlobalAccessToken(res.accessToken);
+    const me = await getMe();
+    updateUserStruct(me);
+    connectWebSocket(res.accessToken);
   }
 
   const logout = async () => {
-    try {
-      await logoutAPI() // 서버 쿠키 삭제 요청
-    } catch (error) {
-      console.error("로그아웃 실패 (토큰 만료 가능성):", error)
-    } finally {
-      setUser(null)
-      setGlobalAccessToken(null) // 메모리 토큰 삭제
-      setCompletedRecipes(new Set())
-      setReviewedRecipes(new Set())
-      localStorage.removeItem("cooksync_user")
-      // 쿠키 삭제는 서버 응답에 맡김 (HttpOnly)
-    }
+    try { await logoutAPI() } catch { }
+    disconnectWebSocket();
+    setUser(null); setGlobalAccessToken(null); sessionStorage.removeItem("cooksync_user");
   }
 
-  const updateProfile = async (data: Partial<User> & { currentPassword?: string; newPassword?: string; newPasswordConfirm?: string }) => {
-    if (user) {
-      try {
-        // Only send fields that actually changed
-        const updatePayload: any = {}
-        if (data.nickname && data.nickname !== user.nickname) {
-          updatePayload.nickname = data.nickname
-        }
-        if (data.currentPassword) updatePayload.currentPassword = data.currentPassword
-        if (data.newPassword) updatePayload.newPassword = data.newPassword
-        if (data.newPasswordConfirm) updatePayload.newPasswordConfirm = data.newPasswordConfirm
+  const updateLocation = async (lat: number, lng: number) => {
+    const res = await verifyLocation({ latitude: lat, longitude: lng });
 
-        await updateProfileAPI(updatePayload)
-        const { currentPassword, newPassword, newPasswordConfirm, ...safeData } = data
-        const updatedUser = { ...user, ...safeData }
-        setUser(updatedUser)
-        localStorage.setItem("cooksync_user", JSON.stringify(updatedUser))
+    let address = "";
+    let message = "";
 
-      } catch (error) {
-        console.error("프로필 수정 실패:", error)
-        throw error
-      }
-    }
-  }
-
-  const updateLocation = async (latitude: number, longitude: number): Promise<string> => {
-    if (!user) throw new Error("사용자 정보가 없습니다.")
-
-    // ✅ 변경: 쿠키 대신 메모리 토큰 확인 (혹은 isLoggedIn 확인)
-    const token = getGlobalAccessToken()
-    if (!token) throw new Error("토큰이 없습니다. 다시 로그인 해주세요.")
-
-    const fixedLocationData: LocationRequestDto = {
-      latitude: FIXED_LATITUDE,
-      longitude: FIXED_LONGITUDE,
+    if (typeof res === "string") {
+      address = res;
+      message = res;
+    } else if (res && typeof res === "object") {
+      address = res.locationAddress || "";
+      message = res.message || res.locationAddress || "";
     }
 
-    const res = await verifyLocation(fixedLocationData)
-
-    let locationAddress = typeof res === "string" ? res : res.locationAddress ?? res.message ?? "위치 인증 완료"
-    const match = locationAddress.match(/'([^']+)'/)
-    if (match && match[1]) {
-      locationAddress = match[1]
+    // 유저 상태에는 '주소(동이름)'만 저장
+    if (address) {
+      const newUser = { ...user, location: address };
+      updateUserStruct(newUser);
     }
 
-    const locationCode = typeof res === "string" ? "" : res.locationCode ?? ""
-
-    const updatedUser = {
-      ...user,
-      location: locationAddress,
-      latitude: FIXED_LATITUDE,
-      longitude: FIXED_LONGITUDE,
-      locationCode,
-    }
-
-    setUser(updatedUser)
-    localStorage.setItem("cooksync_user", JSON.stringify(updatedUser))
-
-    return locationAddress
-  }
-
-  // --- Logic Helpers ---
-  const toggleLikeRecipe = (recipe: LikedRecipe) => {
-    setLikedRecipes((prev) => {
-      const isAlreadyLiked = prev.some((r) => r.id === recipe.id)
-      const updated = isAlreadyLiked
-          ? prev.filter((r) => r.id !== recipe.id)
-          : [...prev, { ...recipe, savedAt: new Date().toISOString().split("T")[0].replace(/-/g, ".") }]
-      localStorage.setItem("cooksync_liked_recipes", JSON.stringify(updated))
-      return updated
-    })
-  }
-
-  const isRecipeLiked = (recipeId: string) => likedRecipes.some((r) => r.id === recipeId)
-
-  const sendMessage = (recipientId: string, recipientName: string, recipientAvatar: string, content: string) => {
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      recipientId,
-      recipientName,
-      recipientAvatar,
-      content,
-      timestamp: new Date().toISOString(),
-      isRead: false,
-      isSentByMe: true,
-    }
-
-    setMessages((prev) => {
-      const updated = [...prev, newMessage]
-      localStorage.setItem("cooksync_messages", JSON.stringify(updated))
-      return updated
-    })
-
-    setConversations((prev) => {
-      const existingIndex = prev.findIndex((c) => c.recipientId === recipientId)
-      let updated = [...prev]
-      if (existingIndex >= 0) {
-        updated[existingIndex] = { ...updated[existingIndex], lastMessage: content, lastMessageTime: new Date().toISOString() }
-      } else {
-        updated.push({
-          id: Date.now().toString(), recipientId, recipientName, recipientAvatar,
-          lastMessage: content, lastMessageTime: new Date().toISOString(), unreadCount: 0,
-        })
-      }
-      localStorage.setItem("cooksync_conversations", JSON.stringify(updated))
-      return updated
-    })
-  }
-
-  const getMessages = (recipientId: string) => messages.filter((m) => m.recipientId === recipientId)
-
-  const deleteConversation = (recipientId: string) => {
-    setMessages(prev => {
-      const updated = prev.filter(m => m.recipientId !== recipientId)
-      localStorage.setItem("cooksync_messages", JSON.stringify(updated))
-      return updated
-    })
-    setConversations(prev => {
-      const updated = prev.filter(c => c.recipientId !== recipientId)
-      localStorage.setItem("cooksync_conversations", JSON.stringify(updated))
-      return updated
-    })
-  }
-
-  const addUserRecipe = (recipe: Omit<UserRecipe, "id" | "createdAt">) => {
-    const newId = `user-recipe-${Date.now()}`
-    const newRecipe = { ...recipe, id: newId, createdAt: new Date().toISOString() }
-    setUserRecipes(prev => {
-      const updated = [newRecipe, ...prev]
-      localStorage.setItem("cooksync_user_recipes", JSON.stringify(updated))
-      return updated
-    })
-    earnStars(1, "recipe")
-    return newId
-  }
-
-  const updateUserRecipe = (id: string, recipe: Partial<Omit<UserRecipe, "id" | "createdAt">>) => {
-    setUserRecipes(prev => {
-      const updated = prev.map(r => r.id === id ? { ...r, ...recipe } : r)
-      localStorage.setItem("cooksync_user_recipes", JSON.stringify(updated))
-      return updated
-    })
-  }
-
-  const deleteUserRecipe = (id: string) => {
-    setUserRecipes(prev => {
-      const updated = prev.filter(r => r.id !== id)
-      localStorage.setItem("cooksync_user_recipes", JSON.stringify(updated))
-      return updated
-    })
-  }
-
-  const addUserPost = (post: Omit<UserPost, "id" | "createdAt" | "status" | "likes">) => {
-    const newPost: UserPost = { ...post, id: `user-post-${Date.now()}`, createdAt: new Date().toISOString(), status: "available", likes: 0 }
-    setUserPosts(prev => {
-      const updated = [newPost, ...prev]
-      localStorage.setItem("cooksync_user_posts", JSON.stringify(updated))
-      return updated
-    })
-  }
-
-  const updateUserPost = (id: string, post: Partial<Omit<UserPost, "id" | "createdAt">>) => {
-    setUserPosts(prev => {
-      const updated = prev.map(p => p.id === id ? { ...p, ...post } : p)
-      localStorage.setItem("cooksync_user_posts", JSON.stringify(updated))
-      return updated
-    })
-  }
-
-  const deleteUserPost = (id: string) => {
-    setUserPosts(prev => {
-      const updated = prev.filter(p => p.id !== id)
-      localStorage.setItem("cooksync_user_posts", JSON.stringify(updated))
-      return updated
-    })
-  }
-
-  const toggleLikePost = (postOrEvent: React.MouseEvent | UserPost, maybePost?: UserPost) => {
-    if ((postOrEvent as any).stopPropagation) (postOrEvent as React.MouseEvent).stopPropagation()
-    const post = (maybePost ?? postOrEvent) as UserPost
-    setLikedPosts(prev => {
-      const isLiked = prev.some(p => p.id === post.id)
-      const updated = isLiked ? prev.filter(p => p.id !== post.id) : [...prev, { ...post, savedAt: new Date().toISOString() }]
-      localStorage.setItem("cooksync_liked_posts", JSON.stringify(updated))
-      return updated
-    })
-  }
-
-  const isPostLiked = (postId: string) => likedPosts.some(p => p.id === postId)
-
-  const earnStars = (amount: number, reason: "cook" | "recipe"): boolean => {
-    if (!user) return false
-    const today = new Date().toISOString().split("T")[0]
-    let currentTodayStars = user.lastStarDate !== today ? 0 : user.todayStars
-    if (currentTodayStars >= 3) return false
-    const actualAmount = Math.min(amount, 3 - currentTodayStars)
-    if (actualAmount <= 0) return false
-    const updatedUser = { ...user, stars: Math.min(user.stars + actualAmount, 100), todayStars: currentTodayStars + actualAmount, lastStarDate: today }
-    setUser(updatedUser)
-    localStorage.setItem("cooksync_user", JSON.stringify(updatedUser))
-    return true
-  }
-
-  const getStarLevel = () => user ? Math.floor(user.stars / 10) : 0
-
-  const markRecipeAsCompleted = React.useCallback((recipeId: string) => {
-    if (!user?.id) return
-    const key = storageKey("cooksync_completed_recipes", user.id)
-    setCompletedRecipes(prev => {
-      if (prev.has(recipeId)) return prev
-      const updated = new Set(prev).add(recipeId)
-      localStorage.setItem(key, JSON.stringify(Array.from(updated)))
-      return updated
-    })
-  }, [user?.id])
-
-  const markRecipeAsReviewed = (recipeId: string) => {
-    if (!user?.id) return
-    const key = storageKey("cooksync_reviewed_recipes", user.id)
-    setReviewedRecipes(prev => {
-      const updated = new Set(prev).add(recipeId)
-      localStorage.setItem(key, JSON.stringify(Array.from(updated)))
-      return updated
-    })
-  }
-
-  const hasUserReviewedRecipe = (recipeId: string) => reviewedRecipes.has(recipeId)
-
-  const withdraw = async () => {
-    try {
-      await withdrawUser()
-      logout()
-      alert("회원 탈퇴가 완료되었습니다.")
-    } catch (error) {
-      console.error("회원 탈퇴 실패:", error)
-      throw error
-    }
+    // 호출자에게는 구조화된 데이터 리턴
+    return { message, address };
   }
 
   return (
-      <AuthContext.Provider
-          value={{
-            isLoading, // ✅ Added
-            user,
-            isLoggedIn: !!user,
-            login,
-            signup,
-            logout,
-            onSocialLogin, // ✅ [추가] Provide function
-            updateProfile,
-            updateLocation,
-            likedRecipes, toggleLikeRecipe, isRecipeLiked, conversations, sendMessage, getMessages,
-            deleteConversation, userRecipes, addUserRecipe, updateUserRecipe, deleteUserRecipe,
-            userPosts, addUserPost, updateUserPost, deleteUserPost, likedPosts, toggleLikePost,
-            isPostLiked, earnStars, getStarLevel, completedRecipes, markRecipeAsCompleted,
-            reviewedRecipes, markRecipeAsReviewed, hasUserReviewedRecipe, withdraw,
-          }}
-      >
-        {children}
-      </AuthContext.Provider>
+    <AuthContext.Provider value={{ isLoading, user, isLoggedIn: !!user, login, signup: async () => { }, logout, updateProfile: async () => { }, conversations, currentMessages, enterChatRoom, exitChatRoom, startChatFromPost: async () => "", sendMessage, deleteConversation: async () => { }, updateLocation }}>
+      {children}
+    </AuthContext.Provider>
   )
 }
 
 export function useAuth() {
-  const context = React.useContext(AuthContext)
-  if (context === undefined) throw new Error("useAuth must be used within an AuthProvider")
-  return context
+  const context = React.useContext(AuthContext);
+  if (context === undefined) throw new Error("useAuth must be used within an AuthProvider");
+  return context;
 }

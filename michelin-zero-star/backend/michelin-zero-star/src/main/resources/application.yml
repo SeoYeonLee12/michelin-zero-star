@@ -96,4 +96,4 @@ logging:
     root: INFO
     com.michelin0.michelinzerostar: DEBUG
     org.hibernate.SQL: DEBUG
-    org.hibernate.orm.jdbc.bind: TRACE
+    org.hibernate.orm.jdbc.bind: INFO

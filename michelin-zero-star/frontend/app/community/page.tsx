@@ -41,8 +41,8 @@ export default function CommunityPage() {
     )
   }
 
-  // 동네 인증 체크
-  if (!user?.location) {
+  // 동네 인증 체크 (isVerified가 true여야 함)
+  if (!user?.isVerified) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <Navbar />

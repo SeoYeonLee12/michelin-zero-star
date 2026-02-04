@@ -2,15 +2,7 @@ package com.michelin0.michelinzerostar.domain.chat.entity;
 
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.global.domain.BaseTimeEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -31,7 +23,6 @@ public class ChatMessage extends BaseTimeEntity {
     @JoinColumn(name = "room_id", nullable = false)
     private ChatRoom chatRoom;
 
-    // 스키마의 users_id 컬럼과 매핑 (보낸 사람)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "users_id", nullable = false)
     private User sender;
@@ -46,11 +37,11 @@ public class ChatMessage extends BaseTimeEntity {
     private boolean isRead;
 
     @Builder
-    public ChatMessage(ChatRoom chatRoom, User sender, String message, String imageUrl) {
+    public ChatMessage(ChatRoom chatRoom, User sender, String message, String imageUrl, boolean isRead) {
         this.chatRoom = chatRoom;
         this.sender = sender;
         this.message = message;
         this.imageUrl = imageUrl;
-        this.isRead = false;
+        this.isRead = isRead;
     }
 }
