@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.schemas.chat import ChatResponse, RagRequest, QnaRequest
+from app.schemas.chat import ChatResponse, RagRequest, QnaRequest, QnaResponse
 from app.services.rag_service import rag_service
 
 router = APIRouter()
@@ -21,7 +21,7 @@ async def chat_search(request: RagRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # 2. [Q&A] 레시피 상세 질의응답 (상세 페이지)
-@router.post("/qna", response_model=ChatResponse)
+@router.post("/qna", response_model=QnaResponse)
 async def chat_qna(request: QnaRequest):
     try:
         # 서비스 로직 호출
@@ -32,7 +32,7 @@ async def chat_qna(request: QnaRequest):
             chat_history=request.chat_history
         )
         # Q&A는 추천 레시피 없이 답변만 반환
-        return ChatResponse(answer=answer, recommended_recipes=[])
+        return QnaResponse(answer=answer)
     except Exception as e:
         print(f"QnA Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
