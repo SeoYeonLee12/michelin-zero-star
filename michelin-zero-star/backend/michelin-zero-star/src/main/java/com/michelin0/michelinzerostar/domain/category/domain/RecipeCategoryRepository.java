@@ -8,11 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public interface RecipeCategoryRepository extends JpaRepository<RecipeCategory, Long> {
-
-    @Modifying
-    @Transactional
-    void deleteAllByRecipeRecipeId(Long recipeId);
-
+    
     @Modifying
     @Transactional
     void deleteByRecipe(Recipe recipe);
