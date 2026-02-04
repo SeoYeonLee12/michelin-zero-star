@@ -63,14 +63,13 @@ export default function MyPage() {
     user,
     isLoggedIn,
     isLoading, // ✅ 로딩 상태 가져오기
-    likedRecipes,
+    likedRecipes = [],
     toggleLikeRecipe,
-    userRecipes,
+    userRecipes = [],
     // userPosts, // Context에서 제거됨 -> 로컬 State로 대체
     deleteUserRecipe,
     // deleteUserPost, // Context에서 제거됨
-    // updateUserPost, // Context에서 제거됨
-    likedPosts,
+    likedPosts = [],
   } = useAuth()
 
   const [activeTab, setActiveTab] = React.useState("saved")

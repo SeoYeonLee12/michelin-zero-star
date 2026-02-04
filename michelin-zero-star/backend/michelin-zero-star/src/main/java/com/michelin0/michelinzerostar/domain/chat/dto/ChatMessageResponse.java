@@ -9,8 +9,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class ChatMessageResponse {
 
+    private Long roomId; // [Added]
     private Long messageId;
     private Long senderId;
+    private Long recipientId;
     private String senderNickname;
     private String content;
     private String imageUrl;
@@ -18,6 +20,7 @@ public class ChatMessageResponse {
     private boolean isRead;
 
     public ChatMessageResponse(ChatMessage message) {
+        this.roomId = message.getChatRoom().getId();  // [Added]
         this.messageId = message.getId();
         this.senderId = message.getSender().getId();
         this.senderNickname = message.getSender().getNickname();
@@ -25,5 +28,10 @@ public class ChatMessageResponse {
         this.imageUrl = message.getImageUrl();
         this.sendTime = message.getCreatedAt();
         this.isRead = message.isRead();
+
+        // 수신자 ID 계산
+        Long buyerId = message.getChatRoom().getBuyer().getId();
+        Long sellerId = message.getChatRoom().getSeller().getId();
+        this.recipientId = this.senderId.equals(buyerId) ? sellerId : buyerId;
     }
 }

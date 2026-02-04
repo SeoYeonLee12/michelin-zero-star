@@ -200,13 +200,25 @@ public class UserService {
                 .map(ufc -> ufc.getCategory().getCategoryName())
                 .collect(Collectors.toList());
 
+        // 프로필 정보 조회 (위치/인증 정보 포함용)
+        UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
+
         // 응답 DTO 반환
-        return UserResponseDto.builder()
+        UserResponseDto.UserResponseDtoBuilder builder = UserResponseDto.builder()
                 .id(user.getId())
                 .email(user.getEmail())
                 .nickname(user.getNickname())
                 .profileImageUrl(user.getProfileImageUrl())
                 .categories(categories) // ★ 업데이트된 카테고리 목록 포함
-                .build();
+                .socialProvider(user.getSocialProvider())
+                .totalStar(user.getTotalStar())
+                .role(user.getRole());
+
+        if (profile != null) {
+            builder.location(profile.getLocationAddress())
+                    .isVerified(profile.isVerified());
+        }
+
+        return builder.build();
     }
 }

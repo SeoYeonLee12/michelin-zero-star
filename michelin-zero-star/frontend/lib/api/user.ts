@@ -16,6 +16,7 @@ export type MeResponse = {
   totalStar?: number // ✅ 추가
   todayStars?: number
   lastStarDate?: string
+  isVerified?: boolean
 }
 
 export function getMe() {

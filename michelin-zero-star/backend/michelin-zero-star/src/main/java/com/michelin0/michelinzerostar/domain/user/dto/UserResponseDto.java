@@ -26,6 +26,8 @@ public class UserResponseDto {
 
     private SocialProvider socialProvider;
     private String location;
+
+    @com.fasterxml.jackson.annotation.JsonProperty("isVerified")
     private boolean isVerified;
     private List<String> categories;
 
