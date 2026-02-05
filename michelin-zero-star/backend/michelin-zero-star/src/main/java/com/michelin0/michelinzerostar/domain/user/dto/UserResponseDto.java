@@ -23,6 +23,7 @@ public class UserResponseDto {
     private UserRole role;
 
     private Double totalStar;
+    private Double todayStars;
 
     private SocialProvider socialProvider;
     private String location;
@@ -38,5 +39,10 @@ public class UserResponseDto {
         this.role = user.getRole();
         this.totalStar = user.getTotalStar();
         this.socialProvider = user.getSocialProvider();
+        this.todayStars = 0.0; // Default value, should be set by service
+    }
+
+    public void setTodayStars(Double todayStars) {
+        this.todayStars = todayStars;
     }
 }

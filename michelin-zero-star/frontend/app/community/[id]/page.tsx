@@ -265,13 +265,13 @@ export default function CommunityDetailPage() {
     <div className="flex min-h-screen flex-col bg-background">
       <Navbar />
       <ScrollToTop />
-      <main className="flex-1 container mx-auto max-w-4xl px-4 py-8">
-        <Button variant="ghost" size="sm" className="mb-4" onClick={() => router.push("/community")}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
+      <main className="flex-1 container mx-auto max-w-4xl px-4 py-4">
+        <Button variant="ghost" size="sm" className="mb-4 bg-transparent hover:bg-transparent active:bg-transparent focus:bg-transparent" onClick={() => router.push("/community")}>
+          <ArrowLeft className="h-4 w-4 mr-0" />
           목록으로
         </Button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           {/* Left - Image */}
           <div className="space-y-4">
             <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted">

@@ -253,15 +253,15 @@ export default function CommunityPage() {
                   fill
                   className="object-cover transition-transform group-hover:scale-105"
                 />
-                {share.isMyPost && (
-                  <div className="absolute top-2 left-2 z-10">
-                    <Badge className="bg-[#800020] text-white hover:bg-[#800020]">내 나눔</Badge>
-                  </div>
-                )}
                 {share.status === "completed" && (
                   <div className="absolute inset-0 bg-black/60 z-10 flex flex-col items-center justify-center text-white">
                     <CheckCircle className="w-8 h-8 mb-2" />
                     <span className="text-lg font-bold">거래 완료</span>
+                  </div>
+                )}
+                {share.isMyPost && (
+                  <div className="absolute bottom-2 left-2 z-20">
+                    <Badge className="bg-[#800020] text-white hover:bg-[#800020]">내 나눔</Badge>
                   </div>
                 )}
               </div>
@@ -278,12 +278,6 @@ export default function CommunityPage() {
                 <span>·</span>
                 <span>{share.timeAgo}</span>
               </div>
-
-              {share.isMyPost && (
-                <div className="absolute top-2 left-2 bg-[#800020] text-white text-[10px] px-2 py-0.5 rounded-full font-medium z-10 shadow-sm">
-                  내 나눔글
-                </div>
-              )}
             </div>
           ))}
         </div>

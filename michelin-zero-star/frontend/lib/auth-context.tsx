@@ -148,6 +148,7 @@ interface AuthContextType {
   markRecipeAsReviewed: (recipeId: string) => void
   hasUserReviewedRecipe: (recipeId: string) => boolean
   withdraw: () => Promise<void>
+  refreshUser: () => Promise<void> // ✅ Added
 }
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined)
@@ -671,16 +672,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const refreshUser = async () => {
+    try {
+      const me = await getMe()
+      console.log("DEBUG: refreshUser fetched me:", me)
+      console.log("DEBUG: todayStars from backend:", me.todayStars)
+
+      const newUser: User = {
+        ...me,
+        id: String(me.id),
+        stars: me.stars ?? (me as any).stars ?? 0,
+        totalStar: me.totalStar ?? (me as any).total_star ?? 0,
+        todayStars: me.todayStars ?? (me as any).today_stars ?? 0,
+        lastStarDate: me.lastStarDate ?? (me as any).last_star_date ?? new Date().toISOString().split("T")[0],
+      }
+      setUser(newUser)
+      localStorage.setItem("cooksync_user", JSON.stringify(newUser))
+    } catch (error) {
+      console.error("Failed to refresh user data:", error)
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
-        isLoading, // ✅ Added
+        isLoading,
         user, isLoggedIn: !!user, login, signup, logout, updateProfile, updateLocation,
         likedRecipes, toggleLikeRecipe, isRecipeLiked, conversations, sendMessage, getMessages,
         deleteConversation, userRecipes, addUserRecipe, updateUserRecipe, deleteUserRecipe,
         userPosts, addUserPost, updateUserPost, deleteUserPost, likedPosts, toggleLikePost,
         isPostLiked, earnStars, getStarLevel, completedRecipes, markRecipeAsCompleted,
         reviewedRecipes, markRecipeAsReviewed, hasUserReviewedRecipe, withdraw,
+        refreshUser, // ✅ Added
       }}
     >
       {children}
