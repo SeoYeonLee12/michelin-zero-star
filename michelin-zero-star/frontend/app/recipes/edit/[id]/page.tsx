@@ -670,61 +670,60 @@ export default function EditRecipePage() {
                     />
                   </div>
                 </div>
+
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentStepIndex((prev) => Math.min(steps.length - 1, prev + 1))}
+                  disabled={currentStepIndex === steps.length - 1}
+                  className="shrink-0"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
 
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setCurrentStepIndex((prev) => Math.min(steps.length - 1, prev + 1))}
-                disabled={currentStepIndex === steps.length - 1}
-                className="shrink-0"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+              <div className="flex justify-center gap-2 mt-4">
+                {steps.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentStepIndex(index)}
+                    className={cn(
+                      "w-2 h-2 rounded-full transition-all",
+                      index === currentStepIndex
+                        ? "bg-[#800020] w-6"
+                        : "bg-muted-foreground/30 hover:bg-muted-foreground/50",
+                    )}
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
-            <div className="flex justify-center gap-2 mt-4">
-              {steps.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentStepIndex(index)}
-                  className={cn(
-                    "w-2 h-2 rounded-full transition-all",
-                    index === currentStepIndex
-                      ? "bg-[#800020] w-6"
-                      : "bg-muted-foreground/30 hover:bg-muted-foreground/50",
-                  )}
-                />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="flex justify-end gap-4">
-          <Button variant="outline" onClick={() => router.back()} className="bg-transparent">
-            취소
-          </Button>
-          <Button onClick={handleSubmitClick} className="bg-[#800020] hover:bg-[#800020]/90">
-            저장
-          </Button>
+          <div className="flex justify-end gap-4">
+            <Button variant="outline" onClick={() => router.back()} className="bg-transparent">
+              취소
+            </Button>
+            <Button onClick={handleSubmitClick} className="bg-[#800020] hover:bg-[#800020]/90">
+              저장
+            </Button>
+          </div>
         </div>
-    </div>
       </main >
 
-    <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>레시피 수정</AlertDialogTitle>
-          <AlertDialogDescription>변경사항을 저장하시겠습니까?</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>아니오</AlertDialogCancel>
-          <AlertDialogAction onClick={handleConfirmSubmit} className="bg-[#800020] hover:bg-[#800020]/90">
-            예
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>레시피 수정</AlertDialogTitle>
+            <AlertDialogDescription>변경사항을 저장하시겠습니까?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>아니오</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSubmit} className="bg-[#800020] hover:bg-[#800020]/90">
+              예
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div >
   )
 }

@@ -13,12 +13,14 @@ import { ChatMessageList } from "@/components/ui/chat-message-list"
 import { ChatBubble, ChatBubbleAvatar, ChatBubbleMessage } from "@/components/ui/chat-bubble"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { searchRecipes, leftoverRecipes } from "@/lib/dummy-data"
-import type { Recipe, ChatMessage } from "@/lib/types"
+import { leftoverRecipes } from "@/lib/dummy-data"
+import type { Recipe, ChatMessage } from "@/lib/types" // Ensure ChatMessage type is compatible or updated
 import { useAuth } from "@/lib/auth-context"
 import { ArrowLeft, Clock, Users, Flame } from "lucide-react"
 import Image from "next/image"
 import { MichelinIcon } from "@/components/common/MichelinIcon"
+import { getAiChatHistory, type AiChatHistoryDto } from "@/lib/api/chat"
+import { formatDate } from "date-fns" // Assuming date-fns usage
 
 const suggestedPrompts = ["잡채 레시피 알려줘", "매콤한게 땡기는데 먹을만한 거 추천해줘", "매운 오징어 요리 찾아줘", "양파로 만들 수 있는 요리 알려줘"]
 
@@ -26,7 +28,7 @@ type ViewState = "chat" | "recommendations" | "detail" | "cooking"
 
 export default function HomePage() {
   const router = useRouter()
-  const { user, isLoggedIn } = useAuth()
+  const { user, isLoggedIn, subscribeToAiChat, unsubscribeFromAiChat, sendAiMessage } = useAuth()
   const [messages, setMessages] = React.useState<ChatMessage[]>([])
   const [viewState, setViewState] = React.useState<ViewState>("chat")
   const [selectedRecipe, setSelectedRecipe] = React.useState<Recipe | null>(null)
@@ -48,6 +50,114 @@ export default function HomePage() {
     location: isLoggedIn && user?.location ? user.location : "위치 미등록",
   }
 
+  // --- WebSocket & History ---
+  React.useEffect(() => {
+    // 1. Initial History Load
+    const loadHistory = async () => {
+      if (!isLoggedIn) return
+      try {
+        const history = await getAiChatHistory()
+        const formatted: ChatMessage[] = history.flatMap((item, idx) => {
+          const msgs: ChatMessage[] = []
+          if (item.content) {
+            msgs.push({
+              id: `hist-${idx}-user`,
+              role: "user",
+              content: item.content,
+              timestamp: new Date(item.sendDate)
+            })
+          }
+          if (item.answer) {
+            // Transform recommended recipes to Recipe type
+            const recs: Recipe[] = (item.recommended_recipes || item.recommendedRecipes || []).map((r: any) => ({
+              id: String(r.recipes_id || r.id),
+              name: r.title,
+              thumbnail: r.main_image_url || r.image,
+              duration: r.cook_time ? Number(r.cook_time) : 0,
+              servings: r.servings ? Number(r.servings) : 1,
+              calories: r.calories ? Number(r.calories) : 0,
+              difficulty: "중급",
+              likes: 0,
+              isLiked: false,
+              tags: r.tags || [],
+              ingredients: [],
+              steps: []
+            }))
+
+            msgs.push({
+              id: `hist-${idx}-ai`,
+              role: "assistant",
+              content: item.answer,
+              timestamp: new Date(item.sendDate),
+              recipes: recs.length > 0 ? recs : undefined
+            })
+          }
+          return msgs
+        })
+        setMessages(formatted)
+
+        // If last message has recipes, show them
+        const lastMsg = formatted[formatted.length - 1];
+        if (lastMsg && lastMsg.role === "assistant" && lastMsg.recipes && lastMsg.recipes.length > 0) {
+          setCurrentRecipes(lastMsg.recipes)
+          setViewState("recommendations")
+        }
+      } catch (e: any) {
+        // Gracefully handle missing endpoint (404) - backend not implemented yet
+        if (e?.message?.includes("Not Found") || e?.status === 404) {
+          console.warn("⚠️ Chat history endpoint not available yet (/api/chat). Starting fresh.")
+        } else {
+          console.error("Failed to load history", e)
+        }
+      }
+    }
+    loadHistory()
+
+    // 2. Subscribe to AI Chat using AuthContext WebSocket
+    if (user && isLoggedIn) {
+      subscribeToAiChat(user.id, (body: any) => {
+        setIsLoading(false) // Stop loading on receive
+
+        // Handle both field names: content (no recipe) or answer (with recipe)
+        const aiText = body.answer || body.content || "답변을 불러올 수 없습니다."
+
+        const recs: Recipe[] = (body.recommended_recipes || body.recommendedRecipes || []).map((r: any) => ({
+          id: String(r.recipes_id || r.id),
+          name: r.title,
+          thumbnail: r.main_image_url || r.image,
+          duration: r.cook_time ? Number(r.cook_time) : 0,
+          servings: r.servings ? Number(r.servings) : 1,
+          calories: r.calories ? Number(r.calories) : 0,
+          difficulty: "중급",
+          likes: 0,
+          isLiked: false,
+          tags: r.tags || [],
+          ingredients: [],
+          steps: []
+        }))
+
+        const aiMsg: ChatMessage = {
+          id: `live-${Date.now()}`,
+          role: "assistant",
+          content: aiText,
+          timestamp: new Date(),
+          recipes: recs.length > 0 ? recs : undefined
+        }
+
+        setMessages(prev => [...prev, aiMsg])
+        if (recs.length > 0) {
+          setCurrentRecipes(recs)
+          setViewState("recommendations")
+        }
+      })
+
+      // Cleanup on unmount
+      return () => {
+        unsubscribeFromAiChat()
+      }
+    }
+  }, [isLoggedIn, user, subscribeToAiChat, unsubscribeFromAiChat])
+
   React.useEffect(() => {
     if (chatContainerRef.current && messages.length > 0) {
       setTimeout(() => {
@@ -57,68 +167,50 @@ export default function HomePage() {
         })
       }, 100)
     }
-  }, [messages])
+  }, [messages, viewState]) // trigger on viewState change too (e.g. switching back to chat)
 
+  // Animation Effect (Keep existing)
   React.useEffect(() => {
     if (viewState !== "chat") {
       animationRef.current = false
       return
     }
-
     animationRef.current = true
-
     const runAnimation = async () => {
       const tags = ["#tag-korean", "#tag-quick", "#tag-healthy", "#tag-comfort"]
-
       while (animationRef.current) {
         for (const tag of tags) {
           if (!animationRef.current) break
-
           try {
             await animate("#pointer", { x: 0, y: 0 }, { duration: 0 })
-
             const tagEl = scope.current?.querySelector(tag)
             if (!tagEl || !scope.current || !animationRef.current) continue
-
             const tagRect = tagEl.getBoundingClientRect()
             const scopeRect = scope.current.getBoundingClientRect()
-
-            await animate(
-              "#pointer",
-              {
-                x: tagRect.left - scopeRect.left + tagRect.width / 2 - 10,
-                y: tagRect.top - scopeRect.top + tagRect.height / 2 - 10,
-              },
-              { duration: 0.5, ease: "easeInOut" },
-            )
-
+            await animate("#pointer", {
+              x: tagRect.left - scopeRect.left + tagRect.width / 2 - 10,
+              y: tagRect.top - scopeRect.top + tagRect.height / 2 - 10,
+            }, { duration: 0.5, ease: "easeInOut" })
             if (!animationRef.current) break
-
             await animate(tag, { opacity: 1, scale: 1.05 }, { duration: 0.2 })
-
             await new Promise((resolve) => setTimeout(resolve, 800))
-
             if (!animationRef.current) break
-
             await animate(tag, { opacity: 0.5, scale: 1 }, { duration: 0.2 })
-          } catch {
-            break
-          }
+          } catch { break }
         }
       }
     }
-
-    const timer = setTimeout(() => {
-      runAnimation()
-    }, 100)
-
+    const timer = setTimeout(() => { runAnimation() }, 100)
     return () => {
       animationRef.current = false
       clearTimeout(timer)
     }
   }, [animate, scope, viewState])
 
+
   const handleSendMessage = (message: string, image?: string) => {
+    if (!message.trim()) return
+
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: "user",
@@ -128,20 +220,11 @@ export default function HomePage() {
     setMessages((prev) => [...prev, userMessage])
     setIsLoading(true)
 
-    setTimeout(() => {
-      const matchedRecipes = searchRecipes(message)
-      const aiMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `"${message || "이미지"}"에 대한 추천 레시피 ${matchedRecipes.length}가지를 찾았어요!`,
-        timestamp: new Date(),
-        recipes: matchedRecipes,
-      }
-      setMessages((prev) => [...prev, aiMessage])
-      setCurrentRecipes(matchedRecipes)
-      setViewState("recommendations")
-      setIsLoading(false)
-    }, 1000)
+    // Use AuthContext's WebSocket to send AI message
+    sendAiMessage(message)
+
+    // Switch to recommendations view to show split layout
+    setViewState("recommendations")
   }
 
   const handleSelectRecipe = (recipe: Recipe) => {
@@ -164,9 +247,14 @@ export default function HomePage() {
     } else if (viewState === "detail") {
       setViewState("recommendations")
     } else if (viewState === "recommendations") {
+      // Logic to go back to initial state? 
+      // Usually users want to go back to 'initial' large search if they clear everything
+      // But button says 'Back'.
+      // If we go back from split view, maybe we go to home?
+      // Let's keep it simple:
       setViewState("chat")
-      setMessages([])
-      setCurrentRecipes([])
+      // setMessages([]) // Keep history?
+      // setCurrentRecipes([]) 
     }
   }
 
@@ -202,27 +290,11 @@ export default function HomePage() {
           {/* Back Button */}
           {viewState !== "chat" && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-              {/* <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleBack}
-                  className="mb-4 text-muted-foreground hover:text-foreground hover:bg-accent"
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4 hover" />
-                  뒤로 가기
-                </Button> */}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleBack}
-                className="
-                    mb-4
-                    text-muted-foreground
-                    hover:text-foreground
-                    hover:bg-transparent
-                    focus-visible:ring-0
-                    focus-visible:ring-offset-0
-                  "
+                className="mb-4 text-muted-foreground hover:text-foreground hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
               >
                 <ArrowLeft className="mr-0 h-4 w-4" />
                 뒤로 가기
@@ -233,7 +305,7 @@ export default function HomePage() {
           {/* Status Badge */}
           <div className="mb-0 flex justify-center"></div>
 
-          {/* Chat View */}
+          {/* Chat View (Initial Large Search) */}
           {viewState === "chat" && (
             <div className="space-y-8">
               <div className="relative min-h-[400px] flex flex-col lg:flex-row items-center justify-center gap-6 lg:gap-12 p-8 lg:p-10">
@@ -258,6 +330,7 @@ export default function HomePage() {
 
                   </div>
 
+                  {/* Tags Animation */}
                   <div
                     id="tag-korean"
                     className="absolute bottom-12 left-6 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-600 opacity-50"
@@ -372,6 +445,7 @@ export default function HomePage() {
             </div>
           )}
 
+          {/* Recommendations View (Split Screen) */}
           {viewState === "recommendations" && (
             <motion.div
               initial={{ opacity: 0, y: 40 }}
@@ -379,6 +453,7 @@ export default function HomePage() {
               transition={{ duration: 0.5, type: "spring", stiffness: 100, damping: 15 }}
               className="h-[calc(100vh-180px)] flex gap-6"
             >
+              {/* Left: Chat History */}
               <div className="w-1/2 flex flex-col border-r pr-6">
                 <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
                   <ChatMessageList smooth>
@@ -422,67 +497,52 @@ export default function HomePage() {
                 </div>
               </div>
 
+              {/* Right: Recipe Cards */}
               <div className="w-1/2 overflow-y-auto px-2 py-2">
                 <div className="mb-4">
                   <h3 className="text-lg font-semibold text-foreground">추천 레시피</h3>
                   <p className="text-sm text-muted-foreground">클릭하여 상세 정보를 확인하세요</p>
                 </div>
                 <div className="grid grid-cols-1 gap-4">
-                  {currentRecipes.map((recipe) => (
-                    <Card
-                      key={recipe.id}
-                      onClick={() => handleSelectRecipe(recipe)}
-                      className="cursor-pointer group overflow-hidden transition-all hover:shadow-lg hover:ring-2 hover:ring-[#800020]/30
-                      p-0"
-                    >
-                      <div className="flex items-center gap-5 px-4 py-3">
-                        {/* 이미지 영역 - 크기 더 증가 */}
-                        <div className="relative w-44 aspect-[4/3] shrink-0 overflow-hidden rounded-lg">
-                          <img
-                            src={recipe.thumbnail || "/placeholder.svg"}
-                            alt={recipe.name}
-                            className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                          />
-                        </div>
-
-                        {/* Content - 균일한 세로 간격 */}
-                        <div className="flex flex-col justify-center gap-2">
-                          {/* 레시피명 크기 더 증가 */}
-                          <h4 className="font-bold text-xl leading-snug line-clamp-2">{recipe.name}</h4>
-
-                          {/* 태그 표시 */}
-                          <div className="flex flex-wrap gap-1.5">
-                            {recipe.tags?.slice(0, 3).map((tag) => (
-                              <span
-                                key={tag}
-                                className="text-xs text-[#800020] font-medium"
-                              >
-                                #{tag}
-                              </span>
-                            ))}
+                  {currentRecipes.length > 0 ? (
+                    currentRecipes.map((recipe) => (
+                      <Card
+                        key={recipe.id}
+                        onClick={() => handleSelectRecipe(recipe)}
+                        className="cursor-pointer group overflow-hidden transition-all hover:shadow-lg hover:ring-2 hover:ring-[#800020]/30 p-0"
+                      >
+                        <div className="flex items-center gap-5 px-4 py-3">
+                          <div className="relative w-44 aspect-[4/3] shrink-0 overflow-hidden rounded-lg">
+                            <img
+                              src={recipe.thumbnail || "/placeholder.svg"}
+                              alt={recipe.name}
+                              className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                            />
                           </div>
-
-                          {/* 조리시간, 인분 수, 칼로리 정보 */}
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
-                              {recipe.duration}분
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Users className="h-4 w-4" />
-                              {recipe.servings}인분
-                            </span>
-                            {recipe.calories && (
-                              <span className="flex items-center gap-1">
-                                <Flame className="h-4 w-4" />
-                                {recipe.calories}kcal
-                              </span>
-                            )}
+                          <div className="flex flex-col justify-center gap-2">
+                            <h4 className="font-bold text-xl leading-snug line-clamp-2">{recipe.name}</h4>
+                            <div className="flex flex-wrap gap-1.5">
+                              {recipe.tags?.slice(0, 3).map((tag) => (
+                                <span key={tag} className="text-xs text-[#800020] font-medium">#{tag}</span>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <span className="flex items-center gap-1"><Clock className="h-4 w-4" />{recipe.duration}분</span>
+                              <span className="flex items-center gap-1"><Users className="h-4 w-4" />{recipe.servings}인분</span>
+                              {recipe.calories && (
+                                <span className="flex items-center gap-1"><Flame className="h-4 w-4" />{recipe.calories}kcal</span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </Card>
-                  ))}
+                      </Card>
+                    ))
+                  ) : (
+                    <div className="text-center text-muted-foreground py-10">
+                      <p>추천된 레시피가 없습니다.</p>
+                      <p className="text-sm">AI에게 다른 요리를 물어보세요!</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -520,7 +580,6 @@ export default function HomePage() {
         </div>
       </main>
 
-      {/* Complete Dialog */}
       <CompleteCookDialog
         open={showCompleteDialog}
         onOpenChange={setShowCompleteDialog}

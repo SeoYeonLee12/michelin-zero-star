@@ -26,7 +26,9 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className={`font-sans antialiased scroll-smooth`}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         <Analytics />
       </body>
     </html>

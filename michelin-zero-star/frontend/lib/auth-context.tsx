@@ -172,6 +172,12 @@ interface AuthContextType {
   hasUserReviewedRecipe: (recipeId: string) => boolean
 
   refreshUser: () => Promise<void> // ✅ Added
+
+  // AI Chatbot WebSocket
+  subscribeToAiChat: (userId: string, callback: (message: any) => void) => void
+  unsubscribeFromAiChat: () => void
+  sendAiMessage: (content: string) => void
+  getStompClient: () => Client | null
 }
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined)
@@ -353,6 +359,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     subscriptions.current.set("user-global", sub);
   }
+
+  // --- AI Chatbot Functions ---
+  const subscribeToAiChat = (userId: string, callback: (message: any) => void) => {
+    if (!stompClient.current?.connected || subscriptions.current.has("ai-chat")) {
+      console.warn("⚠️ Cannot subscribe to AI chat: WebSocket not connected or already subscribed");
+      return;
+    }
+
+    console.log(`🤖 [Subscribe-AI] Topic: /topic/global/${userId}`);
+
+    const sub = stompClient.current.subscribe(`/topic/global/${userId}`, (message: IMessage) => {
+      try {
+        const body = JSON.parse(message.body);
+        console.log("📨 [AI-Chat] Received:", body);
+        callback(body);
+      } catch (e) {
+        console.error("Failed to parse AI message", e);
+      }
+    });
+
+    subscriptions.current.set("ai-chat", sub);
+  };
+
+  const unsubscribeFromAiChat = () => {
+    const sub = subscriptions.current.get("ai-chat");
+    if (sub) {
+      sub.unsubscribe();
+      subscriptions.current.delete("ai-chat");
+      console.log("🤖 [Unsubscribe-AI] AI Chat unsubscribed");
+    }
+  };
+
+  const sendAiMessage = (content: string) => {
+    if (!stompClient.current?.connected) {
+      console.error("❌ Cannot send AI message: WebSocket not connected");
+      return;
+    }
+
+    const token = getGlobalAccessToken();
+    if (!token) {
+      console.error("❌ Cannot send AI message: No auth token");
+      return;
+    }
+
+    try {
+      stompClient.current.publish({
+        destination: "/app/common/ask",
+        body: JSON.stringify({ content }),
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      console.log("✅ [AI-Chat] Message sent:", content);
+    } catch (error) {
+      console.error("❌ [AI-Chat] Failed to send message:", error);
+    }
+  };
+
+  const getStompClient = () => stompClient.current;
+
 
   const fetchConversations = async () => {
     try {
@@ -905,6 +969,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         reviewedRecipes, markRecipeAsReviewed, hasUserReviewedRecipe, withdraw,
         refreshUser, // ✅ Added
         isChatLoaded, // ✅ Added
+        // AI Chatbot
+        subscribeToAiChat, unsubscribeFromAiChat, sendAiMessage, getStompClient
       }}
     >
       {isLoading ? null : children}
