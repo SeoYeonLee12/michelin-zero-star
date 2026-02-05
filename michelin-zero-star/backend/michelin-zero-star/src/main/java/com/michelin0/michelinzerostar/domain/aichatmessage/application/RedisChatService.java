@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiToUserResponse;
 import com.michelin0.michelinzerostar.domain.aichatmessage.application.command.RedisChatSaveCommand;
 import com.michelin0.michelinzerostar.domain.aichatmessage.domain.enums.SenderType;
+import com.michelin0.michelinzerostar.global.exception.errorcode.InternalServerErrorCode;
+import com.michelin0.michelinzerostar.global.exception.exception.GlobalException;
 import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
@@ -29,14 +31,12 @@ public class RedisChatService {
                 LocalDateTime.now(),
                 content
         );
-
         try {
             String jsonValue = objectMapper.writeValueAsString(command);
             redisTemplate.opsForList().rightPush(key, jsonValue);
             redisTemplate.expire(key, GLOBAL_CHAT_TTL, TimeUnit.DAYS);
-        } catch (Exception e) {
-            log.error("Redis 저장 중 JSON 변환 에러: {}", e.getMessage());
-            throw new RuntimeException("Redis Save Error", e);
+        } catch (JsonProcessingException e) {
+            throw new GlobalException(InternalServerErrorCode.JSON_SERIALIZATION_ERROR);
         }
     }
 
@@ -48,13 +48,13 @@ public class RedisChatService {
                 response.sendDate(),
                 response.content()
         );
-
         try {
             String jsonValue = objectMapper.writeValueAsString(command);
             redisTemplate.opsForList().rightPush(key, jsonValue);
             redisTemplate.expire(key, GLOBAL_CHAT_TTL, TimeUnit.DAYS);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException("Redis AI Message Save Error", e);
+            throw new GlobalException(InternalServerErrorCode.JSON_SERIALIZATION_ERROR);
         }
     }
+
 }
