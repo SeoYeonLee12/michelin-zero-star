@@ -511,17 +511,10 @@ function CommunityNewForm() {
 
                 <div className="flex gap-3 mt-4">
                   <Button
-                    variant="outline"
-                    className="flex-1 bg-transparent"
-                    onClick={() => setShowSuccessDialog(false)}
-                  >
-                    계속 등록하기
-                  </Button>
-                  <Button
                     className="flex-1 bg-[#800020] hover:bg-[#800020]/90 text-white font-semibold shadow-sm"
                     onClick={handleViewPost}
                   >
-                    내 게시글 보기
+                    게시글 목록보기
                   </Button>
                 </div>
               </div>

@@ -150,7 +150,10 @@ export async function apiFetch<T = unknown>(
       }
     }
 
-    throw new Error(message)
+    const errorObj: any = new Error(message)
+    errorObj.status = res.status
+    errorObj.payload = payload
+    throw errorObj
   }
 
   return (parsed ?? (raw as unknown)) as T

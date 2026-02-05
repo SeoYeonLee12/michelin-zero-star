@@ -165,21 +165,21 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
       # [Hybrid Merge] Localhost value with Remote Variable Name
-      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api/v1
-      - WATCHPACK_POLLING=true
-      - CHOKIDAR_USEPOLLING=true
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
+      - NEXT_PUBLIC_API_BASE_URL=https://i14b208.p.ssafy.io/api/v1
+      # Localhost WebSocket URL is handled dynamically in client, but for server-side render we might need this
+      - NEXT_PUBLIC_WS_URL=wss://i14b208.p.ssafy.io/ws-stomp
+    # volumes:  <-- PROD: Remove source mount
+    #   - ./frontend:/app
+    #   - /app/node_modules
+    #   - /app/.next
     networks:
       - mzs-network
     depends_on:
       - backend
-    command: npm run dev -- --webpack -H 0.0.0.0 -p 3000
+    # command: npm run dev ... <-- PROD: Remove command, use Dockerfile CMD
 
 #===============================================#
 # Network & Volume Definition

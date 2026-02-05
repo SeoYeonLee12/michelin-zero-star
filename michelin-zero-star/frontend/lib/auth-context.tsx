@@ -454,6 +454,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       totalStar: me.totalStar ?? (me as any).total_star ?? 0,
       todayStars: me.todayStars ?? (me as any).today_stars ?? 0,
       lastStarDate: me.lastStarDate ?? (me as any).last_star_date ?? new Date().toISOString().split("T")[0],
+      categories: me.categories, // ✅ Added categories mapping
     }
     setUser(newUser)
     sessionStorage.setItem("cooksync_user", JSON.stringify(newUser))

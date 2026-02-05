@@ -59,8 +59,6 @@ export default function ProfileEditPage() {
     name: user?.name || "",
     nickname: user?.nickname || "",
     email: user?.email || "",
-    bio: user?.bio || "",
-    location: user?.location || "",
     categories: [] as string[],
   })
 
@@ -84,7 +82,7 @@ export default function ProfileEditPage() {
         name: user.name,
         nickname: user.nickname || "",
         email: user.email,
-        bio: user.bio || "",
+        location: user.location || "",
         location: user.location || "",
         categories: user.categories || [],
       })
@@ -351,16 +349,7 @@ export default function ProfileEditPage() {
               </div>
 
               {/* Preferred Categories  */}
-              <div className="space-y-2">
-                <Label htmlFor="bio">자기소개</Label>
-                <Textarea
-                  id="bio"
-                  value={formData.bio}
-                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                  placeholder="나를 소개하는 한마디"
-                  className="resize-none"
-                />
-              </div>
+
 
               {/* 선호 카테고리 */}
               <div className="space-y-3 pt-2">

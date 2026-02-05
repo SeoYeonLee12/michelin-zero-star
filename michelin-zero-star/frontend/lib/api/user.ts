@@ -16,6 +16,7 @@ export type MeResponse = {
   totalStar?: number // ✅ 추가
   todayStars?: number
   lastStarDate?: string
+  categories?: string[] // ✅ 추가: 관심 카테고리 목록
   isVerified?: boolean
 }
 
