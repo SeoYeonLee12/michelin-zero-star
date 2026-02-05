@@ -50,6 +50,7 @@ interface RecipeStep {
     duration?: boolean
     image?: boolean
   }
+  imageErrorMessage?: string // New
 }
 
 interface Ingredient {
@@ -115,7 +116,12 @@ function NewRecipeForm() {
   const [ingredientError, setIngredientError] = useState(false)
   const [tagError, setTagError] = useState(false)
   const [titleError, setTitleError] = useState(false)
+  const [titleErrorMessage, setTitleErrorMessage] = useState("") // New: Support specific messages
   const [thumbnailError, setThumbnailError] = useState(false)
+  const [thumbnailErrorMessage, setThumbnailErrorMessage] = useState("") // New
+  const [fileTypeWarning, setFileTypeWarning] = useState<string | null>(null) // New
+  const [servingsError, setServingsError] = useState<string | null>(null) // New
+  const [timeError, setTimeError] = useState(false) // New
   const [createdRecipeId, setCreatedRecipeId] = useState<number | null>(null)
 
   // ✅ Fetch data if Edit Mode
@@ -190,8 +196,16 @@ function NewRecipeForm() {
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      if (!file.type.startsWith("image/")) {
+        setThumbnailError(true)
+        setThumbnailErrorMessage("이미지 파일만 업로드할 수 있습니다.")
+        e.target.value = "" // Reset input
+        return
+      }
       setThumbnail(file)
       setThumbnailPreview(URL.createObjectURL(file))
+      setThumbnailError(false)
+      setThumbnailErrorMessage("")
     }
   }
 
@@ -203,9 +217,28 @@ function NewRecipeForm() {
   const handleStepImageChange = (stepId: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      if (!file.type.startsWith("image/")) {
+        setSteps(
+          steps.map((step) =>
+            step.id === stepId
+              ? { ...step, imageErrorMessage: "이미지 파일만 업로드할 수 있습니다.", errors: { ...step.errors, image: true } }
+              : step,
+          ),
+        )
+        e.target.value = ""
+        return
+      }
       setSteps(
         steps.map((step) =>
-          step.id === stepId ? { ...step, image: file, imagePreview: URL.createObjectURL(file) } : step,
+          step.id === stepId
+            ? {
+              ...step,
+              image: file,
+              imagePreview: URL.createObjectURL(file),
+              imageErrorMessage: "", // Clear error
+              errors: { ...step.errors, image: false },
+            }
+            : step,
         ),
       )
     }
@@ -308,6 +341,14 @@ function NewRecipeForm() {
   const handleSubmitClick = () => {
     let isValid = true
 
+    // Clear previous errors
+    setIngredientError(false)
+    setTagError(false)
+    setTitleError(false)
+    setThumbnailError(false)
+    setTimeError(false)
+    setServingsError(null)
+
     if (ingredients.length === 0) {
       setIngredientError(true)
       isValid = false
@@ -318,18 +359,27 @@ function NewRecipeForm() {
       isValid = false
     }
 
+    if (totalCookingTime === 0) {
+      setTimeError(true)
+      isValid = false
+    }
+
+    const servingsNum = Number(servings)
+    if (!servings || servingsNum < 1 || servingsNum > 100) {
+      setServingsError("인분 수는 1에서 100 사이여야 합니다.")
+      isValid = false
+    }
+
     if (!title) {
       setTitleError(true)
+      setTitleErrorMessage("레시피 제목을 입력해주세요")
       isValid = false
-    } else {
-      setTitleError(false)
     }
 
     if (!thumbnailPreview) {
       setThumbnailError(true)
+      setThumbnailErrorMessage("대표 이미지를 등록해주세요")
       isValid = false
-    } else {
-      setThumbnailError(false)
     }
 
     const newSteps = steps.map((step) => {
@@ -382,11 +432,11 @@ function NewRecipeForm() {
           ingredientAmount: i.amount
         })),
         tags: tags.map(t => ({ tagName: t })),
-        steps: steps.map(s => ({
-          stepNumber: s.id,
+        steps: steps.map((s, index: number) => ({
+          stepNumber: index + 1,
           stepDescription: s.description,
           timerSeconds: s.duration,
-          stepImageUrl: s.imagePreview || "", // Use existing preview URL if no new file
+          stepImageUrl: s.imagePreview || null, // Use null if no image
           cookingTip: s.tips || null
         }))
       }
@@ -394,9 +444,9 @@ function NewRecipeForm() {
       // 2. 파일 객체 수집
       const files: any = {
         mainImage: thumbnail,
-        stepImages: steps.reduce((acc, step) => {
+        stepImages: steps.reduce((acc, step, index) => {
           if (step.image) {
-            acc[step.id] = step.image
+            acc[index + 1] = step.image
           }
           return acc
         }, {} as { [key: number]: File })
@@ -428,9 +478,18 @@ function NewRecipeForm() {
       // setSuccessDialogOpen(true) // 기존 Dialog 대신 보상 Dialog 사용
       setShowRewardDialog(true)
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Recipe registration/update failed:", error)
-      alert("레시피 저장에 실패했습니다.")
+      // Duplicate title handling
+      if (error.message?.includes("Title") || error.payload?.message?.includes("Title") || error.message?.includes("중복") || error.status === 409) {
+        // alert("이미 등록한 동일한 제목의 레시피가 있습니다. 제목을 변경해주세요.")
+        setTitleError(true)
+        setTitleErrorMessage("이미 등록한 동일한 제목의 레시피가 있습니다.")
+        // Scroll to title
+        document.getElementById("title")?.scrollIntoView({ behavior: "smooth", block: "center" })
+      } else {
+        alert("레시피 저장에 실패했습니다.")
+      }
     }
   }
 
@@ -524,7 +583,7 @@ function NewRecipeForm() {
                       if (e.target.files?.length) setThumbnailError(false)
                     }}
                   />
-                  {thumbnailError && <p className="text-red-500 text-sm mt-1">대표 이미지를 등록해주세요</p>}
+                  {thumbnailError && <p className="text-red-500 text-sm mt-1">{thumbnailErrorMessage || "대표 이미지를 등록해주세요"}</p>}
                 </div>
 
                 <div className="space-y-4 md:w-1/2">
@@ -541,18 +600,18 @@ function NewRecipeForm() {
                       maxLength={50}
                       className={cn(titleError && "border-red-500 focus-visible:ring-red-500")}
                     />
-                    {titleError && <p className="text-red-500 text-sm mt-1">레시피 제목을 입력해주세요</p>}
+                    {titleError && <p className="text-red-500 text-sm mt-1">{titleErrorMessage || "레시피 제목을 입력해주세요"}</p>}
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="description">레시피 소개</Label>
                     <Textarea
                       id="description"
-                      placeholder="이 레시피에 대해 간단히 소개해주세요 (최대 1000자)"
+                      placeholder="이 레시피에 대해 간단히 소개해주세요 (최대 255자)"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       className="min-h-[80px]"
-                      maxLength={1000}
+                      maxLength={255}
                     />
                   </div>
 
@@ -578,9 +637,36 @@ function NewRecipeForm() {
                         id="servings"
                         placeholder="예: 2"
                         type="number"
+                        min="1"
+                        max="100"
                         value={servings}
-                        onChange={(e) => setServings(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setServings(val)
+                          if (val === "") {
+                            setServingsError(null)
+                          } else {
+                            const num = Number(val)
+                            if (num < 1 || num > 100) {
+                              setServingsError("인분 수는 1에서 100 사이여야 합니다.")
+                            } else {
+                              setServingsError(null)
+                            }
+                          }
+                        }}
+                        onBlur={() => {
+                          if (servings && Number(servings) < 1) {
+                            setServings("1")
+                            setServingsError(null)
+                          }
+                          if (servings && Number(servings) > 100) {
+                            setServings("100")
+                            setServingsError(null)
+                          }
+                        }}
+                        className={cn(servingsError && "border-red-500 focus-visible:ring-red-500")}
                       />
+                      {servingsError && <p className="text-red-500 text-sm mt-1">{servingsError}</p>}
                     </div>
                   </div>
                 </div>
@@ -635,7 +721,7 @@ function NewRecipeForm() {
                     maxLength={20}
                   />
                   <Input
-                    placeholder="용량 (예: 200g, 약간, 1큰술, 1.5컵)"
+                    placeholder="용량 (예: 200g)"
                     value={ingredientAmount}
                     onChange={(e) => {
                       setIngredientAmount(e.target.value)
@@ -675,6 +761,7 @@ function NewRecipeForm() {
                   <span className="font-semibold text-foreground">{formatCookingTime(totalCookingTime)}</span> (
                   {steps.length}단계)
                 </p>
+                {timeError && <p className="text-red-500 text-sm mt-1">조리 시간을 입력해주세요 (최소 1초 이상)</p>}
               </div>
             </CardContent>
           </Card>
@@ -760,7 +847,11 @@ function NewRecipeForm() {
                         className="hidden"
                         onChange={(e) => handleStepImageChange(currentStep.id, e)}
                       />
-                      {currentStep.errors?.image && <p className="text-red-500 text-sm mt-1">단계 이미지를 등록해주세요</p>}
+                      {currentStep.errors?.image && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {currentStep.imageErrorMessage || "단계 이미지를 등록해주세요"}
+                        </p>
+                      )}
                     </div>
 
                     <div className="space-y-4 md:w-1/2 flex flex-col min-w-0">
@@ -773,8 +864,10 @@ function NewRecipeForm() {
                               min="0"
                               value={Math.floor((currentStep.duration || 0) / 60) || ""}
                               onChange={(e) => {
-                                const valStr = e.target.value.replace(/^0+/, "")
+                                const valStr = e.target.value
+                                if (valStr.includes("-")) return // Prevent negative input
                                 const newMinutes = valStr ? parseInt(valStr) : 0
+                                if (newMinutes < 0) return
                                 const currentSeconds = (currentStep.duration || 0) % 60
                                 updateStep(currentStep.id, "duration", newMinutes * 60 + currentSeconds)
                               }}
@@ -790,7 +883,12 @@ function NewRecipeForm() {
                               max="59"
                               value={(currentStep.duration || 0) % 60 || ""}
                               onChange={(e) => {
-                                let valStr = e.target.value.replace(/^0+/, "")
+                                let valStr = e.target.value
+                                if (valStr.includes("-")) return // Prevent negative input
+                                let val = parseInt(valStr)
+                                if (val < 0) return
+
+                                valStr = valStr.replace(/^0+/, "")
                                 // Handle case where user might paste/type > 59, logic should clamp or just accept?
                                 // For simplicity allow typing, clamping via max usually handles spin buttons but typing can be anything.
                                 // Ensuring valid seconds:
