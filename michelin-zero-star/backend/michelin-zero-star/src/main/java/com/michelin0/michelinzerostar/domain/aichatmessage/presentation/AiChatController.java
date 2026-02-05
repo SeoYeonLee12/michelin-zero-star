@@ -1,13 +1,16 @@
 package com.michelin0.michelinzerostar.domain.aichatmessage.presentation;
 
 import com.michelin0.michelinzerostar.domain.aichatmessage.application.AiChatMessageService;
-import com.michelin0.michelinzerostar.domain.aichatmessage.application.RedisChataService;
+import com.michelin0.michelinzerostar.domain.aichatmessage.application.RedisChatService;
+import com.michelin0.michelinzerostar.domain.aichatmessage.application.command.CommonChatbotCommand;
 import com.michelin0.michelinzerostar.domain.aichatmessage.application.command.RecipeChatbotCommand;
 import com.michelin0.michelinzerostar.domain.aichatmessage.application.result.ChatHistoryResult;
 import com.michelin0.michelinzerostar.domain.aichatmessage.presentation.dto.ChatMessage;
 import com.michelin0.michelinzerostar.domain.aichatmessage.presentation.dto.ChatSaveMessageRequest;
+import com.michelin0.michelinzerostar.domain.aichatmessage.presentation.dto.CommonChatMassageRequest;
 import com.michelin0.michelinzerostar.domain.auth.UserPrincipal;
 import com.michelin0.michelinzerostar.global.security.jwt.JwtTokenProvider;
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,17 +33,17 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class AiChatController {
 
     private final SimpMessagingTemplate messageTemplate;
-    private final RedisChataService redisChataService;
+    private final RedisChatService redisChataService;
     private final AiChatMessageService aiChatMessageService;
     private final JwtTokenProvider jwtTokenProvider;
 
     @MessageMapping("/hello")
     public void greeting(ChatMessage message) {
-        redisChataService.saveMessage("default-room", message);
+//        redisChataService.saveMessage("default-room", message);
 
         // 구독하는 클라이언트에게 발행
         ChatMessage response = new ChatMessage("서버가 보냅니다", "반가워요, " + message.getSender());
-        redisChataService.saveMessage("default-room-server", response);
+//        redisChataService.saveMessage("default-room-server", response);
 
         messageTemplate.convertAndSend("/topic/greetings", response);
         log.info("발송완료");
@@ -48,7 +51,7 @@ public class AiChatController {
 
     @MessageMapping("/recipes/ask")
     public void saveUserMessage(
-            @Payload ChatSaveMessageRequest request,
+            @Payload @Valid ChatSaveMessageRequest request,
             @Header("Authorization") String token
     ) {
         String resolvedToken = extractToken(token);
@@ -84,6 +87,18 @@ public class AiChatController {
                 .toList();
         return ResponseEntity.status(HttpStatus.OK)
                 .body(AIChatListResponse.of(response, nextCursorId, hasNext));
+    }
+
+    @MessageMapping("/common/ask")
+    public void askCommonMessage(
+            @Payload @Valid CommonChatMassageRequest request,
+            @Header("Authorization") String token
+    ) {
+        String resolvedToken = extractToken(token);
+        UserPrincipal user = getUserFromToken(resolvedToken);
+        CommonChatbotCommand command = new CommonChatbotCommand(user.getId(), request.content());
+        aiChatMessageService.askCommonChatAI(command);
+
     }
 
 

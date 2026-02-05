@@ -15,6 +15,9 @@ public enum InternalServerErrorCode implements ErrorCode {
     UNKNOWN_EXCEPTION(HttpStatus.INTERNAL_SERVER_ERROR, "ISE1", "알 수 없는 예외가 발생했습니다."),
     EXTERNAL_API_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "ISE2", "API 호출 중 예외가 발생했습니다."),
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "ISE3", "유효하지 않은 입력값입니다."),
+    JSON_SERIALIZATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "ISE4",
+            "데이터 처리 중 JSON 변환 오류가 발생했습니다."),
+
     ;
 
     private final HttpStatus httpStatus;

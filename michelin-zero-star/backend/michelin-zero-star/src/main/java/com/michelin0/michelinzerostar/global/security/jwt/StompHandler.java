@@ -26,13 +26,13 @@ public class StompHandler implements ChannelInterceptor {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message,
                 StompHeaderAccessor.class);
 
+        // accessor가 null일 경우 방어 로직 추가
         if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
-            // 🔍 [디버깅] 연결 요청이 들어옴을 로그로 확인
-            log.info("STOMP CONNECT 요청 들어옴");
+            log.info("📢 STOMP CONNECT 요청 도착");
 
             try {
                 String authorizationHeader = accessor.getFirstNativeHeader("Authorization");
-                log.info("Authorization Header: {}", authorizationHeader); // 헤더가 오는지 확인
+                log.info("🔑 Authorization Header: {}", authorizationHeader);
 
                 if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
                     String token = authorizationHeader.substring(7);
@@ -40,23 +40,20 @@ public class StompHandler implements ChannelInterceptor {
                     if (jwtTokenProvider.validateToken(token)) {
                         Authentication authentication = jwtTokenProvider.getAuthentication(token);
                         accessor.setUser(authentication);
-                        log.info("STOMP 인증 성공: {}", authentication.getName());
+                        log.info("✅ STOMP 인증 성공: User={}", authentication.getName());
                     } else {
-                        // 토큰이 유효하지 않음
-                        log.error("STOMP 토큰 유효성 검사 실패");
+                        log.error("❌ STOMP 토큰 유효성 검사 실패");
                         throw new RuntimeException("Invalid JWT Token");
                     }
                 } else {
-                    // 헤더가 없거나 형식이 틀림
-                    log.error("STOMP Authorization 헤더가 없음 또는 형식 불일치");
-                    // 필요 시 에러를 던져서 연결 거부
-                    // throw new RuntimeException("Authorization header is missing");
+                    // [중요] 토큰이 없으면 연결 차단!
+                    log.error("❌ STOMP Authorization 헤더 누락 또는 형식 오류");
+                    throw new RuntimeException("Authorization header is missing or invalid");
                 }
             } catch (Exception e) {
-                // 🚨 여기서 에러를 잡아서 로그를 찍어야 콘솔에 보입니다!
-                log.error("STOMP 연결 중 에러 발생: {}", e.getMessage());
-                e.printStackTrace(); // 상세 에러 스택 출력
-                throw e; // 에러를 다시 던져서 클라이언트에게 에러 프레임 전송
+                log.error("🚨 STOMP 연결 핸들링 중 에러: {}", e.getMessage());
+                // 에러를 던져야 클라이언트 연결이 끊어짐
+                throw new RuntimeException("Authentication failed", e);
             }
         }
         return message;
