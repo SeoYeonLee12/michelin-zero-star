@@ -67,13 +67,17 @@ public class JwtTokenProvider {
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.joining(","));
 
+        return createAccessToken(authentication.getName(), authorities, "LOCAL");
+    }
+
+    public String createAccessToken(String email, String role, String provider) {
         long now = (new Date()).getTime();
         Date accessTokenExpiresIn = new Date(now + accessTokenValidityInMilliseconds);
 
         return Jwts.builder()
-                .setSubject(authentication.getName())
-                .claim("auth", authorities)
-                .claim("provider", "LOCAL")
+                .setSubject(email)
+                .claim("auth", role)
+                .claim("provider", provider)
                 .setExpiration(accessTokenExpiresIn)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
