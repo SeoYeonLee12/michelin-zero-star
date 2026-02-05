@@ -13,6 +13,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import org.hibernate.validator.constraints.URL;
 
+//TODO: validation 다시하기
 public record RecipeRegisterRequest(
         @NotBlank(message = "레시피명을 입력하세요.")
         String title,
