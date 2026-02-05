@@ -140,6 +140,7 @@ interface AuthContextType {
   // Chat (WebSocket + Remote)
   conversations: Conversation[]
   currentMessages: Message[]
+  isChatLoaded: boolean // ✅ Added
   enterChatRoom: (roomId: string) => Promise<void>
   exitChatRoom: () => void
   startChatFromPost: (postId: number) => Promise<string>
@@ -169,7 +170,7 @@ interface AuthContextType {
   reviewedRecipes: Set<string>
   markRecipeAsReviewed: (recipeId: string) => void
   hasUserReviewedRecipe: (recipeId: string) => boolean
-  withdraw: () => Promise<void>
+
   refreshUser: () => Promise<void> // ✅ Added
 }
 
@@ -183,6 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Chat State
   const [conversations, setConversations] = React.useState<Conversation[]>([])
   const [currentMessages, setCurrentMessages] = React.useState<Message[]>([])
+  const [isChatLoaded, setIsChatLoaded] = React.useState(false) // ✅ Added state
   const stompClient = React.useRef<Client | null>(null)
   const subscriptions = React.useRef<Map<string, any>>(new Map())
   const isAuthInitialized = React.useRef(false)
@@ -368,6 +370,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const unique = Array.from(new Map(mapped.map(item => [item.id, item])).values());
       setConversations(unique);
     } catch (error) { console.error(error); }
+    finally { setIsChatLoaded(true); } // ✅ Set loaded
   }
 
   const connectWebSocket = (token: string) => {
@@ -901,6 +904,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isPostLiked, earnStars, getStarLevel, completedRecipes, markRecipeAsCompleted,
         reviewedRecipes, markRecipeAsReviewed, hasUserReviewedRecipe, withdraw,
         refreshUser, // ✅ Added
+        isChatLoaded, // ✅ Added
       }}
     >
       {isLoading ? null : children}
