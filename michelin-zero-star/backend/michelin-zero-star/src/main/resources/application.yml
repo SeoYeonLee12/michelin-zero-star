@@ -50,13 +50,13 @@ spring:
             client-id: ${GOOGLE_CLIENT_ID}
             client-secret: ${GOOGLE_CLIENT_SECRET}
             scope: [email, profile]
-            redirect-uri: "${APP_FRONTEND_URL:http://localhost:3000}/login/oauth2/code/google"
+            redirect-uri: "{baseUrl}/login/oauth2/code/google"
           kakao:
             client-id: ${KAKAO_CLIENT_ID}
             client-secret: ${KAKAO_CLIENT_SECRET}
             client-authentication-method: client_secret_post
             authorization-grant-type: authorization_code
-            redirect-uri: "${APP_FRONTEND_URL:http://localhost:3000}/login/oauth2/code/kakao"
+            redirect-uri: "{baseUrl}/login/oauth2/code/kakao"
             scope: [profile_nickname, profile_image, account_email]
             client-name: Kakao
           naver:
@@ -64,7 +64,7 @@ spring:
             client-secret: ${NAVER_CLIENT_SECRET}
             client-authentication-method: client_secret_post
             authorization-grant-type: authorization_code
-            redirect-uri: "${APP_FRONTEND_URL:http://localhost:3000}/login/oauth2/code/naver"
+            redirect-uri: "{baseUrl}/login/oauth2/code/naver"
             scope: [name, email, profile_image]
             client-name: Naver
         provider:

@@ -3,6 +3,7 @@ package com.michelin0.michelinzerostar.global.security.oauth.handler;
 import com.michelin0.michelinzerostar.global.redis.RedisUtil;
 import com.michelin0.michelinzerostar.global.security.jwt.JwtTokenProvider;
 import com.michelin0.michelinzerostar.global.security.jwt.TokenDto;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -29,7 +30,6 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     @Value("${app.frontend-url:http://localhost:3000}")
     private String frontendUrl;
 
-    @Override
     @PostConstruct
     public void init() {
         log.info("=========================================");
@@ -56,7 +56,44 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         log.info("[ACCESS TOKEN]: {}", tokenDto.getAccessToken());
 
-        boolean isSecure = frontendUrl.startsWith("https");
+        // HTTPS 여부 확인 (기본값 설정)
+        boolean isSecure = request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto"));
+
+        // [수정] 동적 리다이렉트 처리
+        // 1. 쿠키에 저장된 redirect_uri가 있으면 그걸 최우선으로 사용
+        // 2. 없으면 기본 설정된 frontendUrl 사용
+        // 3. 그것도 없으면 Referer 헤더 사용
+        String targetFrontendUrl = frontendUrl;
+        
+        // 쿠키에서 redirect_uri 확인 (HttpCookieOAuth2AuthorizationRequestRepository에서 "redirect_uri" 쿠키를 저장한다고 가정)
+        // 현재 코드엔 해당 로직이 없으므로, 기본적으로는 .env의 APP_FRONTEND_URL을 따르되,
+        // 로컬/운영 분기를 위해 Referer나 Origin을 활용할 수 있음.
+
+        // 여기서는 간단히: frontendUrl이 "http://localhost:3000" (기본값) 이거나 설정되어 있으면 그걸 씁니다.
+        // 하지만 "Both"를 지원하려면 클라이언트가 로그인 시작할 때 보낸 redirect_uri 파라미터를 쿠키에 저장했다가 꺼내 쓰는게 정석입니다.
+        // HttpCookieOAuth2AuthorizationRequestRepository가 이미 redirect_uri 쿠키를 처리하고 있다면 아래와 같이 가져올 수 있습니다.
+        
+        // (간소화) 일단은 설정된 frontendUrl을 사용하되, 만약 요청이 localhost로 왔다면 localhost로 보내는 등의 로직 추가 가능
+        // 하지만 가장 확실한 건 클라이언트가 보낸 값을 믿는 것입니다.
+        
+        // 여기서는 기존 로직 유지하되, application.yml의 {baseUrl} 변경에 맞춰 동작함.
+        // 사용자가 "localhost:3000" 접속 -> 백엔드 Login 시작 -> 백엔드가 {baseUrl}로 구글에 요청 -> 구글이 백엔드로 리턴
+        // -> 백엔드가 성공 핸들러 실행 -> 여기서 targetFrontendUrl로 리다이렉트
+        
+        // 만약 frontendUrl이 고정되어 있으면 무조건 거기로 감.
+        // 따라서 "Both"를 위해서는 SuccessHandler도 동적으로 바뀌어야 함.
+        
+        // [임시 해결책] 요청정보를 보고 판단
+        String referer = request.getHeader("Referer");
+        if (referer != null && referer.contains("localhost:3000")) {
+            targetFrontendUrl = "http://localhost:3000";
+        } else if (frontendUrl != null && !frontendUrl.isEmpty()) {
+            targetFrontendUrl = frontendUrl;
+        } else {
+             targetFrontendUrl = "http://localhost:3000";
+        }
+
+        log.info("Determined Target Frontend URL: {}", targetFrontendUrl);
 
         // Refresh Token을 HttpOnly 쿠키로 굽기
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", tokenDto.getRefreshToken())
@@ -69,7 +106,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         response.addHeader("Set-Cookie", refreshCookie.toString());
 
-        String targetUrl = UriComponentsBuilder.fromUriString(frontendUrl + "/auth/callback")
+        String targetUrl = UriComponentsBuilder.fromUriString(targetFrontendUrl + "/auth/callback")
                 .queryParam("accessToken", tokenDto.getAccessToken())
                 .build().encode(StandardCharsets.UTF_8).toUriString();
 
