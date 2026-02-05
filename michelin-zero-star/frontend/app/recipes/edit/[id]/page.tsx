@@ -38,6 +38,7 @@ interface RecipeStep {
     duration?: boolean
     image?: boolean
   }
+  imageErrorMessage?: string
 }
 
 const categoryOptions = [
@@ -72,15 +73,17 @@ export default function EditRecipePage() {
   const [ingredientAmount, setIngredientAmount] = useState("")
 
   // ✅ Validation States
-  const [ingredientError, setIngredientError] = useState(false)
-  const [tagError, setTagError] = useState(false)
-  const [titleError, setTitleError] = useState(false)
-  const [thumbnailError, setThumbnailError] = useState(false)
   const [steps, setSteps] = useState<RecipeStep[]>([
     { id: 1, action: "", description: "", duration: 0, image: null, imagePreview: null, tips: "" },
   ])
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
+  const [titleError, setTitleError] = useState(false)
+  const [titleErrorMessage, setTitleErrorMessage] = useState("")
+  const [thumbnailError, setThumbnailError] = useState(false)
+  const [thumbnailErrorMessage, setThumbnailErrorMessage] = useState("")
+  const [servingsError, setServingsError] = useState<string | null>(null)
+  const [timeError, setTimeError] = useState(false)
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -131,16 +134,43 @@ export default function EditRecipePage() {
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      if (!file.type.startsWith("image/")) {
+        setThumbnailError(true)
+        setThumbnailErrorMessage("이미지 파일만 업로드할 수 있습니다.")
+        e.target.value = ""
+        return
+      }
       setThumbnailPreview(URL.createObjectURL(file))
+      setThumbnailError(false)
+      setThumbnailErrorMessage("")
     }
   }
 
   const handleStepImageChange = (stepId: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      if (!file.type.startsWith("image/")) {
+        setSteps(
+          steps.map((step) =>
+            step.id === stepId
+              ? { ...step, imageErrorMessage: "이미지 파일만 업로드할 수 있습니다.", errors: { ...step.errors, image: true } }
+              : step,
+          ),
+        )
+        e.target.value = ""
+        return
+      }
       setSteps(
         steps.map((step) =>
-          step.id === stepId ? { ...step, image: file, imagePreview: URL.createObjectURL(file) } : step,
+          step.id === stepId
+            ? {
+              ...step,
+              image: file,
+              imagePreview: URL.createObjectURL(file),
+              imageErrorMessage: "",
+              errors: { ...step.errors, image: false },
+            }
+            : step,
         ),
       )
     }
@@ -176,19 +206,16 @@ export default function EditRecipePage() {
   }
 
   const addTag = () => {
+    const trimmedInput = tagInput.trim()
+    if (!trimmedInput) return
+
     if (tags.length >= 10) {
       alert("태그는 최대 10개까지 등록할 수 있습니다.")
       return
     }
-    if (tagInput.trim() && !tags.includes(tagInput.trim())) {
-      if (tagInput.trim().length > 20) {
-        alert("태그는 20자 이내로 입력해주세요.")
-        return
-      }
-      setTags([...tags, tagInput.trim()])
-      setTagInput("")
-      setTagError(false)
-    }
+
+    setTags([...tags, trimmedInput])
+    setTagInput("")
   }
 
   const removeTag = (tag: string) => {
@@ -197,12 +224,6 @@ export default function EditRecipePage() {
 
   const addIngredient = () => {
     if (!ingredientName.trim()) return
-
-    if (ingredientName.trim() && !ingredientAmount.trim()) {
-      setIngredientError(true)
-      return
-    }
-    setIngredientError(false)
 
     if (ingredientName.trim() && ingredientAmount.trim()) {
       setIngredients([...ingredients, { name: ingredientName.trim(), amount: ingredientAmount.trim() }])
@@ -220,46 +241,44 @@ export default function EditRecipePage() {
   const handleSubmitClick = () => {
     let isValid = true
 
-    if (ingredients.length === 0) {
-      setIngredientError(true)
-      isValid = false
-    }
-
-    if (tags.length === 0) {
-      setTagError(true)
-      isValid = false
-    }
+    // Clear errors
+    setTitleError(false)
+    setThumbnailError(false)
+    setTimeError(false)
+    setServingsError(null)
 
     if (!title) {
       setTitleError(true)
+      setTitleErrorMessage("레시피 제목을 입력해주세요.")
       isValid = false
-    } else {
-      setTitleError(false)
     }
-
     if (!thumbnailPreview) {
       setThumbnailError(true)
+      setThumbnailErrorMessage("대표 이미지를 등록해주세요.")
       isValid = false
-    } else {
-      setThumbnailError(false)
+    }
+    if (ingredients.length === 0) {
+      alert("재료를 하나 이상 등록해주세요.")
+      isValid = false
+    }
+    if (totalCookingTime === 0) {
+      setTimeError(true)
+      isValid = false
     }
 
-    const newSteps = steps.map((step) => {
-      const errors = {
-        description: !step.description,
-        duration: !step.duration,
-        image: !step.imagePreview && !step.image,
-      }
-      if (errors.description || errors.duration || errors.image) {
-        isValid = false
-      }
-      return { ...step, errors }
-    })
-    setSteps(newSteps)
-
-    if (!isValid) {
-      return
+    // Validate Servings
+    const servingsNum = Number(servings)
+    if (!servings || servingsNum < 1 || servingsNum > 100) {
+      setServingsError("인분 수는 1에서 100 사이여야 합니다.")
+      isValid = false
     }
+
+    if (steps.some(s => !s.description)) {
+      alert("모든 조리 순서에 설명을 입력해주세요.")
+      isValid = false
+    }
+
+    if (!isValid) return
 
     setConfirmDialogOpen(true)
   }
@@ -335,12 +354,9 @@ export default function EditRecipePage() {
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => {
-                    handleThumbnailChange(e)
-                    if (e.target.files?.length) setThumbnailError(false)
-                  }}
+                  onChange={handleThumbnailChange}
                 />
-                {thumbnailError && <p className="text-red-500 text-sm mt-1">대표 이미지를 등록해주세요</p>}
+                {thumbnailError && <p className="text-red-500 text-sm mt-1">{thumbnailErrorMessage}</p>}
               </div>
 
               <div className="space-y-2">
@@ -356,7 +372,7 @@ export default function EditRecipePage() {
                   maxLength={50}
                   className={cn(titleError && "border-red-500 focus-visible:ring-red-500")}
                 />
-                {titleError && <p className="text-red-500 text-sm mt-1">레시피 제목을 입력해주세요</p>}
+                {titleError && <p className="text-red-500 text-sm mt-1">{titleErrorMessage}</p>}
               </div>
 
               <div className="space-y-2">
@@ -393,8 +409,33 @@ export default function EditRecipePage() {
                     placeholder="예: 2"
                     type="number"
                     value={servings}
-                    onChange={(e) => setServings(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setServings(val)
+                      if (val === "") {
+                        setServingsError(null)
+                      } else {
+                        const num = Number(val)
+                        if (num < 1 || num > 100) {
+                          setServingsError("인분 수는 1에서 100 사이여야 합니다.")
+                        } else {
+                          setServingsError(null)
+                        }
+                      }
+                    }}
+                    onBlur={() => {
+                      if (servings && Number(servings) < 1) {
+                        setServings("1")
+                        setServingsError(null)
+                      }
+                      if (servings && Number(servings) > 100) {
+                        setServings("100")
+                        setServingsError(null)
+                      }
+                    }}
+                    className={cn(servingsError && "border-red-500 focus-visible:ring-red-500")}
                   />
+                  {servingsError && <p className="text-red-500 text-sm mt-1">{servingsError}</p>}
                 </div>
               </div>
 
@@ -415,9 +456,6 @@ export default function EditRecipePage() {
                     추가
                   </Button>
                 </div>
-                {tagError && tags.length === 0 && (
-                  <p className="text-red-500 text-sm mt-1">태그를 입력해주세요</p>
-                )}
                 {tags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     {tags.map((tag) => (
@@ -451,22 +489,15 @@ export default function EditRecipePage() {
                   <Input
                     placeholder="용량 (예: 200g, 약간, 1큰술, 1.5컵)"
                     value={ingredientAmount}
-                    onChange={(e) => {
-                      setIngredientAmount(e.target.value)
-                      if (e.target.value.trim()) setIngredientError(false)
-                    }}
-
+                    onChange={(e) => setIngredientAmount(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addIngredient())}
-                    className={cn("flex-[4]", ingredientError && "border-red-500 focus-visible:ring-red-500")}
+                    className="flex-[4]"
                     maxLength={20}
                   />
                   <Button type="button" onClick={addIngredient} variant="outline">
                     추가
                   </Button>
                 </div>
-                {ingredientError && (
-                  <p className="text-red-500 text-sm mt-1">용량을 입력해주세요</p>
-                )}
                 {ingredients.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     {ingredients.map((ingredient, idx) => (
@@ -490,6 +521,7 @@ export default function EditRecipePage() {
                   <span className="font-semibold text-foreground">{Math.ceil(totalCookingTime / 60)}분</span> (
                   {steps.length}단계)
                 </p>
+                {timeError && <p className="text-red-500 text-sm mt-1">조리 시간을 입력해주세요 (최소 1초 이상)</p>}
               </div>
             </CardContent>
           </Card>
@@ -563,7 +595,11 @@ export default function EditRecipePage() {
                       className="hidden"
                       onChange={(e) => handleStepImageChange(currentStep.id, e)}
                     />
-                    {currentStep.errors?.image && <p className="text-red-500 text-sm mt-1">단계 이미지를 등록해주세요</p>}
+                    {currentStep.errors?.image && (
+                      <p className="text-red-500 text-sm mt-1">
+                        {currentStep.imageErrorMessage || "단계 이미지를 등록해주세요"}
+                      </p>
+                    )}
                   </div>
 
                   {/* <div className="space-y-2">
@@ -634,60 +670,61 @@ export default function EditRecipePage() {
                     />
                   </div>
                 </div>
-
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentStepIndex((prev) => Math.min(steps.length - 1, prev + 1))}
-                  disabled={currentStepIndex === steps.length - 1}
-                  className="shrink-0"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
               </div>
 
-              <div className="flex justify-center gap-2 mt-4">
-                {steps.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentStepIndex(index)}
-                    className={cn(
-                      "w-2 h-2 rounded-full transition-all",
-                      index === currentStepIndex
-                        ? "bg-[#800020] w-6"
-                        : "bg-muted-foreground/30 hover:bg-muted-foreground/50",
-                    )}
-                  />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentStepIndex((prev) => Math.min(steps.length - 1, prev + 1))}
+                disabled={currentStepIndex === steps.length - 1}
+                className="shrink-0"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
 
-          <div className="flex justify-end gap-4">
-            <Button variant="outline" onClick={() => router.back()} className="bg-transparent">
-              취소
-            </Button>
-            <Button onClick={handleSubmitClick} className="bg-[#800020] hover:bg-[#800020]/90">
-              저장
-            </Button>
-          </div>
+            <div className="flex justify-center gap-2 mt-4">
+              {steps.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentStepIndex(index)}
+                  className={cn(
+                    "w-2 h-2 rounded-full transition-all",
+                    index === currentStepIndex
+                      ? "bg-[#800020] w-6"
+                      : "bg-muted-foreground/30 hover:bg-muted-foreground/50",
+                  )}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-end gap-4">
+          <Button variant="outline" onClick={() => router.back()} className="bg-transparent">
+            취소
+          </Button>
+          <Button onClick={handleSubmitClick} className="bg-[#800020] hover:bg-[#800020]/90">
+            저장
+          </Button>
         </div>
+    </div>
       </main >
 
-      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>레시피 수정</AlertDialogTitle>
-            <AlertDialogDescription>변경사항을 저장하시겠습니까?</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>아니오</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSubmit} className="bg-[#800020] hover:bg-[#800020]/90">
-              예
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+    <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>레시피 수정</AlertDialogTitle>
+          <AlertDialogDescription>변경사항을 저장하시겠습니까?</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>아니오</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirmSubmit} className="bg-[#800020] hover:bg-[#800020]/90">
+            예
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </div >
   )
 }

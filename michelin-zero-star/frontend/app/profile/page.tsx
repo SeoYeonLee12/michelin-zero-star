@@ -311,7 +311,7 @@ export default function ProfileEditPage() {
                   <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                     사진 변경
                   </Button>
-                  <p className="text-xs text-muted-foreground">JPG, PNG 파일, 최대 5MB</p>
+                  <p className="text-xs text-muted-foreground">JPG, PNG 파일, 최대 10MB</p>
                 </div>
               </div>
             </CardContent>

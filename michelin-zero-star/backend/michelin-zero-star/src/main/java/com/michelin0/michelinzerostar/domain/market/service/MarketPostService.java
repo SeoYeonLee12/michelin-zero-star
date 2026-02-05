@@ -121,7 +121,7 @@ public class MarketPostService {
     // 게시글 수정
     @Transactional
     public void updatePost(Long postId, Long userId, MarketPostUpdateRequest request,
-            List<MultipartFile> images) {
+            List<MultipartFile> images, List<String> existingImageUrls) {
         MarketPost post = marketPostRepository.findById(postId)
                 .orElseThrow(() -> new GlobalException(MarketErrorCode.POST_NOT_FOUND));
 
@@ -130,11 +130,46 @@ public class MarketPostService {
         post.update(request.getTitle(), request.getContent(), request.getPrice(),
                 request.getMeetingPlace());
 
+        // 1. 기존 이미지 중 삭제된 것 제거
+        List<MarketPostImage> currentImages = post.getImages();
+        
+        // existingImageUrls가 null이면 빈 리스트로 처리 (전체 삭제 의도일 수 있음)
+        List<String> validExistingUrls = existingImageUrls != null ? existingImageUrls : List.of();
+
+        // 유지할 이미지만 남기고, 삭제될 이미지는 파일 시스템에서도 삭제
+        currentImages.removeIf(img -> {
+            if (!validExistingUrls.contains(img.getImageUrl())) {
+                deleteFile(img.getImageUrl());
+                return true;
+            }
+            return false;
+        });
+
+        // 2. 새로운 이미지 추가
         if (images != null && !images.isEmpty()) {
-            deletePostImages(post);
             uploadImages(post, images);
         }
+
+        // 3. 순서 재정렬 (기존 이미지 순서 유지 + 새 이미지 뒤에 추가)
+        // 만약 기존 이미지 순서를 existingImageUrls 순서대로 하고 싶다면 별도 로직 필요
+        // 현재 로직: 기존 이미지 -> 새 이미지 순
+        for (int i = 0; i < currentImages.size(); i++) {
+            currentImages.get(i).updateOrderIndex(i);
+        }
+        
         log.info("게시글 수정 완료: ID={}", post.getId());
+    }
+
+    private void deleteFile(String imageUrl) {
+        try {
+            File file = new File(
+                    Paths.get(uploadDir, imageUrl.replace("/images/", "")).toString());
+            if (file.exists()) {
+                file.delete();
+            }
+        } catch (Exception e) {
+            log.error("파일 삭제 실패: {}", imageUrl, e);
+        }
     }
 
     // 내가 쓴 게시물 조회
