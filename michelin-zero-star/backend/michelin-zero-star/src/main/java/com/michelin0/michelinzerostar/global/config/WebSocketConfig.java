@@ -25,7 +25,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     // TODO 이거 String Utility로 이동 예정 기능 완성 후 리팩토링
-    private static final String END_POINT = "/ws-stompt";
+    private static final String END_POINT = "/ws-stomp";
     private static final String SIMPLE_BROKER_TOPIC = "/topic";
     private static final String SIMPLE_BROKER_QUEUE = "/queue";
     private static final String PUBLISH = "/app";
