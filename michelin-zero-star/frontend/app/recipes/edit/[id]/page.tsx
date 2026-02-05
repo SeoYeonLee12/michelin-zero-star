@@ -302,6 +302,7 @@ export default function EditRecipePage() {
                   placeholder="예: 엄마표 김치찌개"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  maxLength={50}
                 />
               </div>
 
@@ -312,6 +313,7 @@ export default function EditRecipePage() {
                   placeholder="이 레시피에 대해 간단히 소개해주세요"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
+                  maxLength={1000}
                 />
               </div>
 
@@ -332,7 +334,7 @@ export default function EditRecipePage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="servings">인분</Label>
+                  <Label htmlFor="servings">인분<span className="text-red-500 ml-1">*</span></Label>
                   <Input
                     id="servings"
                     placeholder="예: 2"
@@ -354,6 +356,7 @@ export default function EditRecipePage() {
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
+                    maxLength={20}
                   />
                   <Button type="button" onClick={addTag} variant="outline">
                     추가
@@ -390,6 +393,7 @@ export default function EditRecipePage() {
                     value={ingredientName}
                     onChange={(e) => setIngredientName(e.target.value)}
                     className="flex-1"
+                    maxLength={20}
                   />
                   <Input
                     placeholder="용량 (예: 200g)"
@@ -398,8 +402,10 @@ export default function EditRecipePage() {
                       setIngredientAmount(e.target.value)
                       if (e.target.value.trim()) setIngredientError(false)
                     }}
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addIngredient())}
-                    className={cn("w-32", ingredientError && "border-red-500 focus-visible:ring-red-500")}
+                    }}
+                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addIngredient())}
+                  className={cn("w-32", ingredientError && "border-red-500 focus-visible:ring-red-500")}
+                  maxLength={20}
                   />
                   <Button type="button" onClick={addIngredient} variant="outline">
                     추가
@@ -521,6 +527,8 @@ export default function EditRecipePage() {
                       placeholder="이 단계에서 해야 할 일을 자세히 설명해주세요"
                       value={currentStep.description}
                       onChange={(e) => updateStep(currentStep.id, "description", e.target.value)}
+                      className="min-h-[100px] break-all"
+                      maxLength={700}
                     />
                   </div>
 
@@ -539,6 +547,7 @@ export default function EditRecipePage() {
                         placeholder="요리 팁을 입력하세요"
                         value={currentStep.tips}
                         onChange={(e) => updateStep(currentStep.id, "tips", e.target.value)}
+                        maxLength={300}
                       />
                     </div>
                   </div>

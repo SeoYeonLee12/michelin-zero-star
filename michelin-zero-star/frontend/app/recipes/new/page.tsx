@@ -494,6 +494,7 @@ function NewRecipeForm() {
                       placeholder="예: 엄마표 김치찌개"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
+                      maxLength={50}
                     />
                   </div>
 
@@ -505,6 +506,7 @@ function NewRecipeForm() {
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       className="min-h-[80px]"
+                      maxLength={1000}
                     />
                   </div>
 
@@ -525,7 +527,7 @@ function NewRecipeForm() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="servings">인분</Label>
+                      <Label htmlFor="servings">인분<span className="text-red-500 ml-1">*</span></Label>
                       <Input
                         id="servings"
                         placeholder="예: 2"
@@ -548,6 +550,7 @@ function NewRecipeForm() {
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
+                    maxLength={20}
                   />
                   <Button type="button" onClick={addTag} variant="outline">
                     추가
@@ -583,6 +586,7 @@ function NewRecipeForm() {
                     value={ingredientName}
                     onChange={(e) => setIngredientName(e.target.value)}
                     className="flex-[6]"
+                    maxLength={20}
                   />
                   <Input
                     placeholder="용량 (예: 200g, 약간, 1큰술, 1.5컵)"
@@ -593,6 +597,7 @@ function NewRecipeForm() {
                     }}
                     className={cn("w-32", ingredientError && "border-red-500 focus-visible:ring-red-500")}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addIngredient())}
+                    maxLength={20}
                   />
                   <Button type="button" onClick={addIngredient} variant="outline">
                     추가
@@ -765,7 +770,8 @@ function NewRecipeForm() {
                           placeholder="이 단계에서 해야 할 일을 자세히 설명해주세요"
                           value={currentStep.description}
                           onChange={(e) => updateStep(currentStep.id, "description", e.target.value)}
-                          className="min-h-[100px] flex-1 overflow-y-auto text-base resize-none"
+                          className="min-h-[100px] flex-1 overflow-y-auto text-base resize-none break-all"
+                          maxLength={700}
                         />
                       </div>
 
@@ -776,6 +782,7 @@ function NewRecipeForm() {
                           value={currentStep.tips}
                           onChange={(e) => updateStep(currentStep.id, "tips", e.target.value)}
                           className="text-base"
+                          maxLength={300}
                         />
                       </div>
                     </div>

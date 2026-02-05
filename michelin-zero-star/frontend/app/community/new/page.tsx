@@ -161,8 +161,13 @@ function CommunityNewForm() {
   }
 
   const handleSubmit = () => {
-    if (!formData.title || !formData.description) {
-      alert("제목과 내용을 입력해주세요.")
+    if (!formData.title || formData.title.length < 2) {
+      alert("제목은 2자 이상 입력해주세요.")
+      return
+    }
+
+    if (!formData.description || formData.description.length < 5) {
+      alert("내용은 5자 이상 입력해주세요.")
       return
     }
 
@@ -333,9 +338,10 @@ function CommunityNewForm() {
               </Label>
               <Input
                 id="title"
-                placeholder="예: 양배추 반 통 같이 나눠요"
+                placeholder="예: 양배추 반 통 같이 나눠요 (2~40자)"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                maxLength={40}
               />
             </div>
 
@@ -355,7 +361,11 @@ function CommunityNewForm() {
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={6}
+                maxLength={150}
               />
+              <div className="text-right text-xs text-muted-foreground">
+                {formData.description.length}/150
+              </div>
             </div>
 
             {/* Price */}
@@ -384,6 +394,8 @@ function CommunityNewForm() {
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                 disabled={isFree}
+                type="number"
+                min="0"
               />
             </div>
 
@@ -400,6 +412,7 @@ function CommunityNewForm() {
                   value={formData.place}
                   onChange={(e) => setFormData({ ...formData, place: e.target.value })}
                   className="pl-10"
+                  maxLength={30}
                 />
               </div>
             </div>

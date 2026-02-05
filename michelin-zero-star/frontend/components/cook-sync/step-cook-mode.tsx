@@ -580,7 +580,7 @@ export function StepCookMode({
           if (stompClientRef.current && stompClientRef.current.connected) {
             const token = getGlobalAccessToken()
             stompClientRef.current.publish({
-              destination: "/app/recipes/ask",
+              destination: "/pub/recipes/ask",
               headers: token ? { Authorization: `Bearer ${token}` } : {},
               body: JSON.stringify({
                 content: raw,
@@ -709,7 +709,7 @@ export function StepCookMode({
     if (stompClientRef.current && stompClientRef.current.connected) {
       const token = getGlobalAccessToken()
       stompClientRef.current.publish({
-        destination: "/app/recipes/ask",
+        destination: "/pub/recipes/ask",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: JSON.stringify({
           content: userText,
