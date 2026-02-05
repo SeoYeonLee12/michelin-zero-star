@@ -1,23 +1,60 @@
 package com.michelin0.michelinzerostar.domain.aichatmessage.application;
 
-import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiCommonChatbotResponse;
-import com.michelin0.michelinzerostar.domain.aichatmessage.presentation.dto.ChatMessage;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiToUserResponse;
+import com.michelin0.michelinzerostar.domain.aichatmessage.application.command.RedisChatSaveCommand;
+import com.michelin0.michelinzerostar.domain.aichatmessage.domain.enums.SenderType;
+import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RedisChatService {
 
     private final RedisTemplate<String, Object> redisTemplate;
-
+    private final ObjectMapper objectMapper;
     private static final long GLOBAL_CHAT_TTL = 1;
 
-    public void saveMessage(Long userId, AiCommonChatbotResponse message) {
+    // 유저 질문 레디스 저장 메소드
+    public void saveUserMessage(Long userId, String content) {
         String key = "chat:global:user:" + userId;
-        redisTemplate.opsForList().rightPush(key, message);
-        redisTemplate.expire(key, GLOBAL_CHAT_TTL, TimeUnit.DAYS);
+        RedisChatSaveCommand command = new RedisChatSaveCommand(
+                SenderType.USER.toString(),
+                LocalDateTime.now(),
+                content
+        );
+
+        try {
+            String jsonValue = objectMapper.writeValueAsString(command);
+            redisTemplate.opsForList().rightPush(key, jsonValue);
+            redisTemplate.expire(key, GLOBAL_CHAT_TTL, TimeUnit.DAYS);
+        } catch (Exception e) {
+            log.error("Redis 저장 중 JSON 변환 에러: {}", e.getMessage());
+            throw new RuntimeException("Redis Save Error", e);
+        }
+    }
+
+    // AI 응답 레디스 저장 메소드 생성
+    public void saveAiMessage(Long userId, AiToUserResponse response) {
+        String key = "chat:global:user:" + userId;
+        RedisChatSaveCommand command = new RedisChatSaveCommand(
+                response.senderType(),
+                response.sendDate(),
+                response.content()
+        );
+
+        try {
+            String jsonValue = objectMapper.writeValueAsString(command);
+            redisTemplate.opsForList().rightPush(key, jsonValue);
+            redisTemplate.expire(key, GLOBAL_CHAT_TTL, TimeUnit.DAYS);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Redis AI Message Save Error", e);
+        }
     }
 }

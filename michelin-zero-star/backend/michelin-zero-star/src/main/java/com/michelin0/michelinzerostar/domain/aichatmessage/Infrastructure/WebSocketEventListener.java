@@ -1,11 +1,10 @@
 package com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure;
 
-import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiCommonChatbotResponse;
+import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiToUserResponse;
 import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.UserAiChatResponse;
 import com.michelin0.michelinzerostar.domain.aichatmessage.application.RedisChatService;
 import com.michelin0.michelinzerostar.domain.aichatmessage.domain.AiChatCompletedEvent;
 import com.michelin0.michelinzerostar.domain.aichatmessage.domain.AiResponseArrivedEvent;
-import com.michelin0.michelinzerostar.domain.aichatmessage.presentation.dto.ChatMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -33,16 +32,12 @@ public class WebSocketEventListener {
 
     @EventListener
     public void handleAiCommonChatComplete(AiChatCompletedEvent event) {
-        log.info("Common Chat Event Received for User: {}", event.userId());
-        AiCommonChatbotResponse response = AiCommonChatbotResponse.from(event.answer());
+        log.info("응답 받는 유저 아이디: {}", event.userId());
+        AiToUserResponse response = AiToUserResponse.from(event.answer());
+        redisChatService.saveAiMessage(event.userId(), response);
         String destination = "/topic/global/" + event.userId();
-
         simpMessagingTemplate.convertAndSend(destination, response);
-        log.info("WebSocket Sent to: {}", destination);
-
-        // TODO 레디스 저장 어플리케이션 서비스로 이동
-        redisChatService.saveMessage(event.userId(), response);
-        log.info("Redis Saved for User: {}", event.userId());
+        log.info("전송 완료 !! 전송 경로: {}", destination);
     }
 }
 

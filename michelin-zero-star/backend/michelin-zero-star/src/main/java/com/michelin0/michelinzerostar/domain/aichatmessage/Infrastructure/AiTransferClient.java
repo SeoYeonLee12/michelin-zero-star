@@ -35,7 +35,7 @@ public class AiTransferClient {
                 currentStepNumber,
                 steps
         );
-        log.info("Complete Transfer");
+        log.info("전송 완료");
         return aiRestClient.post()
                 .uri("/api/chat/qna")
                 .body(request)
@@ -53,16 +53,15 @@ public class AiTransferClient {
                 content,
                 favoriteCategories
         );
-        log.info("Sending request to AI Server: {}", request);
-
+        log.info("요청 내역: {}", request);
         AiCommonChatbotResponse response = aiRestClient.post()
                 .uri("/api/chat/search")
                 .body(request)
                 .retrieve()
                 .body(AiCommonChatbotResponse.class);
         if (response == null) {
-            throw new GlobalException(AiChatMessageErrorCode.EMPTY_AI_CLIENT_REPSONSE);
+            throw new GlobalException(AiChatMessageErrorCode.EMPTY_AI_CLIENT_RESPONSE);
         }
-        return response.toDomain();
+        return response.toCommonAiAnswer();
     }
 }

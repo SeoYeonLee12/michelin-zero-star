@@ -1,7 +1,6 @@
 package com.michelin0.michelinzerostar.domain.aichatmessage.domain;
 
 import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.AiTransferClient;
-import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiCommonChatbotResponse;
 import com.michelin0.michelinzerostar.domain.aichatmessage.Infrastructure.dto.AiRecipeChatbotResponse;
 import com.michelin0.michelinzerostar.domain.recipe.domain.Recipe;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeStep;
@@ -14,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 // ai 작업할 서비스임(얘는 비동기 작업)
 @Service
@@ -60,13 +58,13 @@ public class RecipeAiService {
     public void processCommonChatbotAI(User user, String content) {
         List<String> userFavoriteCategories =
                 userFavoriteCategoryRepository.findCategoryNamesByUser(user);
-
+        // 응답 요청 보내고 응답 받아오기
         CommonAiAnswer answer = aiTransferClient.transferData(
                 user,
                 content,
                 userFavoriteCategories
         );
-
+        // 이벤트 발생하면 리스너가 응답(이 객체가 만들어지는 순간임) -> 유저에게 응답+센더타입+보낸날짜 보내기
         applicationEventPublisher.publishEvent(
                 AiChatCompletedEvent.of(user.getId(), answer)
         );

@@ -1,5 +1,6 @@
 package com.michelin0.michelinzerostar.domain.aichatmessage.application;
 
+import com.michelin0.michelinzerostar.domain.aichatmessage.application.command.CommonChatbotCommand;
 import com.michelin0.michelinzerostar.domain.aichatmessage.application.command.RecipeChatbotCommand;
 import com.michelin0.michelinzerostar.domain.aichatmessage.application.result.ChatHistoryResult;
 import com.michelin0.michelinzerostar.domain.aichatmessage.domain.AiChatMessage;
@@ -29,6 +30,7 @@ public class AiChatMessageService {
     private final UserRepository userRepository;
     private final RecipeRepository recipeRepository;
     private final AiChatMessageQueryRepository aiChatMessageQueryRepository;
+    private final RedisChatService redisChatService;
 
     public void askRecipe(RecipeChatbotCommand command) {
         User searchedUser = userRepository.getReferenceById(command.userId());
@@ -59,8 +61,13 @@ public class AiChatMessageService {
     }
 
     // TODO 여기부터 완성
-    public void askCommonChatAI(CommonChatbotCommand command){
-        User searchedUser= userRepository.getReferenceById(command.userId());
+    public void askCommonChatAI(CommonChatbotCommand command) {
+        User searchedUser = userRepository.getById(command.userId());
+        log.info("Redis Saved for User: {}", command.userId());
+        // 유저 응답 레디스 저장
+        redisChatService.saveUserMessage(command.userId(), command.content());
+        // 비동기로 유저에게 응답보내고
+        recipeAiService.processCommonChatbotAI(searchedUser, command.content());
 
     }
 

@@ -2,6 +2,7 @@ package com.michelin0.michelinzerostar.domain.aichatmessage.presentation;
 
 import com.michelin0.michelinzerostar.domain.aichatmessage.application.AiChatMessageService;
 import com.michelin0.michelinzerostar.domain.aichatmessage.application.RedisChatService;
+import com.michelin0.michelinzerostar.domain.aichatmessage.application.command.CommonChatbotCommand;
 import com.michelin0.michelinzerostar.domain.aichatmessage.application.command.RecipeChatbotCommand;
 import com.michelin0.michelinzerostar.domain.aichatmessage.application.result.ChatHistoryResult;
 import com.michelin0.michelinzerostar.domain.aichatmessage.presentation.dto.ChatMessage;
@@ -95,6 +96,8 @@ public class AiChatController {
     ) {
         String resolvedToken = extractToken(token);
         UserPrincipal user = getUserFromToken(resolvedToken);
+        CommonChatbotCommand command = new CommonChatbotCommand(user.getId(), request.content());
+        aiChatMessageService.askCommonChatAI(command);
 
     }
 
