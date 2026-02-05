@@ -16,7 +16,7 @@ public class AiServerConfig {
     public RestClient aiRestClient() {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(5000);
-        requestFactory.setReadTimeout(30000);
+        requestFactory.setReadTimeout(60000);
 
         return RestClient.builder()
                 .baseUrl(aiServerUrl)
