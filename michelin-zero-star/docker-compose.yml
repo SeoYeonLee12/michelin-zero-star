@@ -142,8 +142,8 @@ services:
     environment:
       - ES_URL=http://elasticsearch:9200
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - SPEECH_KEY=${SPEECH_KEY}
-      - SPEECH_REGION=${SPEECH_REGION}
+      - SPEECH_KEY=${NEXT_PUBLIC_SPEECH_KEY}
+      - SPEECH_REGION=${NEXT_PUBLIC_SPEECH_REGION}
       - PYTHONUNBUFFERED=1
       - PROJECT_NAME="Michelin Zero Star AI"
     volumes:
@@ -161,6 +161,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_SPEECH_KEY=${NEXT_PUBLIC_SPEECH_KEY}
+        - NEXT_PUBLIC_SPEECH_REGION=${NEXT_PUBLIC_SPEECH_REGION:-koreacentral}
     restart: always
     ports:
       - "3000:3000"
@@ -170,6 +173,8 @@ services:
       # [Hybrid Merge] Localhost value with Remote Variable Name
       - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-https://i14b208.p.ssafy.io/api/v1}
       - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-wss://i14b208.p.ssafy.io/ws-stomp}
+      - NEXT_PUBLIC_SPEECH_KEY=${NEXT_PUBLIC_SPEECH_KEY}
+      - NEXT_PUBLIC_SPEECH_REGION=${NEXT_PUBLIC_SPEECH_REGION:-koreacentral}
     # volumes:  <-- PROD: Keep commented out to use built artifacts
     #   - ./frontend:/app
     #   - /app/node_modules
