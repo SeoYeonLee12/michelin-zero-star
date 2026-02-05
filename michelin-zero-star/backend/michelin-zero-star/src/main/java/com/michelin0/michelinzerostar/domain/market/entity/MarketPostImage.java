@@ -43,4 +43,8 @@ public class MarketPostImage {
     public void assignPost(MarketPost marketPost) {
         this.marketPost = marketPost;
     }
+
+    public void updateOrderIndex(int orderIndex) {
+        this.orderIndex = orderIndex;
+    }
 }

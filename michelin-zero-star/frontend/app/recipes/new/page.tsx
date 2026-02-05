@@ -481,14 +481,25 @@ function NewRecipeForm() {
     } catch (error: any) {
       console.error("Recipe registration/update failed:", error)
       // Duplicate title handling
-      if (error.message?.includes("Title") || error.payload?.message?.includes("Title") || error.message?.includes("중복") || error.status === 409) {
+      const errorMessage = error.message?.toLowerCase() || ""
+      const payloadMessage = error.payload?.message?.toLowerCase() || ""
+
+      if (
+        errorMessage.includes("title") ||
+        payloadMessage.includes("title") ||
+        errorMessage.includes("중복") ||
+        errorMessage.includes("already exist") ||
+        errorMessage.includes("이미 존재") ||
+        errorMessage.includes("already_exists") ||
+        error.status === 409
+      ) {
         // alert("이미 등록한 동일한 제목의 레시피가 있습니다. 제목을 변경해주세요.")
         setTitleError(true)
         setTitleErrorMessage("이미 등록한 동일한 제목의 레시피가 있습니다.")
         // Scroll to title
         document.getElementById("title")?.scrollIntoView({ behavior: "smooth", block: "center" })
       } else {
-        alert("레시피 저장에 실패했습니다.")
+        alert("레시피 저장에 실패했습니다: " + (error.message || "알 수 없는 오류"))
       }
     }
   }
@@ -721,7 +732,7 @@ function NewRecipeForm() {
                     maxLength={20}
                   />
                   <Input
-                    placeholder="용량 (예: 200g)"
+                    placeholder="용량 (예: 200g, 약간, 1큰술, 1.5컵)"
                     value={ingredientAmount}
                     onChange={(e) => {
                       setIngredientAmount(e.target.value)
@@ -1027,9 +1038,9 @@ function NewRecipeForm() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-3 mt-4">
-            <Button variant="outline" className="flex-1 bg-transparent" onClick={() => setSuccessDialogOpen(false)}>
+            {/* <Button variant="outline" className="flex-1 bg-transparent" onClick={() => setSuccessDialogOpen(false)}>
               계속 등록하기
-            </Button>
+            </Button> */}
             <Button className="flex-1 bg-[#800020] hover:bg-[#800020]/90" onClick={handleViewRecipe}>
               내 레시피 보기
             </Button>
