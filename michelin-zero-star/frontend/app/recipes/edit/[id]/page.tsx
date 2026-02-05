@@ -33,6 +33,11 @@ interface RecipeStep {
   image: File | null
   imagePreview: string | null
   tips: string
+  errors?: {
+    description?: boolean
+    duration?: boolean
+    image?: boolean
+  }
 }
 
 const categoryOptions = [
@@ -69,8 +74,10 @@ export default function EditRecipePage() {
   // ✅ Validation States
   const [ingredientError, setIngredientError] = useState(false)
   const [tagError, setTagError] = useState(false)
+  const [titleError, setTitleError] = useState(false)
+  const [thumbnailError, setThumbnailError] = useState(false)
   const [steps, setSteps] = useState<RecipeStep[]>([
-    { id: 1, action: "", description: "", duration: 60, image: null, imagePreview: null, tips: "" },
+    { id: 1, action: "", description: "", duration: 0, image: null, imagePreview: null, tips: "" },
   ])
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
@@ -145,7 +152,7 @@ export default function EditRecipePage() {
       id: newId,
       action: "",
       description: "",
-      duration: 60,
+      duration: 0,
       image: null,
       imagePreview: null,
       tips: "",
@@ -169,7 +176,15 @@ export default function EditRecipePage() {
   }
 
   const addTag = () => {
+    if (tags.length >= 10) {
+      alert("태그는 최대 10개까지 등록할 수 있습니다.")
+      return
+    }
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
+      if (tagInput.trim().length > 20) {
+        alert("태그는 20자 이내로 입력해주세요.")
+        return
+      }
       setTags([...tags, tagInput.trim()])
       setTagInput("")
       setTagError(false)
@@ -203,20 +218,49 @@ export default function EditRecipePage() {
   const totalCookingTime = steps.reduce((acc, step) => acc + step.duration, 0)
 
   const handleSubmitClick = () => {
+    let isValid = true
+
+    if (ingredients.length === 0) {
+      setIngredientError(true)
+      isValid = false
+    }
+
     if (tags.length === 0) {
       setTagError(true)
-      // UI scroll optional
+      isValid = false
+    }
+
+    if (!title) {
+      setTitleError(true)
+      isValid = false
+    } else {
+      setTitleError(false)
+    }
+
+    if (!thumbnailPreview) {
+      setThumbnailError(true)
+      isValid = false
+    } else {
+      setThumbnailError(false)
+    }
+
+    const newSteps = steps.map((step) => {
+      const errors = {
+        description: !step.description,
+        duration: !step.duration,
+        image: !step.imagePreview && !step.image,
+      }
+      if (errors.description || errors.duration || errors.image) {
+        isValid = false
+      }
+      return { ...step, errors }
+    })
+    setSteps(newSteps)
+
+    if (!isValid) {
       return
     }
 
-    if (
-      !title ||
-      !thumbnailPreview ||
-      steps.some((s) => !s.action || !s.description || !s.duration || !s.imagePreview)
-    ) {
-      alert("제목, 대표 이미지, 그리고 모든 단계의 제목, 설명, 소요 시간(초), 단계 이미지는 필수입니다.")
-      return
-    }
     setConfirmDialogOpen(true)
   }
 
@@ -291,27 +335,38 @@ export default function EditRecipePage() {
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={handleThumbnailChange}
+                  onChange={(e) => {
+                    handleThumbnailChange(e)
+                    if (e.target.files?.length) setThumbnailError(false)
+                  }}
                 />
+                {thumbnailError && <p className="text-red-500 text-sm mt-1">대표 이미지를 등록해주세요</p>}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="title">레시피 제목<span className="text-red-500 ml-1">*</span></Label>
                 <Input
                   id="title"
-                  placeholder="예: 엄마표 김치찌개"
+                  placeholder="예: 엄마표 김치찌개 (최대 50자)"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => {
+                    setTitle(e.target.value)
+                    if (e.target.value) setTitleError(false)
+                  }}
+                  maxLength={50}
+                  className={cn(titleError && "border-red-500 focus-visible:ring-red-500")}
                 />
+                {titleError && <p className="text-red-500 text-sm mt-1">레시피 제목을 입력해주세요</p>}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description">레시피 소개</Label>
                 <Textarea
                   id="description"
-                  placeholder="이 레시피에 대해 간단히 소개해주세요"
+                  placeholder="이 레시피에 대해 간단히 소개해주세요 (최대 1000자)"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
+                  maxLength={1000}
                 />
               </div>
 
@@ -332,7 +387,7 @@ export default function EditRecipePage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="servings">인분</Label>
+                  <Label htmlFor="servings">인분<span className="text-red-500 ml-1">*</span></Label>
                   <Input
                     id="servings"
                     placeholder="예: 2"
@@ -348,12 +403,13 @@ export default function EditRecipePage() {
                 <Label>
                   태그<span className="text-red-500 ml-1">*</span>
                 </Label>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   <Input
-                    placeholder="태그 입력 후 추가"
+                    placeholder="태그 입력 후 추가 (최대 10개, 20자 이내)"
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
+                    maxLength={20}
                   />
                   <Button type="button" onClick={addTag} variant="outline">
                     추가
@@ -389,17 +445,20 @@ export default function EditRecipePage() {
                     placeholder="재료명 (예: 김치)"
                     value={ingredientName}
                     onChange={(e) => setIngredientName(e.target.value)}
-                    className="flex-1"
+                    className="flex-[6]"
+                    maxLength={20}
                   />
                   <Input
-                    placeholder="용량 (예: 200g)"
+                    placeholder="용량 (예: 200g, 약간, 1큰술, 1.5컵)"
                     value={ingredientAmount}
                     onChange={(e) => {
                       setIngredientAmount(e.target.value)
                       if (e.target.value.trim()) setIngredientError(false)
                     }}
+
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addIngredient())}
-                    className={cn("w-32", ingredientError && "border-red-500 focus-visible:ring-red-500")}
+                    className={cn("flex-[4]", ingredientError && "border-red-500 focus-visible:ring-red-500")}
+                    maxLength={20}
                   />
                   <Button type="button" onClick={addIngredient} variant="outline">
                     추가
@@ -463,7 +522,7 @@ export default function EditRecipePage() {
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
 
-                <div className="flex-1 p-4 border rounded-xl space-y-4">
+                <div className="flex-1 p-4 border rounded-xl space-y-4 min-w-0">
                   <div className="flex items-center justify-between">
                     <h4 className="font-semibold text-[#800020]">STEP {currentStepIndex + 1}</h4>
                     {steps.length > 1 && (
@@ -504,43 +563,75 @@ export default function EditRecipePage() {
                       className="hidden"
                       onChange={(e) => handleStepImageChange(currentStep.id, e)}
                     />
+                    {currentStep.errors?.image && <p className="text-red-500 text-sm mt-1">단계 이미지를 등록해주세요</p>}
                   </div>
 
-                  <div className="space-y-2">
+                  {/* <div className="space-y-2">
                     <Label>단계 제목<span className="text-red-500 ml-1">*</span></Label>
                     <Input
                       placeholder="예: 재료 손질하기"
                       value={currentStep.action}
                       onChange={(e) => updateStep(currentStep.id, "action", e.target.value)}
                     />
-                  </div>
+                  </div> */}
 
                   <div className="space-y-2">
                     <Label>상세 설명<span className="text-red-500 ml-1">*</span></Label>
                     <Textarea
-                      placeholder="이 단계에서 해야 할 일을 자세히 설명해주세요"
+                      placeholder="이 단계에서 해야 할 일을 자세히 설명해주세요 (최대 700자)"
                       value={currentStep.description}
                       onChange={(e) => updateStep(currentStep.id, "description", e.target.value)}
+                      className="break-all whitespace-pre-wrap"
+                      maxLength={700}
                     />
+                    {currentStep.errors?.description && <p className="text-red-500 text-sm mt-1">상세 설명을 입력해주세요</p>}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>소요 시간 (초)<span className="text-red-500 ml-1">*</span></Label>
-                      <Input
-                        type="number"
-                        value={currentStep.duration}
-                        onChange={(e) => updateStep(currentStep.id, "duration", Number.parseInt(e.target.value) || 60)}
-                      />
+                  <div className="space-y-2">
+                    <Label>소요 시간 (분/초)<span className="text-red-500 ml-1">*</span></Label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          value={Math.floor((currentStep.duration || 0) / 60) || ""}
+                          onChange={(e) => {
+                            const valStr = e.target.value.replace(/^0+/, "")
+                            const newMinutes = valStr ? parseInt(valStr) : 0
+                            const currentSeconds = (currentStep.duration || 0) % 60
+                            updateStep(currentStep.id, "duration", newMinutes * 60 + currentSeconds)
+                          }}
+                          placeholder="0"
+                        />
+                        <span className="text-sm text-muted-foreground whitespace-nowrap">분</span>
+                      </div>
+                      <div className="flex-1 flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="59"
+                          value={(currentStep.duration || 0) % 60 || ""}
+                          onChange={(e) => {
+                            const valStr = e.target.value.replace(/^0+/, "")
+                            const newSeconds = valStr ? parseInt(valStr) : 0
+                            const currentMinutes = Math.floor((currentStep.duration || 0) / 60)
+                            updateStep(currentStep.id, "duration", currentMinutes * 60 + newSeconds)
+                          }}
+                          placeholder="0"
+                        />
+                        <span className="text-sm text-muted-foreground whitespace-nowrap">초</span>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>팁 (선택)</Label>
-                      <Input
-                        placeholder="요리 팁을 입력하세요"
-                        value={currentStep.tips}
-                        onChange={(e) => updateStep(currentStep.id, "tips", e.target.value)}
-                      />
-                    </div>
+                    {currentStep.errors?.duration && <p className="text-red-500 text-sm mt-1">소요 시간을 입력해주세요</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>팁 (선택)</Label>
+                    <Input
+                      placeholder="요리 팁을 입력하세요 (최대 300자)"
+                      value={currentStep.tips}
+                      onChange={(e) => updateStep(currentStep.id, "tips", e.target.value)}
+                      maxLength={300}
+                    />
                   </div>
                 </div>
 
@@ -581,7 +672,7 @@ export default function EditRecipePage() {
             </Button>
           </div>
         </div>
-      </main>
+      </main >
 
       <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
         <AlertDialogContent>
@@ -597,6 +688,6 @@ export default function EditRecipePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </div >
   )
 }

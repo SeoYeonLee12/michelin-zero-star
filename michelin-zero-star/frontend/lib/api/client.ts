@@ -5,6 +5,7 @@ type ApiErrorPayload = {
   message?: string
   error?: string
   status?: number
+  validationErrors?: Record<string, string>
 }
 
 // ✅ 메모리 내 액세스 토큰 (브라우저 새로고침 시 초기화됨 -> Silent Refresh로 복구 필요)
@@ -97,6 +98,11 @@ export async function apiFetch<T = unknown>(
         console.log("[apiFetch] Silent Refresh Success. Retrying original request.")
         setGlobalAccessToken(newAccessToken)
 
+        // ✅ 토큰 갱신 이벤트 발생 (AuthContext에서 감지하여 WS 재연결)
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("cooksync:token-refreshed", { detail: { token: newAccessToken } }));
+        }
+
         // 새 토큰으로 재시도
         const newHeaders = new Headers(fetchOptions.headers || {})
         newHeaders.set("Authorization", `Bearer ${newAccessToken}`)
@@ -128,14 +134,26 @@ export async function apiFetch<T = unknown>(
 
   if (!res.ok) {
     const payload = (parsed ?? {}) as ApiErrorPayload
-    const message =
+    let message =
       payload.message ||
       payload.error ||
       (typeof parsed === "string" ? parsed : "") ||
       raw ||
       `Request failed (${res.status})`
 
-    throw new Error(message)
+    if (payload.validationErrors) {
+      const details = Object.entries(payload.validationErrors)
+        .map(([field, msg]) => `${field}: ${msg}`)
+        .join("\n")
+      if (details) {
+        message += `\n${details}`
+      }
+    }
+
+    const errorObj: any = new Error(message)
+    errorObj.status = res.status
+    errorObj.payload = payload
+    throw errorObj
   }
 
   return (parsed ?? (raw as unknown)) as T

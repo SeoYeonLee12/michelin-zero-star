@@ -63,14 +63,13 @@ export default function MyPage() {
     user,
     isLoggedIn,
     isLoading, // ✅ 로딩 상태 가져오기
-    likedRecipes,
+    likedRecipes = [],
     toggleLikeRecipe,
-    userRecipes,
+    userRecipes = [],
     // userPosts, // Context에서 제거됨 -> 로컬 State로 대체
     deleteUserRecipe,
     // deleteUserPost, // Context에서 제거됨
-    // updateUserPost, // Context에서 제거됨
-    likedPosts,
+    likedPosts = [],
   } = useAuth()
 
   const [activeTab, setActiveTab] = React.useState("saved")
@@ -259,7 +258,9 @@ export default function MyPage() {
                       </Button>
                     </div>
                     <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
-                      {user?.bio || "매일 조금씩 요리 실력을 키워가고 있어요!"}
+                      {user?.categories && user.categories.length > 0
+                        ? `${user.categories.join(", ")} 100스타에 도전 중!`
+                        : "깨어나라 봉인된 셰프여"}
                     </p>
                   </div>
                 </div>
@@ -318,7 +319,7 @@ export default function MyPage() {
 
         {/* ✅ Tabs 레이아웃 시작 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="flex flex-col md:flex-row gap-8 items-start relative mt-8">
+          <div className="flex flex-col md:flex-row gap-8 items-start relative mt-2">
 
             {/* [좌측 사이드바] 스크롤 시 상단 고정 */}
             <aside className="hidden md:block w-1/5 sticky top-24 shrink-0">

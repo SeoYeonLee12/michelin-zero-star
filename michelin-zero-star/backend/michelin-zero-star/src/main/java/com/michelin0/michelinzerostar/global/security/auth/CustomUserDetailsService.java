@@ -25,7 +25,8 @@ public class CustomUserDetailsService implements UserDetailsService {
     }
 
     public UserDetails loadUserByEmailAndProvider(String email, SocialProvider provider) {
-        User user = userRepository.findByEmailAndSocialProvider(email, provider)
+        // 이미 이메일로 인증된 토큰이므로, DB에 해당 이메일이 있다면 로그인 허용 (계정 통합 지원)
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("유저를 찾을 수 없습니다."));
 
         return new UserPrincipal(user);

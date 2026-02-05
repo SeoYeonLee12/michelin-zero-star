@@ -1,3 +1,4 @@
+// michelin-zero-star\frontend\app\community\chat\[roomId]\page.tsx
 "use client"
 
 import * as React from "react"

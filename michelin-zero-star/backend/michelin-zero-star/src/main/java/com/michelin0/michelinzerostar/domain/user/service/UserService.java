@@ -35,7 +35,9 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final UserFavoriteCategoryRepository userFavoriteCategoryRepository;
+
     private final CategoryRepository categoryRepository;
+    private final com.michelin0.michelinzerostar.domain.starhistory.domain.StarHistoryRepository starHistoryRepository;
 
     private final JwtTokenProvider jwtTokenProvider;
     private final RedisUtil redisUtil;
@@ -130,7 +132,14 @@ public class UserService {
                     .isVerified(profile.isVerified());
         }
 
-        return builder.build();
+        UserResponseDto responseDto = builder.build();
+        
+        // [Add] 오늘 획득한 스타 조회
+        double todayStars = starHistoryRepository.sumRewardAmountByUserAndDateBetween(user);
+        log.info("Calculated todayStars for user {}: {}", user.getId(), todayStars);
+        responseDto.setTodayStars(todayStars);
+
+        return responseDto;
     }
 
     // 내 정보 수정
@@ -200,13 +209,25 @@ public class UserService {
                 .map(ufc -> ufc.getCategory().getCategoryName())
                 .collect(Collectors.toList());
 
+        // 프로필 정보 조회 (위치/인증 정보 포함용)
+        UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
+
         // 응답 DTO 반환
-        return UserResponseDto.builder()
+        UserResponseDto.UserResponseDtoBuilder builder = UserResponseDto.builder()
                 .id(user.getId())
                 .email(user.getEmail())
                 .nickname(user.getNickname())
                 .profileImageUrl(user.getProfileImageUrl())
                 .categories(categories) // ★ 업데이트된 카테고리 목록 포함
-                .build();
+                .socialProvider(user.getSocialProvider())
+                .totalStar(user.getTotalStar())
+                .role(user.getRole());
+
+        if (profile != null) {
+            builder.location(profile.getLocationAddress())
+                    .isVerified(profile.isVerified());
+        }
+
+        return builder.build();
     }
 }

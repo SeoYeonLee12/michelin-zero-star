@@ -1,3 +1,4 @@
+// recipe-card.tsx
 "use client"
 
 import React from "react"
@@ -148,7 +149,7 @@ export function RecipeCard({ recipe, isLiked, onHeartClick, onEdit, onDelete, on
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <img
-              src="/michelin-full-star.png"
+              src="/michelin-star.png"
               alt="미슐랭"
               className="h-4 w-4"
             />
@@ -161,8 +162,8 @@ export function RecipeCard({ recipe, isLiked, onHeartClick, onEdit, onDelete, on
         </div>
         <div className="flex items-center justify-between gap-2 mt-2">
           <div className="flex flex-wrap gap-1 flex-1 min-w-0">
-            {recipe.hashtags?.slice(0, 2).map((tag) => (
-              <span key={tag} className="text-xs text-primary font-medium">
+            {recipe.hashtags?.slice(0, 2).map((tag, index) => (
+              <span key={index} className="text-xs text-primary font-medium">
                 #{tag}
               </span>
             ))}

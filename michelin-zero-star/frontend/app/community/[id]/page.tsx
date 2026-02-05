@@ -26,105 +26,30 @@ import {
   ChevronRight,
   MapPin,
   Clock,
-  Star,
   Pencil,
+  Loader2,
   CheckCircle,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 
-const mockPosts: Record<
-  string,
-  {
-    id: string
-    user: { id: string; name: string; avatar: string; location: string; starLevel: number }
-    title: string
-    description: string
-    price: string
-    images: string[]
-    place: string
-    timeAgo: string
-    likes: number
-    chatCount: number
-    status: "available" | "completed"
-  }
-> = {
-  "1": {
-    id: "1",
-    user: {
-      id: "user1",
-      name: "김대전",
-      avatar: "/korean-woman-avatar.jpg",
-      location: "대전 서구 둔산동",
-      starLevel: 3,
-    },
-    title: "양배추 반 통 나눠요",
-    description:
-      "대형마트에서 양배추 샀는데 혼자 다 못 먹을 것 같아요.\n반 통 1000원에 나눕니다!\n\n상태 좋고 신선해요. 둔산동 근처에서 직거래 가능합니다.",
-    price: "1,000원",
-    images: ["/half-cabbage.jpg"],
-    place: "둔산동 이마트 앞",
-    timeAgo: "10분 전",
-    likes: 5,
-    chatCount: 3,
-    status: "available",
-  },
-  "2": {
-    id: "2",
-    user: {
-      id: "user2",
-      name: "박요리",
-      avatar: "/korean-man-avatar.jpg",
-      location: "대전 유성구 봉명동",
-      starLevel: 5,
-    },
-    title: "계란 한 판 나눔 하실 분",
-    description: "계란 30개 한 판 사서 10개씩 나눠요.\n신선한 당일 구매 제품입니다.\n\n봉명동 근처에서 직거래 원해요!",
-    price: "2,500원/10개",
-    images: ["/eggs-carton.png"],
-    place: "봉명동 롯데마트 정문",
-    timeAgo: "25분 전",
-    likes: 12,
-    chatCount: 5,
-    status: "available",
-  },
-  "3": {
-    id: "3",
-    user: {
-      id: "user3",
-      name: "이맛집",
-      avatar: "/young-korean-woman-avatar.jpg",
-      location: "대전 중구 대흥동",
-      starLevel: 2,
-    },
-    title: "고구마 3kg 같이 사요",
-    description:
-      "꿀고구마 박스로 사면 싼데 혼자 다 못 먹어서...\n같이 나와서 사실 분 구해요!\n\n대흥동 마트 앞에서 만나요.",
-    price: "5,000원/1kg",
-    images: ["/roasted-sweet-potatoes.png"],
-    place: "대흥동 하나로마트",
-    timeAgo: "1시간 전",
-    likes: 8,
-    chatCount: 2,
-    status: "completed",
-  },
-}
-
 export default function CommunityDetailPage() {
   const router = useRouter()
   const params = useParams()
   const postId = params.id as string
-  const { isLoggedIn, user, toggleLikePost } = useAuth()
-  // const { isLoggedIn, userPosts, user, likedPosts, toggleLikePost, updateUserPost } = useAuth() // AuthContext의 userPosts 사용 중단
-  // likedPosts는 AuthContext에서 가져오되, 상세 조회 시 API에서 like 여부를 알 수 있다면 좋음.
-  // 현재 API에는 'owner' 필드가 있고, 'isLiked'는 없음. likedPosts를 통해 확인.
+
+  // ✅ startChatFromPost 추가 (WebSocket Chat Integration)
+  const { isLoggedIn, user, likedPosts, toggleLikePost, startChatFromPost } = useAuth()
 
   const [post, setPost] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [statusDialogOpen, setStatusDialogOpen] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<"SELLING" | "SOLD">("SELLING")
+
+  // ✅ 채팅방 생성 로딩 상태 추가
+  const [isCreatingChat, setIsCreatingChat] = useState(false)
 
   useEffect(() => {
     async function fetchPost() {
@@ -140,10 +65,10 @@ export default function CommunityDetailPage() {
     fetchPost()
   }, [postId])
 
-  const { likedPosts } = useAuth()
+  // 좋아요 상태 확인
   const isLiked = likedPosts.some((p) => p.id === postId)
-
-  const isMyPost = post?.owner || post?.isOwner || false
+  // Owner Check (Robust)
+  const isMyPost = post?.owner || post?.isOwner || (user?.id && String(post?.writerId) === String(user.id)) || false
 
   if (loading) {
     return (
@@ -188,7 +113,7 @@ export default function CommunityDetailPage() {
         title: post.title,
         description: post.content,
         price: post.price.toLocaleString(),
-        image: post.imageUrls[0],
+        image: post.imageUrls?.[0] || "",
         place: post.meetingPlace,
         likes: post.likeCount || 0,
         createdAt: post.createdAt,
@@ -207,12 +132,38 @@ export default function CommunityDetailPage() {
     }
   }
 
-  const handleChat = () => {
+  // ✅ [핵심 수정] 채팅하기 버튼 핸들러 (WebSocket Integrated)
+  const handleChat = async () => {
     if (!isLoggedIn) {
+      alert("로그인이 필요합니다.")
       router.push("/login")
       return
     }
-    router.push(`/messages/${post.writerId}?name=${encodeURIComponent(post.nickname || "이웃")}`)
+
+    if (isCreatingChat) return; // 중복 클릭 방지
+    setIsCreatingChat(true);
+
+    try {
+      // 1. postId를 숫자로 변환
+      const numericPostId = Number(post.id);
+
+      // 2. AuthContext의 함수를 통해 백엔드에서 방 생성/조회 후 roomId 획득
+      const roomId = await startChatFromPost(numericPostId);
+
+      if (!roomId || roomId === "undefined") {
+        throw new Error("Invalid Room ID");
+      }
+
+      // 3. 획득한 roomId를 쿼리 파라미터로 넘기며 이동 (또는 그냥 /messages로 가도 됨)
+      // 여기서는 메시지 페이지로 이동하면서 해당 룸을 열도록 함
+      router.push(`/messages?roomId=${roomId}`);
+
+    } catch (error) {
+      console.error("채팅방 입장 실패:", error);
+      alert("채팅방을 생성하지 못했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsCreatingChat(false);
+    }
   }
 
   const nextImage = () => {
@@ -245,7 +196,6 @@ export default function CommunityDetailPage() {
     }
   }
 
-
   const handleDelete = async () => {
     if (confirm("정말로 이 게시글을 삭제하시겠습니까?")) {
       try {
@@ -259,19 +209,19 @@ export default function CommunityDetailPage() {
     }
   }
 
-  const likeCount = post.likeCount ?? post.like_count ?? 0 // API에서 likeCount 가져오기 (snake_case 대응)
+  const likeCount = post.likeCount ?? post.like_count ?? 0
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Navbar />
       <ScrollToTop />
-      <main className="flex-1 container mx-auto max-w-4xl px-4 py-8">
-        <Button variant="ghost" size="sm" className="mb-4" onClick={() => router.push("/community")}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
+      <main className="flex-1 container mx-auto max-w-4xl px-4 py-4">
+        <Button variant="ghost" size="sm" className="mb-4 bg-transparent hover:bg-transparent active:bg-transparent focus:bg-transparent" onClick={() => router.push("/community")}>
+          <ArrowLeft className="h-4 w-4 mr-0" />
           목록으로
         </Button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           {/* Left - Image */}
           <div className="space-y-4">
             <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted">
@@ -281,7 +231,7 @@ export default function CommunityDetailPage() {
                 fill
                 className="object-cover"
               />
-              {post.status === "SOLD" && (
+              {(post.status === "SOLD" || post.status === "completed") && (
                 <div className="absolute inset-0 bg-black/60 z-10 flex flex-col items-center justify-center text-white">
                   <CheckCircle className="w-16 h-16 mb-3" />
                   <span className="text-2xl font-bold">거래 완료</span>
@@ -316,15 +266,13 @@ export default function CommunityDetailPage() {
               )}
               {/* Heart and comments moved to bottom right of image */}
               <div className="absolute bottom-4 right-4 flex items-center gap-3 bg-black/50 rounded-full px-3 py-1.5 z-20">
-                <div
-                  className={cn("flex items-center gap-1 text-white")}
-                >
+                <div className={cn("flex items-center gap-1 text-white")}>
                   <Heart className={cn("h-5 w-5", "fill-white")} />
                   <span className="text-sm font-medium">{likeCount}</span>
                 </div>
                 <div className="flex items-center gap-1 text-white">
                   <MessageCircle className="h-5 w-5" />
-                  <span className="text-sm font-medium">{post.chatCount}</span>
+                  <span className="text-sm font-medium">{post.chatCount || 0}</span>
                 </div>
               </div>
             </div>
@@ -337,6 +285,7 @@ export default function CommunityDetailPage() {
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
                 <span>{(() => {
+                  if (!post.createdAt) return "";
                   const dateStr = post.createdAt.endsWith("Z") ? post.createdAt : post.createdAt + "Z"
                   const date = new Date(dateStr)
                   return `${date.toLocaleDateString("ko-KR", {
@@ -349,7 +298,9 @@ export default function CommunityDetailPage() {
             </div>
 
             <div>
-              <p className="text-2xl font-bold text-[#800020]">{post.price.toLocaleString()}원</p>
+              <p className="text-2xl font-bold text-[#800020]">
+                {post.price === 0 ? "무료 나눔" : `${post.price.toLocaleString()}원`}
+              </p>
             </div>
 
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -359,17 +310,15 @@ export default function CommunityDetailPage() {
 
             <div className="whitespace-pre-line text-muted-foreground">{post.content}</div>
 
-
-
             {/* User Profile */}
             <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-xl">
               <Avatar className="h-12 w-12">
                 <AvatarImage src={post.profileImageUrl || "/placeholder.svg"} />
-                <AvatarFallback>{post.nickname?.[0]}</AvatarFallback>
+                <AvatarFallback>{post.nickname?.[0] || post.writerNickname?.[0] || "?"}</AvatarFallback>
               </Avatar>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="font-semibold">{post.nickname}</p>
+                  <p className="font-semibold">{post.nickname || post.writerNickname}</p>
                   <span className="flex items-center gap-1 text-xs font-semibold text-[#800020] bg-[#800020]/10 px-2 py-0.5 rounded-full border border-[#800020]/20">
                     <Image
                       src="/michelin-star.png"
@@ -378,7 +327,7 @@ export default function CommunityDetailPage() {
                       height={12}
                       className="object-contain"
                     />
-                    미슐랭 {post.totalStar}스타
+                    미슐랭 {post.totalStar || 0}스타
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -394,17 +343,17 @@ export default function CommunityDetailPage() {
                 // Owner Setup - Minimal Design
                 <div className="flex flex-1 gap-2">
                   <Button
-                    variant={post.status === "SOLD" ? "default" : "default"}
+                    variant="default"
                     className={cn(
                       "flex-[2] font-semibold",
-                      post.status === "SOLD"
+                      (post.status === "SOLD" || post.status === "completed")
                         ? "bg-gray-600 hover:bg-gray-700"
                         : "bg-[#800020] hover:bg-[#800020]/90",
                     )}
-                    onClick={() => handleStatusChange(post.status === "SOLD" ? "SELLING" : "SOLD")}
+                    onClick={() => handleStatusChange((post.status === "SOLD" || post.status === "completed") ? "SELLING" : "SOLD")}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    {post.status === "SOLD" ? "거래 완료됨" : "거래 완료로 변경"}
+                    {(post.status === "SOLD" || post.status === "completed") ? "거래 완료됨" : "거래 완료로 변경"}
                   </Button>
                   <Button
                     variant="outline"
@@ -441,10 +390,14 @@ export default function CommunityDetailPage() {
                     size="lg"
                     className="flex-1 gap-2 bg-[#800020] hover:bg-[#800020]/90"
                     onClick={handleChat}
-                    disabled={post.status === "SOLD"}
+                    disabled={(post.status === "SOLD" || post.status === "completed") || isCreatingChat}
                   >
-                    <MessageCircle className="h-5 w-5" />
-                    채팅하기
+                    {isCreatingChat ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <MessageCircle className="h-5 w-5" />
+                    )}
+                    {isCreatingChat ? "연결 중..." : "채팅하기"}
                   </Button>
                 </>
               )}
@@ -452,6 +405,7 @@ export default function CommunityDetailPage() {
           </div>
         </div>
       </main>
+
       <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -472,6 +426,6 @@ export default function CommunityDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div >
+    </div>
   )
 }

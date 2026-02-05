@@ -33,7 +33,8 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = React.useState("") // ✅ 에러 메시지 상태 추가
 
   const handleSocialLogin = (provider: "google" | "naver" | "kakao") => {
-    window.location.href = `http://localhost:8080/oauth2/authorization/${provider}`
+    // Next.js rewrites 설정을 통해 백엔드로 프록시됨 (/oauth2 -> http://backend:8080/oauth2)
+    window.location.href = `/oauth2/authorization/${provider}`
   }
 
   // ✅ Hydration 에러 및 초기 로직 통합
@@ -220,13 +221,13 @@ export default function LoginPage() {
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Checkbox id="remember" />
+                {/* <Checkbox id="remember" /> */}
                 <Label htmlFor="remember" className="text-sm font-normal cursor-pointer">
-                  로그인 상태 유지
+                  {/* 로그인 상태 유지 */}
                 </Label>
               </div>
               <Link href="/forgot-password" className="text-sm text-[#800020] hover:underline">
-                비밀번호 찾기
+                {/* 비밀번호 찾기 */}
               </Link>
             </div>
 
@@ -249,7 +250,7 @@ export default function LoginPage() {
           </div>
 
           <div className="grid grid-cols-3 gap-3">
-            <Button variant="outline" className="h-12 bg-transparent">
+            <Button variant="outline" className="h-12 bg-transparent" onClick={() => handleSocialLogin("google")}>
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
                   fill="currentColor"
@@ -269,12 +270,13 @@ export default function LoginPage() {
                 />
               </svg>
             </Button>
-            <Button variant="outline" className="h-12 bg-[#03C75A] hover:bg-[#03C75A]/90 text-white border-[#03C75A]">
+            <Button variant="outline" className="h-12 bg-[#03C75A] hover:bg-[#03C75A]/90 text-white border-[#03C75A]" onClick={() => handleSocialLogin("naver")}>
               <span className="font-bold text-lg">N</span>
             </Button>
             <Button
               variant="outline"
               className="h-12 bg-[#FEE500] hover:bg-[#FEE500]/90 text-[#3C1E1E] border-[#FEE500]"
+              onClick={() => handleSocialLogin("kakao")}
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path

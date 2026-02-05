@@ -103,8 +103,13 @@ export default function CommunityEditPage() {
   }
 
   const handleSubmit = () => {
-    if (!formData.title || !formData.description) {
-      alert("제목과 내용을 입력해주세요.")
+    if (!formData.title || formData.title.length < 2) {
+      alert("제목은 2자 이상 입력해주세요.")
+      return
+    }
+
+    if (!formData.description || formData.description.length < 5) {
+      alert("내용은 5자 이상 입력해주세요.")
       return
     }
     setShowConfirmDialog(true)
@@ -215,9 +220,10 @@ export default function CommunityEditPage() {
               </Label>
               <Input
                 id="title"
-                placeholder="예: 양배추 반 통 같이 나눠요"
+                placeholder="예: 양배추 반 통 같이 나눠요 (2~40자)"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                maxLength={40}
               />
             </div>
 
@@ -232,7 +238,11 @@ export default function CommunityEditPage() {
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={6}
+                maxLength={150}
               />
+              <div className="text-right text-xs text-muted-foreground">
+                {formData.description.length}/150
+              </div>
             </div>
 
             {/* Price */}
@@ -243,6 +253,8 @@ export default function CommunityEditPage() {
                 placeholder="예: 1000"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                type="number"
+                min="0"
               />
             </div>
 
@@ -256,6 +268,7 @@ export default function CommunityEditPage() {
                   value={formData.place}
                   onChange={(e) => setFormData({ ...formData, place: e.target.value })}
                   className="pl-10"
+                  maxLength={30}
                 />
               </div>
             </div>

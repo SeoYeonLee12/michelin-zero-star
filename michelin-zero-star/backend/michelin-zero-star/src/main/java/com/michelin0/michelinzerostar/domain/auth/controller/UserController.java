@@ -90,7 +90,7 @@ public class UserController {
 
     // 위치 인증
     @PostMapping("/location")
-    public ResponseEntity<String> verifyLocation(
+    public ResponseEntity<java.util.Map<String, String>> verifyLocation(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody LocationRequestDto requestDto
     ) {
@@ -100,7 +100,11 @@ public class UserController {
                 requestDto.getLongitude()
         );
 
-        return ResponseEntity.ok("현재 위치 '" + dongName + "' 인증이 완료되었습니다.");
+        java.util.Map<String, String> response = new java.util.HashMap<>();
+        response.put("message", "현재 위치 '" + dongName + "' 인증이 완료되었습니다.");
+        response.put("locationAddress", dongName);
+
+        return ResponseEntity.ok(response);
     }
 
     private String resolveToken(String token) {

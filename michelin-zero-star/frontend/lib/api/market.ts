@@ -5,7 +5,6 @@ export type MarketPostCreateRequest = {
     content: string
     price: number
     meetingPlace?: string
-    category?: string
 }
 
 export type MarketPostResponse = string // API 명세에 따르면 "string" 반환

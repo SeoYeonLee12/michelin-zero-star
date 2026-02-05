@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertDialog,
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { ArrowLeft, Upload, X, MapPin, Receipt } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
+import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { createPost, getPostDetail, updatePost } from "@/lib/api/market"
 import { compressImage } from "@/lib/image-utils"
@@ -56,8 +58,10 @@ function CommunityNewForm() {
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showExitDialog, setShowExitDialog] = useState(false)
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [createdPostId, setCreatedPostId] = useState<number | null>(null)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
-  const [showRewardDialog, setShowRewardDialog] = useState(false)
+  const [isFree, setIsFree] = useState(false)
   const [loading, setLoading] = useState(false)
   // Edit Mode Logic
   const searchParams = useSearchParams()
@@ -78,10 +82,13 @@ function CommunityNewForm() {
               return
             }
 
+            const isFreePost = post.price === 0
+            setIsFree(isFreePost)
+
             setFormData({
               title: post.title,
               description: post.content, // API field usually content
-              price: String(post.price),
+              price: isFreePost ? "무료 나눔" : String(post.price),
               place: post.meetingPlace || post.location || "",
             })
             if (post.imageUrls) {
@@ -95,6 +102,15 @@ function CommunityNewForm() {
       fetchPost()
     }
   }, [isEditMode, editPostId, isLoggedIn, router])
+
+  const handleFreeChange = (checked: boolean) => {
+    setIsFree(checked)
+    if (checked) {
+      setFormData((prev) => ({ ...prev, price: "무료 나눔" }))
+    } else {
+      setFormData((prev) => ({ ...prev, price: "" }))
+    }
+  }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files
@@ -146,19 +162,60 @@ function CommunityNewForm() {
   }
 
   const handleSubmit = () => {
-    if (!formData.title || !formData.description) {
-      alert("제목과 내용을 입력해주세요.")
+    if (!formData.title || formData.title.length < 2) {
+      alert("제목은 2자 이상 입력해주세요.")
       return
     }
+
+    if (!formData.description || formData.description.length < 5) {
+      alert("내용은 5자 이상 입력해주세요.")
+      return
+    }
+    if (formData.title.length < 2 || formData.title.length > 40) {
+      alert("제목은 2자 이상 40자 이하로 입력해주세요.")
+      return
+    }
+    if (formData.description.length < 5 || formData.description.length > 150) {
+      alert("내용은 5자 이상 150자 이하로 상세히 작성해주세요.")
+      return
+    }
+
+    if (!isFree) {
+      if (!formData.price) {
+        alert("가격을 입력하거나 무료 나눔을 선택해주세요.")
+        return
+      }
+      const numericPrice = parseInt(formData.price.replace(/,/g, ""), 10)
+      if (isNaN(numericPrice) || numericPrice < 1) {
+        alert("가격은 1원 이상이어야 합니다.")
+        return
+      }
+    }
+
+    if (!formData.place) {
+      alert("거래 장소를 입력해주세요.")
+      return
+    }
+
+    if (formData.place.length > 30) {
+      alert("거래 장소는 30자 이내로 입력해주세요.")
+      return
+    }
+
     setShowConfirmDialog(true)
   }
 
   const confirmSubmit = async () => {
     try {
+      const priceValue = isFree ? 0 : parseInt(formData.price.toString().replace(/,/g, "")) || 0
+
+      if (priceValue < 0) {
+        alert("가격은 0원 이상이어야 합니다.")
+        return
+      }
+
       if (isEditMode && editPostId) {
         // 수정 로직
-        // existingImages: files 배열에 없는(새로 추가되지 않은) images 배열의 URL들
-        // newImages: files 배열에 있는 File 객체들
         const existingImageUrls = images.filter(img => !img.startsWith("data:"))
 
         await updatePost(
@@ -166,7 +223,7 @@ function CommunityNewForm() {
           {
             title: formData.title,
             content: formData.description,
-            price: parseInt(formData.price.toString().replace(/,/g, "")) || 0,
+            price: priceValue,
             meetingPlace: formData.place
           },
           files,
@@ -176,26 +233,38 @@ function CommunityNewForm() {
         router.push(`/community/${editPostId}`)
       } else {
         // 생성 로직
-        await createPost(
+        const result = await createPost(
           {
             title: formData.title,
             content: formData.description,
-            price: Number(formData.price.replace(/,/g, "")) || 0,
-            meetingPlace: formData.place,
-            category: "SHARE",
+            price: priceValue,
+            meetingPlace: formData.place || "장소 협의",
           },
           files,
         )
-        earnStars(1.0, "recipe")
-        setShowRewardDialog(true)
+        // result가 ID라고 가정하고 파싱 시도 (숫자가 아니면 무시)
+        const newPostId = Number(result)
+        if (!isNaN(newPostId)) {
+          setCreatedPostId(newPostId)
+        }
+
+        setShowSuccessDialog(true)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("게시글 처리 실패:", error)
-      alert(isEditMode ? "게시글 수정에 실패했습니다." : "게시글 등록에 실패했습니다.")
+      alert(`게시글 ${isEditMode ? "수정" : "등록"}에 실패했습니다: ${error.message}`)
 
     } finally {
       setLoading(false)
       setShowConfirmDialog(false)
+    }
+  }
+
+  const handleViewPost = () => {
+    if (createdPostId) {
+      router.push(`/community/${createdPostId}`)
+    } else {
+      router.push("/community")
     }
   }
 
@@ -295,10 +364,17 @@ function CommunityNewForm() {
               </Label>
               <Input
                 id="title"
-                placeholder="예: 양배추 반 통 같이 나눠요"
+                placeholder="예: 양배추 반 통 같이 나눠요 (2~40자)"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                maxLength={40}
+                className={formData.title.length === 40 ? "focus-visible:ring-amber-500 ring-1 ring-amber-500" : ""}
               />
+              <div className="flex justify-end mt-1">
+                <span className={cn("text-xs", formData.title.length === 40 ? "text-amber-500 font-medium" : "text-muted-foreground")}>
+                  {formData.title.length} / 40
+                </span>
+              </div>
             </div>
 
             {/* Description */}
@@ -317,23 +393,65 @@ function CommunityNewForm() {
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={6}
+                maxLength={150}
+                className={formData.description.length === 150 ? "focus-visible:ring-amber-500 ring-1 ring-amber-500" : ""}
               />
+              <div className="flex justify-end mt-1">
+                <span className={cn("text-xs", formData.description.length === 150 ? "text-amber-500 font-medium" : "text-muted-foreground")}>
+                  {formData.description.length} / 150
+                </span>
+              </div>
             </div>
 
             {/* Price */}
             <div className="space-y-2">
-              <Label htmlFor="price">가격</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="price">
+                  가격 <span className="text-red-500">*</span>
+                </Label>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="free-sharing"
+                    checked={isFree}
+                    onCheckedChange={handleFreeChange}
+                  />
+                  <Label
+                    htmlFor="free-sharing"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    무료 나눔
+                  </Label>
+                </div>
+              </div>
               <Input
                 id="price"
                 placeholder="예: 1,000"
                 value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value
+                  if (val === "") {
+                    setFormData({ ...formData, price: "" })
+                    return
+                  }
+                  if (!/^\d*$/.test(val)) {
+                    alert("문자는 입력 할 수 없습니다.")
+                    return
+                  }
+                  // 숫자만 입력된 경우
+                  // 0으로 시작하는 경우 제거 (옵션)
+                  setFormData({ ...formData, price: val })
+                }}
+                disabled={isFree}
+                type="number"
+                min="0"
               />
             </div>
 
             {/* Place */}
             <div className="space-y-2">
-              <Label htmlFor="place">거래 장소</Label>
+              <Label htmlFor="place">
+                거래 장소 <span className="text-red-500">*</span>
+              </Label>
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -341,8 +459,14 @@ function CommunityNewForm() {
                   placeholder="예: 둔산동 롯데마트 앞"
                   value={formData.place}
                   onChange={(e) => setFormData({ ...formData, place: e.target.value })}
-                  className="pl-10"
+                  maxLength={30}
+                  className={cn("pl-10", formData.place.length === 30 ? "focus-visible:ring-amber-500 ring-1 ring-amber-500" : "")}
                 />
+              </div>
+              <div className="flex justify-end mt-1">
+                <span className={cn("text-xs", formData.place.length === 30 ? "text-amber-500 font-medium" : "text-muted-foreground")}>
+                  {formData.place.length} / 30
+                </span>
               </div>
             </div>
           </CardContent>
@@ -415,16 +539,16 @@ function CommunityNewForm() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Reward Dialog */}
+      {/* Success Dialog */}
       <AnimatePresence>
-        {showRewardDialog && (
+        {showSuccessDialog && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => router.push("/community")}
+              onClick={handleViewPost}
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -432,27 +556,20 @@ function CommunityNewForm() {
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               className="relative w-full max-w-[340px] bg-white rounded-[2.5rem] p-10 shadow-[0_20px_50px_rgba(0,0,0,0.1)] text-center overflow-hidden border border-gray-50"
             >
-              <div className="relative space-y-8">
+              <div className="relative space-y-6">
                 <div className="space-y-3">
-                  <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-tight">나눔 팟 생성 성공!</h2>
-                  <p className="text-gray-400 text-sm font-medium">게시글 등록이 완료됐습니다.</p>
+                  <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-tight">게시글 등록 성공!</h2>
+                  <p className="text-gray-400 text-sm font-medium">작성하신 나눔 게시글이 등록되었습니다.</p>
                 </div>
 
-                <div className="py-2">
-                  <StarRewardBadge
-                    amount={1}
-                    customText="1스타 적립"
-                    starSize="md"
-                    textSize="sm"
-                  />
+                <div className="flex gap-3 mt-4">
+                  <Button
+                    className="flex-1 bg-[#800020] hover:bg-[#800020]/90 text-white font-semibold shadow-sm"
+                    onClick={handleViewPost}
+                  >
+                    게시글 목록보기
+                  </Button>
                 </div>
-
-                <Button
-                  className="w-full h-12 rounded-xl bg-[#800020] hover:bg-[#800020]/90 text-white font-semibold text-sm transition-all active:scale-[0.98] shadow-sm"
-                  onClick={() => router.push("/community")}
-                >
-                  확인
-                </Button>
               </div>
             </motion.div>
           </div>

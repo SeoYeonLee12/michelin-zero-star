@@ -34,6 +34,8 @@ import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
 import { getCookie } from "@/lib/cookie"
 import { registerRecipe, updateRecipe, getRecipeDetail, type RegisterRecipeRequest } from "@/lib/api/recipes"
+import { StarRewardBadge } from "@/components/cook-sync/star-reward-badge"
+import { AnimatePresence, motion } from "framer-motion"
 
 interface RecipeStep {
   id: number
@@ -43,6 +45,11 @@ interface RecipeStep {
   image: File | null
   imagePreview: string | null
   tips: string
+  errors?: {
+    description?: boolean
+    duration?: boolean
+    image?: boolean
+  }
 }
 
 interface Ingredient {
@@ -83,7 +90,7 @@ function NewRecipeForm() {
   const searchParams = useSearchParams()
   const recipeIdParam = searchParams.get("id")
   const isEditMode = !!recipeIdParam
-  const { isLoggedIn, addUserRecipe, isLoading } = useAuth() // ✅ Added isLoading
+  const { isLoggedIn, addUserRecipe, isLoading, earnStars } = useAuth() // ✅ Added isLoading
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [category, setCategory] = useState("")
@@ -96,16 +103,19 @@ function NewRecipeForm() {
   const [ingredientName, setIngredientName] = useState("")
   const [ingredientAmount, setIngredientAmount] = useState("")
   const [steps, setSteps] = useState<RecipeStep[]>([
-    { id: 1, action: "", description: "", duration: 60, image: null, imagePreview: null, tips: "" },
+    { id: 1, action: "", description: "", duration: 0, image: null, imagePreview: null, tips: "" },
   ])
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [successDialogOpen, setSuccessDialogOpen] = useState(false)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [exitDialogOpen, setExitDialogOpen] = useState(false)
+  const [showRewardDialog, setShowRewardDialog] = useState(false)
 
   // ✅ Validation States
   const [ingredientError, setIngredientError] = useState(false)
   const [tagError, setTagError] = useState(false)
+  const [titleError, setTitleError] = useState(false)
+  const [thumbnailError, setThumbnailError] = useState(false)
   const [createdRecipeId, setCreatedRecipeId] = useState<number | null>(null)
 
   // ✅ Fetch data if Edit Mode
@@ -211,7 +221,7 @@ function NewRecipeForm() {
       id: newId,
       action: "",
       description: "",
-      duration: 60,
+      duration: 0,
       image: null,
       imagePreview: null,
       tips: "",
@@ -235,7 +245,15 @@ function NewRecipeForm() {
   }
 
   const addTag = () => {
+    if (tags.length >= 10) {
+      alert("태그는 최대 10개까지 등록할 수 있습니다.")
+      return
+    }
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
+      if (tagInput.trim().length > 20) {
+        alert("태그는 20자 이내로 입력해주세요.")
+        return
+      }
       setTags([...tags, tagInput.trim()])
       setTagInput("")
       setTagError(false) // 태그 추가 시 에러 해제
@@ -288,21 +306,49 @@ function NewRecipeForm() {
   }
 
   const handleSubmitClick = () => {
+    let isValid = true
+
+    if (ingredients.length === 0) {
+      setIngredientError(true)
+      isValid = false
+    }
+
     if (tags.length === 0) {
       setTagError(true)
-      document.getElementById("tag-section")?.scrollIntoView({ behavior: "smooth" })
-      // alert("태그를 입력해주세요.") // UI 표시로 대체
+      isValid = false
+    }
+
+    if (!title) {
+      setTitleError(true)
+      isValid = false
+    } else {
+      setTitleError(false)
+    }
+
+    if (!thumbnailPreview) {
+      setThumbnailError(true)
+      isValid = false
+    } else {
+      setThumbnailError(false)
+    }
+
+    const newSteps = steps.map((step) => {
+      const errors = {
+        description: !step.description,
+        duration: !step.duration,
+        image: !step.imagePreview && !step.image,
+      }
+      if (errors.description || errors.duration || errors.image) {
+        isValid = false
+      }
+      return { ...step, errors }
+    })
+    setSteps(newSteps)
+
+    if (!isValid) {
       return
     }
 
-    if (
-      !title ||
-      !thumbnailPreview ||
-      steps.some((s) => !s.action || !s.description || !s.duration || (!s.imagePreview && !s.image)) // Check preview OR file
-    ) {
-      alert("제목, 대표 이미지, 그리고 모든 단계의 제목, 설명, 소요 시간(초), 단계 이미지는 필수입니다.")
-      return
-    }
     setConfirmDialogOpen(true)
   }
 
@@ -378,7 +424,9 @@ function NewRecipeForm() {
       }
 
       // 3. 성공 처리 (Only for Create)
-      setSuccessDialogOpen(true)
+      earnStars(1.0, "recipe")
+      // setSuccessDialogOpen(true) // 기존 Dialog 대신 보상 Dialog 사용
+      setShowRewardDialog(true)
 
     } catch (error) {
       console.error("Recipe registration/update failed:", error)
@@ -471,8 +519,12 @@ function NewRecipeForm() {
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={handleThumbnailChange}
+                    onChange={(e) => {
+                      handleThumbnailChange(e)
+                      if (e.target.files?.length) setThumbnailError(false)
+                    }}
                   />
+                  {thumbnailError && <p className="text-red-500 text-sm mt-1">대표 이미지를 등록해주세요</p>}
                 </div>
 
                 <div className="space-y-4 md:w-1/2">
@@ -480,20 +532,27 @@ function NewRecipeForm() {
                     <Label htmlFor="title">레시피 제목<span className="text-red-500 ml-1">*</span></Label>
                     <Input
                       id="title"
-                      placeholder="예: 엄마표 김치찌개"
+                      placeholder="예: 엄마표 김치찌개 (최대 50자)"
                       value={title}
-                      onChange={(e) => setTitle(e.target.value)}
+                      onChange={(e) => {
+                        setTitle(e.target.value)
+                        if (e.target.value) setTitleError(false)
+                      }}
+                      maxLength={50}
+                      className={cn(titleError && "border-red-500 focus-visible:ring-red-500")}
                     />
+                    {titleError && <p className="text-red-500 text-sm mt-1">레시피 제목을 입력해주세요</p>}
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="description">레시피 소개</Label>
                     <Textarea
                       id="description"
-                      placeholder="이 레시피에 대해 간단히 소개해주세요"
+                      placeholder="이 레시피에 대해 간단히 소개해주세요 (최대 1000자)"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       className="min-h-[80px]"
+                      maxLength={1000}
                     />
                   </div>
 
@@ -514,7 +573,7 @@ function NewRecipeForm() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="servings">인분</Label>
+                      <Label htmlFor="servings">인분<span className="text-red-500 ml-1">*</span></Label>
                       <Input
                         id="servings"
                         placeholder="예: 2"
@@ -531,12 +590,13 @@ function NewRecipeForm() {
                 <Label>
                   태그<span className="text-red-500 ml-1">*</span>
                 </Label>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   <Input
-                    placeholder="태그 입력 후 추가"
+                    placeholder="태그 입력 후 추가 (최대 10개, 20자 이내)"
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
+                    maxLength={20}
                   />
                   <Button type="button" onClick={addTag} variant="outline">
                     추가
@@ -572,16 +632,18 @@ function NewRecipeForm() {
                     value={ingredientName}
                     onChange={(e) => setIngredientName(e.target.value)}
                     className="flex-[6]"
+                    maxLength={20}
                   />
                   <Input
-                    placeholder="용량 (예: 200g, 약간, 1큰술, 1.5컵)"
+                    placeholder="용량 (예: 200g)"
                     value={ingredientAmount}
                     onChange={(e) => {
                       setIngredientAmount(e.target.value)
                       if (e.target.value.trim()) setIngredientError(false)
                     }}
-                    className={cn("w-32", ingredientError && "border-red-500 focus-visible:ring-red-500")}
+                    className={cn("flex-[4]", ingredientError && "border-red-500 focus-visible:ring-red-500")}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addIngredient())}
+                    maxLength={20}
                   />
                   <Button type="button" onClick={addIngredient} variant="outline">
                     추가
@@ -642,7 +704,7 @@ function NewRecipeForm() {
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
 
-                <div className="flex-1 p-5 border rounded-xl">
+                <div className="flex-1 p-5 border rounded-xl overflow-hidden min-w-0">
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="font-semibold text-lg text-[#800020]">STEP {currentStepIndex + 1}</h4>
                     {steps.length > 1 && (
@@ -698,52 +760,75 @@ function NewRecipeForm() {
                         className="hidden"
                         onChange={(e) => handleStepImageChange(currentStep.id, e)}
                       />
+                      {currentStep.errors?.image && <p className="text-red-500 text-sm mt-1">단계 이미지를 등록해주세요</p>}
                     </div>
 
-                    <div className="space-y-4 md:w-1/2 flex flex-col">
+                    <div className="space-y-4 md:w-1/2 flex flex-col min-w-0">
                       <div className="space-y-2">
-                        <Label className="text-base">소요 시간 (초)<span className="text-red-500 ml-1">*</span></Label>
+                        <Label className="text-base">소요 시간 (분/초)<span className="text-red-500 ml-1">*</span></Label>
                         <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            value={currentStep.duration}
-                            onChange={(e) =>
-                              updateStep(currentStep.id, "duration", e.target.value ? Number.parseInt(e.target.value) : "")
-                            }
-                            placeholder="예: 120"
-                            className="text-base flex-1"
-                          />
-                          <span className="text-sm text-muted-foreground whitespace-nowrap">초</span>
+                          <div className="flex-1 flex items-center gap-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={Math.floor((currentStep.duration || 0) / 60) || ""}
+                              onChange={(e) => {
+                                const valStr = e.target.value.replace(/^0+/, "")
+                                const newMinutes = valStr ? parseInt(valStr) : 0
+                                const currentSeconds = (currentStep.duration || 0) % 60
+                                updateStep(currentStep.id, "duration", newMinutes * 60 + currentSeconds)
+                              }}
+                              placeholder="0"
+                              className="text-base"
+                            />
+                            <span className="text-sm text-muted-foreground whitespace-nowrap">분</span>
+                          </div>
+                          <div className="flex-1 flex items-center gap-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              max="59"
+                              value={(currentStep.duration || 0) % 60 || ""}
+                              onChange={(e) => {
+                                let valStr = e.target.value.replace(/^0+/, "")
+                                // Handle case where user might paste/type > 59, logic should clamp or just accept?
+                                // For simplicity allow typing, clamping via max usually handles spin buttons but typing can be anything.
+                                // Ensuring valid seconds:
+                                let newSeconds = valStr ? parseInt(valStr) : 0
+                                // Optional: clamp seconds logic if desired, but user asked for input fix.
+
+                                const currentMinutes = Math.floor((currentStep.duration || 0) / 60)
+                                updateStep(currentStep.id, "duration", currentMinutes * 60 + newSeconds)
+                              }}
+                              placeholder="0"
+                              className="text-base"
+                            />
+                            <span className="text-sm text-muted-foreground whitespace-nowrap">초</span>
+                          </div>
                         </div>
                       </div>
+                      {currentStep.errors?.duration && <p className="text-red-500 text-sm mt-1">소요 시간을 입력해주세요</p>}
 
-                      <div className="space-y-2">
-                        <Label className="text-base">단계 제목<span className="text-red-500 ml-1">*</span></Label>
-                        <Input
-                          placeholder="예: 재료 손질하기"
-                          value={currentStep.action}
-                          onChange={(e) => updateStep(currentStep.id, "action", e.target.value)}
-                          className="text-base"
-                        />
-                      </div>
-
-                      <div className="space-y-2 flex-1 flex flex-col">
+                      <div className="space-y-2 flex-1 flex flex-col min-w-0">
                         <Label className="text-base">상세 설명<span className="text-red-500 ml-1">*</span></Label>
                         <Textarea
-                          placeholder="이 단계에서 해야 할 일을 자세히 설명해주세요"
+                          placeholder="이 단계에서 해야 할 일을 자세히 설명해주세요 (최대 700자)"
                           value={currentStep.description}
                           onChange={(e) => updateStep(currentStep.id, "description", e.target.value)}
-                          className="min-h-[100px] flex-1 overflow-y-auto text-base resize-none"
+                          className="min-h-[100px] flex-1 overflow-y-auto text-base resize-none break-all whitespace-pre-wrap"
+                          maxLength={700}
                         />
+                        {currentStep.errors?.description && <p className="text-red-500 text-sm mt-1">상세 설명을 입력해주세요</p>}
                       </div>
 
                       <div className="space-y-2">
                         <Label className="text-base">팁 (선택)</Label>
                         <Input
-                          placeholder="요리 팁을 입력하세요"
+                          placeholder="요리 팁을 입력하세요 (최대 300자)"
                           value={currentStep.tips}
                           onChange={(e) => updateStep(currentStep.id, "tips", e.target.value)}
                           className="text-base"
+                          maxLength={300}
                         />
                       </div>
                     </div>
@@ -793,7 +878,7 @@ function NewRecipeForm() {
               등록
             </Button>
           </div>
-        </div>
+        </div >
       </main >
 
       {/* Confirm Submit Dialog */}
@@ -853,6 +938,59 @@ function NewRecipeForm() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Reward Dialog */}
+      <AnimatePresence>
+        {showRewardDialog && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={handleViewRecipe}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-[340px] bg-white rounded-[2.5rem] p-10 shadow-[0_20px_50px_rgba(0,0,0,0.1)] text-center overflow-hidden border border-gray-50"
+            >
+              <div className="relative space-y-6">
+                <div className="space-y-3">
+                  <h2 className="text-2xl font-bold text-gray-900 tracking-tight leading-tight">레시피 등록 성공!</h2>
+                  <p className="text-gray-400 text-sm font-medium">나만의 레시피가 등록되었습니다.</p>
+                </div>
+
+                <div className="py-2">
+                  <StarRewardBadge
+                    amount={1}
+                    customText="1 스타 적립"
+                    starSize="md"
+                    textSize="sm"
+                  />
+                </div>
+
+                <div className="flex gap-3 mt-1">
+                  <Button
+                    variant="outline"
+                    className="flex-1 bg-transparent"
+                    onClick={() => setShowRewardDialog(false)}
+                  >
+                    계속 등록하기
+                  </Button>
+                  <Button
+                    className="flex-1 bg-[#800020] hover:bg-[#800020]/90"
+                    onClick={handleViewRecipe}
+                  >
+                    내 레시피 보기
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div >
   )
 }
