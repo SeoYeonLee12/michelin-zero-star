@@ -30,6 +30,14 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private String frontendUrl;
 
     @Override
+    @PostConstruct
+    public void init() {
+        log.info("=========================================");
+        log.info("OAuth2SuccessHandler Initialized");
+        log.info("Frontend URL: {}", frontendUrl);
+        log.info("=========================================");
+    }
+
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
             Authentication authentication) throws IOException {
 
