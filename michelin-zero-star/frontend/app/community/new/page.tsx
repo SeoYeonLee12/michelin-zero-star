@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { ArrowLeft, Upload, X, MapPin, Receipt } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
+import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { createPost, getPostDetail, updatePost } from "@/lib/api/market"
 import { compressImage } from "@/lib/image-utils"
@@ -170,14 +171,34 @@ function CommunityNewForm() {
       alert("내용은 5자 이상 입력해주세요.")
       return
     }
-
-    if (!isFree && !formData.price) {
-      alert("가격을 입력하거나 무료 나눔을 선택해주세요.")
+    if (formData.title.length < 2 || formData.title.length > 40) {
+      alert("제목은 2자 이상 40자 이하로 입력해주세요.")
       return
+    }
+    if (formData.description.length < 5 || formData.description.length > 150) {
+      alert("내용은 5자 이상 150자 이하로 상세히 작성해주세요.")
+      return
+    }
+
+    if (!isFree) {
+      if (!formData.price) {
+        alert("가격을 입력하거나 무료 나눔을 선택해주세요.")
+        return
+      }
+      const numericPrice = parseInt(formData.price.replace(/,/g, ""), 10)
+      if (isNaN(numericPrice) || numericPrice < 1) {
+        alert("가격은 1원 이상이어야 합니다.")
+        return
+      }
     }
 
     if (!formData.place) {
       alert("거래 장소를 입력해주세요.")
+      return
+    }
+
+    if (formData.place.length > 30) {
+      alert("거래 장소는 30자 이내로 입력해주세요.")
       return
     }
 
@@ -187,6 +208,11 @@ function CommunityNewForm() {
   const confirmSubmit = async () => {
     try {
       const priceValue = isFree ? 0 : parseInt(formData.price.toString().replace(/,/g, "")) || 0
+
+      if (priceValue < 0) {
+        alert("가격은 0원 이상이어야 합니다.")
+        return
+      }
 
       if (isEditMode && editPostId) {
         // 수정 로직
@@ -342,7 +368,13 @@ function CommunityNewForm() {
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 maxLength={40}
+                className={formData.title.length === 40 ? "focus-visible:ring-amber-500 ring-1 ring-amber-500" : ""}
               />
+              <div className="flex justify-end mt-1">
+                <span className={cn("text-xs", formData.title.length === 40 ? "text-amber-500 font-medium" : "text-muted-foreground")}>
+                  {formData.title.length} / 40
+                </span>
+              </div>
             </div>
 
             {/* Description */}
@@ -362,9 +394,12 @@ function CommunityNewForm() {
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={6}
                 maxLength={150}
+                className={formData.description.length === 150 ? "focus-visible:ring-amber-500 ring-1 ring-amber-500" : ""}
               />
-              <div className="text-right text-xs text-muted-foreground">
-                {formData.description.length}/150
+              <div className="flex justify-end mt-1">
+                <span className={cn("text-xs", formData.description.length === 150 ? "text-amber-500 font-medium" : "text-muted-foreground")}>
+                  {formData.description.length} / 150
+                </span>
               </div>
             </div>
 
@@ -392,7 +427,20 @@ function CommunityNewForm() {
                 id="price"
                 placeholder="예: 1,000"
                 value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value
+                  if (val === "") {
+                    setFormData({ ...formData, price: "" })
+                    return
+                  }
+                  if (!/^\d*$/.test(val)) {
+                    alert("문자는 입력 할 수 없습니다.")
+                    return
+                  }
+                  // 숫자만 입력된 경우
+                  // 0으로 시작하는 경우 제거 (옵션)
+                  setFormData({ ...formData, price: val })
+                }}
                 disabled={isFree}
                 type="number"
                 min="0"
@@ -411,9 +459,14 @@ function CommunityNewForm() {
                   placeholder="예: 둔산동 롯데마트 앞"
                   value={formData.place}
                   onChange={(e) => setFormData({ ...formData, place: e.target.value })}
-                  className="pl-10"
                   maxLength={30}
+                  className={cn("pl-10", formData.place.length === 30 ? "focus-visible:ring-amber-500 ring-1 ring-amber-500" : "")}
                 />
+              </div>
+              <div className="flex justify-end mt-1">
+                <span className={cn("text-xs", formData.place.length === 30 ? "text-amber-500 font-medium" : "text-muted-foreground")}>
+                  {formData.place.length} / 30
+                </span>
               </div>
             </div>
           </CardContent>

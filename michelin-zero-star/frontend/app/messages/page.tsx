@@ -276,17 +276,32 @@ export default function MessagesPage() {
             </div>
 
             <div className="p-4 bg-white border-t">
-              <div className="flex gap-2">
-                <Input
-                  value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && handleSend()}
-                  placeholder="메시지 입력..."
-                  className="rounded-full bg-gray-100 border-none focus-visible:ring-1 focus-visible:ring-[#800020]"
-                />
-                <Button onClick={handleSend} disabled={!messageText.trim()} className="rounded-full bg-[#800020] hover:bg-[#800020]/90 w-10 h-10 p-0 shrink-0">
-                  <Send className="h-4 w-4 text-white" />
-                </Button>
+              <div className="flex flex-col gap-1">
+                <div className="flex gap-2">
+                  <Input
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && handleSend()}
+                    placeholder="메시지 입력..."
+                    className={cn(
+                      "rounded-full bg-gray-100 border-none focus-visible:ring-1",
+                      messageText.length > 1000 ? "focus-visible:ring-red-500 ring-1 ring-red-500" : "focus-visible:ring-[#800020]"
+                    )}
+                  />
+                  <Button
+                    onClick={handleSend}
+                    disabled={!messageText.trim() || messageText.length > 1000}
+                    className={cn(
+                      "rounded-full w-10 h-10 p-0 shrink-0",
+                      messageText.length > 1000 ? "bg-gray-400 hover:bg-gray-400" : "bg-[#800020] hover:bg-[#800020]/90"
+                    )}
+                  >
+                    <Send className="h-4 w-4 text-white" />
+                  </Button>
+                </div>
+                <div className={cn("text-xs text-right px-2", messageText.length > 1000 ? "text-red-500 font-medium" : "text-gray-400")}>
+                  {messageText.length} / 1000
+                </div>
               </div>
             </div>
           </div>

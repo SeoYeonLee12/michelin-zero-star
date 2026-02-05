@@ -109,7 +109,11 @@ public class AuthService {
         if (remainingTime > threeDaysInMillis) {
             System.out.println("====== [DEBUG] 기존 토큰 유지 (로그인 풀림 방지 성공) ======");
             // Access Token만 새로 생성
-            String newAccessToken = jwtTokenProvider.createAccessToken(authentication);
+            String newAccessToken = jwtTokenProvider.createAccessToken(
+                    email,
+                    user.getRole().getKey(),
+                    user.getSocialProvider().name()
+            );
 
             return TokenDto.builder()
                     .grantType("Bearer")
@@ -119,7 +123,11 @@ public class AuthService {
                     .build();
         }
         System.out.println("====== [DEBUG] 새 토큰 교체 (로그인 풀림 위험) ======");
-        return jwtTokenProvider.createToken(authentication);
+        return jwtTokenProvider.createToken(
+                email,
+                user.getRole().getKey(),
+                user.getSocialProvider().name()
+        );
     }
 
     @Transactional

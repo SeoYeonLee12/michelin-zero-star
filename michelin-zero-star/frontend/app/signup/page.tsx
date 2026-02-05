@@ -26,6 +26,7 @@ export default function SignupPage() {
   const { signup } = useAuth()
   const [showPassword, setShowPassword] = React.useState(false)
   const [nicknameError, setNicknameError] = React.useState("")
+  const [emailError, setEmailError] = React.useState("")
   const [formData, setFormData] = React.useState({
     name: "",
     nickname: "",
@@ -43,6 +44,21 @@ export default function SignupPage() {
   ]
 
   const allRequirementsMet = passwordRequirements.every((req) => req.met)
+
+  const validateEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  }
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setFormData({ ...formData, email: value })
+
+    if (value && !validateEmail(value)) {
+      setEmailError("올바른 이메일을 입력해 주세요")
+    } else {
+      setEmailError("")
+    }
+  }
 
   const checkNicknameDuplicate = (nickname: string) => {
     if (!nickname.trim()) {
@@ -64,10 +80,36 @@ export default function SignupPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Name validation
+    if (formData.name.length < 2 || formData.name.length > 10) {
+      alert("이름은 2자 이상 10자 이하로 입력해주세요.")
+      return
+    }
+
+    // Nickname validation
+    if (formData.nickname.length < 2 || formData.nickname.length > 12) {
+      setNicknameError("닉네임은 2자 이상 12자 이하로 입력해주세요.")
+      return
+    }
+
+    if (emailError || !validateEmail(formData.email)) {
+      setEmailError("올바른 이메일을 입력해 주세요")
+      alert("올바른 이메일을 입력해 주세요")
+      return
+    }
+
     if (formData.password !== formData.confirmPassword) {
       alert("비밀번호가 일치하지 않습니다.")
       return
     }
+
+    // Password validation (Double check length explicitly here too)
+    if (formData.password.length < 8 || formData.password.length > 20) {
+      alert("비밀번호는 8자 이상 20자 이하로 입력해주세요.")
+      return
+    }
+
     if (!allRequirementsMet) {
       alert("비밀번호 조건을 모두 충족해주세요.")
       return
@@ -80,6 +122,7 @@ export default function SignupPage() {
       alert("닉네임을 입력해주세요.")
       return
     }
+
     setIsLoading(true)
     try {
       await signup({
@@ -193,6 +236,7 @@ export default function SignupPage() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
+                  maxLength={10}
                   className="h-12"
                 />
               </div>
@@ -206,6 +250,7 @@ export default function SignupPage() {
                   value={formData.nickname}
                   onChange={handleNicknameChange}
                   required
+                  maxLength={12}
                   className={`h-12 ${nicknameError ? "border-destructive" : ""}`}
                 />
                 {nicknameError && <p className="text-xs text-destructive">{nicknameError}</p>}
@@ -220,10 +265,12 @@ export default function SignupPage() {
                 type="email"
                 placeholder="example@email.com"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={handleEmailChange}
                 required
-                className="h-12"
+                maxLength={50}
+                className={`h-12 ${emailError ? "border-destructive" : ""}`}
               />
+              {emailError && <p className="text-xs text-destructive">{emailError}</p>}
             </div>
 
             <div className="space-y-2">
@@ -236,6 +283,7 @@ export default function SignupPage() {
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
+                  maxLength={20}
                   className="h-12 pr-12"
                 />
                 <button
@@ -272,6 +320,7 @@ export default function SignupPage() {
                 value={formData.confirmPassword}
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                 required
+                maxLength={20}
                 className="h-12"
               />
               {formData.confirmPassword && formData.password !== formData.confirmPassword && (
