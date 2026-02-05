@@ -13,14 +13,14 @@ import { ChatMessageList } from "@/components/ui/chat-message-list"
 import { ChatBubble, ChatBubbleAvatar, ChatBubbleMessage } from "@/components/ui/chat-bubble"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { leftoverRecipes } from "@/lib/dummy-data"
 import type { Recipe, ChatMessage } from "@/lib/types" // Ensure ChatMessage type is compatible or updated
 import { useAuth } from "@/lib/auth-context"
 import { ArrowLeft, Clock, Users, Flame } from "lucide-react"
 import Image from "next/image"
 import { MichelinIcon } from "@/components/common/MichelinIcon"
-import { getAiChatHistory, type AiChatHistoryDto } from "@/lib/api/chat"
-import { formatDate } from "date-fns" // Assuming date-fns usage
+import { getRecipeDetail, type BackendRecipeResponse } from "@/lib/api/recipes"
 
 const suggestedPrompts = ["잡채 레시피 알려줘", "매콤한게 땡기는데 먹을만한 거 추천해줘", "매운 오징어 요리 찾아줘", "양파로 만들 수 있는 요리 알려줘"]
 
@@ -35,6 +35,7 @@ export default function HomePage() {
   const [currentStepIndex, setCurrentStepIndex] = React.useState(0)
   const [isLoading, setIsLoading] = React.useState(false)
   const [showCompleteDialog, setShowCompleteDialog] = React.useState(false)
+  const [showLoginDialog, setShowLoginDialog] = React.useState(false)
   const [currentRecipes, setCurrentRecipes] = React.useState<Recipe[]>([])
   const chatContainerRef = React.useRef<HTMLDivElement>(null)
 
@@ -50,70 +51,9 @@ export default function HomePage() {
     location: isLoggedIn && user?.location ? user.location : "위치 미등록",
   }
 
-  // --- WebSocket & History ---
+  // --- WebSocket Subscription ---
   React.useEffect(() => {
-    // 1. Initial History Load
-    const loadHistory = async () => {
-      if (!isLoggedIn) return
-      try {
-        const history = await getAiChatHistory()
-        const formatted: ChatMessage[] = history.flatMap((item, idx) => {
-          const msgs: ChatMessage[] = []
-          if (item.content) {
-            msgs.push({
-              id: `hist-${idx}-user`,
-              role: "user",
-              content: item.content,
-              timestamp: new Date(item.sendDate)
-            })
-          }
-          if (item.answer) {
-            // Transform recommended recipes to Recipe type
-            const recs: Recipe[] = (item.recommended_recipes || item.recommendedRecipes || []).map((r: any) => ({
-              id: String(r.recipes_id || r.id),
-              name: r.title,
-              thumbnail: r.main_image_url || r.image,
-              duration: r.cook_time ? Number(r.cook_time) : 0,
-              servings: r.servings ? Number(r.servings) : 1,
-              calories: r.calories ? Number(r.calories) : 0,
-              difficulty: "중급",
-              likes: 0,
-              isLiked: false,
-              tags: r.tags || [],
-              ingredients: [],
-              steps: []
-            }))
-
-            msgs.push({
-              id: `hist-${idx}-ai`,
-              role: "assistant",
-              content: item.answer,
-              timestamp: new Date(item.sendDate),
-              recipes: recs.length > 0 ? recs : undefined
-            })
-          }
-          return msgs
-        })
-        setMessages(formatted)
-
-        // If last message has recipes, show them
-        const lastMsg = formatted[formatted.length - 1];
-        if (lastMsg && lastMsg.role === "assistant" && lastMsg.recipes && lastMsg.recipes.length > 0) {
-          setCurrentRecipes(lastMsg.recipes)
-          setViewState("recommendations")
-        }
-      } catch (e: any) {
-        // Gracefully handle missing endpoint (404) - backend not implemented yet
-        if (e?.message?.includes("Not Found") || e?.status === 404) {
-          console.warn("⚠️ Chat history endpoint not available yet (/api/chat). Starting fresh.")
-        } else {
-          console.error("Failed to load history", e)
-        }
-      }
-    }
-    loadHistory()
-
-    // 2. Subscribe to AI Chat using AuthContext WebSocket
+    // Subscribe to AI Chat using AuthContext WebSocket
     if (user && isLoggedIn) {
       subscribeToAiChat(user.id, (body: any) => {
         setIsLoading(false) // Stop loading on receive
@@ -211,6 +151,12 @@ export default function HomePage() {
   const handleSendMessage = (message: string, image?: string) => {
     if (!message.trim()) return
 
+    // Check if user is logged in
+    if (!isLoggedIn || !user) {
+      setShowLoginDialog(true)
+      return
+    }
+
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: "user",
@@ -227,10 +173,62 @@ export default function HomePage() {
     setViewState("recommendations")
   }
 
-  const handleSelectRecipe = (recipe: Recipe) => {
-    setSelectedRecipe(recipe)
-    setCurrentStepIndex(0)
-    setViewState("detail")
+  const handleSelectRecipe = async (recipe: Recipe) => {
+    try {
+      // Fetch full recipe details from backend
+      const details = await getRecipeDetail(recipe.id)
+
+      // Transform backend response to Recipe type
+      const fullRecipe: Recipe = {
+        id: String(details.recipeId),
+        name: details.title,
+        thumbnail: details.mainImageUrl,
+        image: details.mainImageUrl,
+        tags: details.tags.map(t => t.tag_name),
+        author: details.nickname,
+        rating: details.averageRating,
+        duration: details.cookTime,
+        difficulty: "중급", // You can map this based on backend data if available
+        servings: details.servings,
+        calorie: details.calorie,
+        nutrition: {
+          protein: details.protein,
+          carbohydrate: details.carbohydrate,
+          fat: details.saturatedFat,
+          sodium: details.sodium,
+          cholesterol: details.cholesterol,
+          calcium: details.calcium,
+        },
+        description: details.description,
+        ingredients: details.ingredients.map(ing => ({
+          name: ing.ingredient_name,
+          amount: ing.ingredient_amount,
+        })),
+        steps: details.steps.map(step => ({
+          id: step.step_number,
+          stepNumber: step.step_number,
+          action: step.step_description.split('.')[0] || "조리",
+          description: step.step_description,
+          ingredients: [],
+          tools: [],
+          duration: step.timer_seconds,
+          imageUrl: step.step_imageUrl || "",
+          tips: step.cooking_tip || undefined,
+        })),
+        isLiked: details.isScrapped,
+        isMine: details.isMine,
+      }
+
+      setSelectedRecipe(fullRecipe)
+      setCurrentStepIndex(0)
+      setViewState("detail")
+    } catch (error) {
+      console.error("Failed to fetch recipe details:", error)
+      // Fallback to using the basic recipe data
+      setSelectedRecipe(recipe)
+      setCurrentStepIndex(0)
+      setViewState("detail")
+    }
   }
 
   const handleStartCooking = () => {
@@ -585,9 +583,44 @@ export default function HomePage() {
         onOpenChange={setShowCompleteDialog}
         completedRecipe={selectedRecipe}
         leftoverRecipes={leftoverRecipes}
+
         onSelectLeftover={handleSelectLeftover}
         onGoHome={handleGoHome}
       />
+
+      <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
+        <DialogContent className="sm:max-w-[450px] gap-6">
+          <DialogHeader className="space-y-3">
+            <DialogTitle className="text-2xl font-bold text-center">
+              로그인이 필요한 서비스입니다
+            </DialogTitle>
+            <DialogDescription className="text-center text-base">
+              AI 레시피 추천 서비스를 이용하려면 로그인이 필요합니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <Button
+              onClick={() => {
+                setShowLoginDialog(false)
+                router.push("/login")
+              }}
+              className="w-full bg-[#800020] hover:bg-[#800020]/90"
+            >
+              로그인 하러가기
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowLoginDialog(false)
+                router.push("/signup")
+              }}
+              className="w-full"
+            >
+              회원가입 하러가기
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
