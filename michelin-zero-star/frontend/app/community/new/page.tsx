@@ -175,9 +175,16 @@ function CommunityNewForm() {
       return
     }
 
-    if (!isFree && !formData.price) {
-      alert("가격을 입력하거나 무료 나눔을 선택해주세요.")
-      return
+    if (!isFree) {
+      if (!formData.price) {
+        alert("가격을 입력하거나 무료 나눔을 선택해주세요.")
+        return
+      }
+      const numericPrice = parseInt(formData.price.replace(/,/g, ""), 10)
+      if (isNaN(numericPrice) || numericPrice < 1) {
+        alert("가격은 1원 이상이어야 합니다.")
+        return
+      }
     }
 
     if (!formData.place) {
@@ -415,7 +422,20 @@ function CommunityNewForm() {
                 id="price"
                 placeholder="예: 1,000"
                 value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value
+                  if (val === "") {
+                    setFormData({ ...formData, price: "" })
+                    return
+                  }
+                  if (!/^\d*$/.test(val)) {
+                    alert("문자는 입력 할 수 없습니다.")
+                    return
+                  }
+                  // 숫자만 입력된 경우
+                  // 0으로 시작하는 경우 제거 (옵션)
+                  setFormData({ ...formData, price: val })
+                }}
                 disabled={isFree}
               />
             </div>
