@@ -12,8 +12,8 @@ public class RewardSaver {
     private final StarHistoryRepository starHistoryRepository;
 
     public boolean tryAward(User user, double rewardAmount, StarHistoryType type) {
-        long todayRewardCount = starHistoryRepository.countByUserAndDateBetween(user);
-        if (user.validAwardReward(todayRewardCount)) {
+        double todayRewardSum = starHistoryRepository.sumRewardAmountByUserAndDateBetween(user);
+        if (user.validAwardReward(todayRewardSum, rewardAmount)) {
             user.awardComplete(rewardAmount);
             StarHistory newStarHistory = new StarHistory(user, type, rewardAmount);
             starHistoryRepository.save(newStarHistory);

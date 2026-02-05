@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { PartyPopper, Clock, Heart, Send, CheckCircle, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -20,6 +20,7 @@ interface CompleteCookDialogProps {
   leftoverRecipes: Recipe[]
   onSelectLeftover: (recipe: Recipe) => void
   onGoHome?: () => void
+  isAwarded?: boolean // ✅ Added prop
 }
 
 export function CompleteCookDialog({
@@ -29,6 +30,7 @@ export function CompleteCookDialog({
   leftoverRecipes,
   onSelectLeftover,
   onGoHome,
+  isAwarded = true, // Default to true for backward compatibility
 }: CompleteCookDialogProps) {
   const router = useRouter()
   const {
@@ -40,33 +42,49 @@ export function CompleteCookDialog({
     hasUserReviewedRecipe,
     markRecipeAsReviewed,
     earnStars,
+    refreshUser,
   } = useAuth()
   const [rating, setRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
   const [comment, setComment] = useState("")
   const [reviewSubmitted, setReviewSubmitted] = useState(false)
   const [scrapFeedback, setScrapFeedback] = useState<string | null>(null)
-  const [starsEarned, setStarsEarned] = useState(false)
+
+  // ✅ Should show reward UI? Only if awarded OR limit exceeded (to show feedback)
+  // Logic: Always show the badge section, but change text based on isAwarded.
+  const [showRewardAnimation, setShowRewardAnimation] = useState(false)
 
   // NOTE: "요리 완료"(completed)와 "리뷰 작성"(reviewed)은 의미가 다르므로 분리합니다.
   // 리뷰 여부는 derived 값으로 계산해 상태 꼬임을 방지합니다.
   const userHasReviewed = completedRecipe ? hasUserReviewedRecipe(completedRecipe.id) : false
 
+  // Prevent double-execution in Strict Mode
+  const processedRef = useState(false) // Using state as ref for simplicity or verify imports? Standard is useRef.
+  // Actually, useRef is better. But I need to import it properly or reuse lines.
+  // Let's use a simpler approach: Check if recipe is already marked locally? 
+  // No, just use a ref.
+  const rewardProcessed = useRef(false) // Need to import useRef
+
   // 다이얼로그가 열리는 시점 = 요리 완료 시점으로 보고 completed 기록
   useEffect(() => {
-    if (open && completedRecipe?.id) {
+    if (open && completedRecipe?.id && !rewardProcessed.current) {
+      rewardProcessed.current = true
       markRecipeAsCompleted(completedRecipe.id)
-      earnStars(0.5, "cook")
-      setStarsEarned(true) // Always show the reward UI when completion modal opens
+
+      // If backend says awarded, we should refresh user data to get updated stars
+      if (isAwarded) {
+        earnStars(0.5, "cook") // Optimistic update
+        refreshUser() // Sync with backend
+      }
+
+      setShowRewardAnimation(true)
     }
-  }, [open, completedRecipe?.id, markRecipeAsCompleted, earnStars])
+  }, [open, completedRecipe?.id, markRecipeAsCompleted, refreshUser, isAwarded])
 
 
   if (!completedRecipe) return null
 
   const isCompletedRecipeLiked = isRecipeLiked(completedRecipe.id)
-
-
 
   const handleLikeCompletedRecipe = () => {
     if (!isLoggedIn) return
@@ -145,15 +163,21 @@ export function CompleteCookDialog({
             </p>
 
             <AnimatePresence mode="wait">
-              {starsEarned && (
+              {showRewardAnimation && (
                 <div className="flex justify-center mt-4 mb-2">
-                  <StarRewardBadge
-                    amount={0.5}
-                    customText="0.5스타 적립"
-                    layout="horizontal"
-                    starSize="sm"
-                    textSize="sm"
-                  />
+                  {isAwarded ? (
+                    <StarRewardBadge
+                      amount={0.5}
+                      customText="0.5스타 적립"
+                      layout="horizontal"
+                      starSize="sm"
+                      textSize="sm"
+                    />
+                  ) : (
+                    <div className="px-4 py-2 bg-gray-100 rounded-full text-xs font-semibold text-gray-500">
+                      오늘의 스타를 모두 획득했어요!
+                    </div>
+                  )}
                 </div>
               )}
             </AnimatePresence>

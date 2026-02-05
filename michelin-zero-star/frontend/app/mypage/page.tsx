@@ -319,7 +319,7 @@ export default function MyPage() {
 
         {/* ✅ Tabs 레이아웃 시작 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="flex flex-col md:flex-row gap-8 items-start relative mt-8">
+          <div className="flex flex-col md:flex-row gap-8 items-start relative mt-2">
 
             {/* [좌측 사이드바] 스크롤 시 상단 고정 */}
             <aside className="hidden md:block w-1/5 sticky top-24 shrink-0">

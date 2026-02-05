@@ -109,8 +109,8 @@ public class User extends SoftDeleteDomain {
         this.totalStar = this.totalStar + amount;
     }
 
-    public boolean validAwardReward(long todayRewardCount) {
-        if (todayRewardCount >= 3) {
+    public boolean validAwardReward(double currentTodayStars, double newAmount) {
+        if (currentTodayStars + newAmount > 3.0) {
             return false;
         }
         return true;

@@ -169,6 +169,8 @@ interface AuthContextType {
   reviewedRecipes: Set<string>
   markRecipeAsReviewed: (recipeId: string) => void
   hasUserReviewedRecipe: (recipeId: string) => boolean
+  withdraw: () => Promise<void>
+  refreshUser: () => Promise<void> // ✅ Added
 }
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined)
@@ -636,16 +638,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return address;
   };
 
-  const withdraw = async () => {
-    try {
-      await withdrawUser()
-      logout()
-      alert("회원 탈퇴가 완료되었습니다.")
-    } catch (error) {
-      console.error("회원 탈퇴 실패:", error)
-      throw error
-    }
-  }
+
 
   // --- Real-time Chat Helpers ---
 
@@ -863,21 +856,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const hasUserReviewedRecipe = (recipeId: string) => reviewedRecipes.has(recipeId)
 
+  const withdraw = async () => {
+    try {
+      await withdrawUser()
+      logout()
+      alert("회원 탈퇴가 완료되었습니다.")
+    } catch (error) {
+      console.error("회원 탈퇴 실패:", error)
+      throw error
+    }
+  }
+
+  const refreshUser = async () => {
+    try {
+      const me = await getMe()
+      console.log("DEBUG: refreshUser fetched me:", me)
+      console.log("DEBUG: todayStars from backend:", me.todayStars)
+
+      const newUser: User = {
+        ...me,
+        id: String(me.id),
+        stars: me.stars ?? (me as any).stars ?? 0,
+        totalStar: me.totalStar ?? (me as any).total_star ?? 0,
+        todayStars: me.todayStars ?? (me as any).today_stars ?? 0,
+        lastStarDate: me.lastStarDate ?? (me as any).last_star_date ?? new Date().toISOString().split("T")[0],
+      }
+      setUser(newUser)
+      localStorage.setItem("cooksync_user", JSON.stringify(newUser))
+    } catch (error) {
+      console.error("Failed to refresh user data:", error)
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
         isLoading,
-        user, isLoggedIn: !!user, login, signup, logout, updateProfile, updateLocation, withdraw,
-        // Chat
-        conversations, currentMessages, enterChatRoom, exitChatRoom, startChatFromPost, sendMessage, deleteConversation, getMessages,
-        // Local Data
-        likedRecipes, toggleLikeRecipe, isRecipeLiked,
-        userRecipes, addUserRecipe, updateUserRecipe, deleteUserRecipe,
-        userPosts, addUserPost, updateUserPost, deleteUserPost,
-        likedPosts, toggleLikePost, isPostLiked,
-        earnStars, getStarLevel,
-        completedRecipes, markRecipeAsCompleted,
-        reviewedRecipes, markRecipeAsReviewed, hasUserReviewedRecipe,
+        user, isLoggedIn: !!user, login, signup, logout, updateProfile, updateLocation,
+        likedRecipes, toggleLikeRecipe, isRecipeLiked, conversations, sendMessage, getMessages,
+        currentMessages, enterChatRoom, exitChatRoom, startChatFromPost, // ✅ Added missing chat functions
+        deleteConversation, userRecipes, addUserRecipe, updateUserRecipe, deleteUserRecipe,
+        userPosts, addUserPost, updateUserPost, deleteUserPost, likedPosts, toggleLikePost,
+        isPostLiked, earnStars, getStarLevel, completedRecipes, markRecipeAsCompleted,
+        reviewedRecipes, markRecipeAsReviewed, hasUserReviewedRecipe, withdraw,
+        refreshUser, // ✅ Added
       }}
     >
       {isLoading ? null : children}

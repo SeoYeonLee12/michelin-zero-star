@@ -35,7 +35,9 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final UserFavoriteCategoryRepository userFavoriteCategoryRepository;
+
     private final CategoryRepository categoryRepository;
+    private final com.michelin0.michelinzerostar.domain.starhistory.domain.StarHistoryRepository starHistoryRepository;
 
     private final JwtTokenProvider jwtTokenProvider;
     private final RedisUtil redisUtil;
@@ -130,7 +132,14 @@ public class UserService {
                     .isVerified(profile.isVerified());
         }
 
-        return builder.build();
+        UserResponseDto responseDto = builder.build();
+        
+        // [Add] 오늘 획득한 스타 조회
+        double todayStars = starHistoryRepository.sumRewardAmountByUserAndDateBetween(user);
+        log.info("Calculated todayStars for user {}: {}", user.getId(), todayStars);
+        responseDto.setTodayStars(todayStars);
+
+        return responseDto;
     }
 
     // 내 정보 수정
