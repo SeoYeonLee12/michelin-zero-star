@@ -14,13 +14,12 @@ import { ChatBubble, ChatBubbleAvatar, ChatBubbleMessage } from "@/components/ui
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { leftoverRecipes } from "@/lib/dummy-data"
-import type { Recipe, ChatMessage } from "@/lib/types" // Ensure ChatMessage type is compatible or updated
+import type { Recipe, ChatMessage } from "@/lib/types"
 import { useAuth } from "@/lib/auth-context"
 import { ArrowLeft, Clock, Users, Flame } from "lucide-react"
 import Image from "next/image"
 import { MichelinIcon } from "@/components/common/MichelinIcon"
-import { getRecipeDetail, type BackendRecipeResponse } from "@/lib/api/recipes"
+import { getRecipeDetail, getRecipeList, type BackendRecipeResponse, type RecipeListItem } from "@/lib/api/recipes"
 
 const suggestedPrompts = ["잡채 레시피 알려줘", "매콤한게 땡기는데 먹을만한 거 추천해줘", "매운 오징어 요리 찾아줘", "양파로 만들 수 있는 요리 알려줘"]
 
@@ -37,6 +36,7 @@ export default function HomePage() {
   const [showCompleteDialog, setShowCompleteDialog] = React.useState(false)
   const [showLoginDialog, setShowLoginDialog] = React.useState(false)
   const [currentRecipes, setCurrentRecipes] = React.useState<Recipe[]>([])
+  const [recommendedRecipes, setRecommendedRecipes] = React.useState<Recipe[]>([])
   const chatContainerRef = React.useRef<HTMLDivElement>(null)
 
   const [scope, animate] = useAnimate()
@@ -171,6 +171,42 @@ export default function HomePage() {
 
     // Switch to recommendations view to show split layout
     setViewState("recommendations")
+  }
+
+  // Fetch random recipes for completion dialog
+  const fetchRandomRecipes = async () => {
+    try {
+      const response = await getRecipeList({
+        recipeType: "USER",
+        sort: "LATEST",
+        page: Math.floor(Math.random() * 3), // Random page 0-2
+        size: 3,
+      })
+
+      // Transform backend response to Recipe type
+      const recipes: Recipe[] = response.recipes.map((r: RecipeListItem) => ({
+        id: String(r.recipeId),
+        name: r.title,
+        thumbnail: r.mainImageUrl,
+        image: r.mainImageUrl,
+        tags: r.tags.map((t: { tag_name: string }) => t.tag_name),
+        author: r.nickName,
+        rating: r.averageRating,
+        duration: 0,
+        difficulty: "중급",
+        servings: 0,
+        calorie: 0,
+        ingredients: [],
+        steps: [],
+        isLiked: r.isScrapped,
+        isMine: r.isMine,
+      }))
+
+      setRecommendedRecipes(recipes)
+    } catch (error) {
+      console.error("Failed to fetch random recipes:", error)
+      setRecommendedRecipes([]) // Empty fallback
+    }
   }
 
   const handleSelectRecipe = async (recipe: Recipe) => {
@@ -580,9 +616,12 @@ export default function HomePage() {
 
       <CompleteCookDialog
         open={showCompleteDialog}
-        onOpenChange={setShowCompleteDialog}
+        onOpenChange={(open) => {
+          setShowCompleteDialog(open)
+          if (open) fetchRandomRecipes() // Fetch when dialog opens
+        }}
         completedRecipe={selectedRecipe}
-        leftoverRecipes={leftoverRecipes}
+        leftoverRecipes={recommendedRecipes}
 
         onSelectLeftover={handleSelectLeftover}
         onGoHome={handleGoHome}
