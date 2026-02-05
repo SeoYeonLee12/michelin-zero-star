@@ -404,9 +404,9 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
         </div>
 
         {/* Right: Info */}
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold">{recipe.name}</h1>
+            <h1 className="text-2xl font-bold break-words">{recipe.name}</h1>
             {recipe.description && (
               <div className="space-y-4">
                 <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap break-all">
@@ -602,9 +602,9 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
                   </div>
 
                   {/* Minimal Step Plate (No cards, no tags) */}
-                  <div className="flex-1 w-full flex flex-col lg:flex-row gap-8 items-start">
+                  <div className="flex-1 w-full flex flex-col lg:flex-row gap-8 items-start min-w-0">
                     {step.imageUrl && (
-                      <div className="relative w-full lg:w-[240px] aspect-[4/3] rounded-2xl overflow-hidden bg-muted shadow-sm hover:shadow-md transition-shadow">
+                      <div className="relative w-full lg:w-[240px] aspect-[4/3] rounded-2xl overflow-hidden bg-muted shadow-sm hover:shadow-md transition-shadow shrink-0">
                         <Image
                           src={step.imageUrl}
                           alt={`Step ${step.stepNumber}`}
@@ -614,8 +614,8 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
                       </div>
                     )}
 
-                    <div className="flex-1 flex flex-col justify-center space-y-5 pt-1">
-                      <p className="text-base sm:text-lg text-foreground/90 leading-relaxed font-normal">
+                    <div className="flex-1 flex flex-col justify-center space-y-5 pt-1 min-w-0">
+                      <p className="text-base sm:text-lg text-foreground/90 leading-relaxed font-normal whitespace-pre-wrap break-all">
                         {cleanDescription}
                       </p>
 
