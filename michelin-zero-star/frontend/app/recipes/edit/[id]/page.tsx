@@ -402,10 +402,10 @@ export default function EditRecipePage() {
                       setIngredientAmount(e.target.value)
                       if (e.target.value.trim()) setIngredientError(false)
                     }}
-                    }}
-                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addIngredient())}
-                  className={cn("w-32", ingredientError && "border-red-500 focus-visible:ring-red-500")}
-                  maxLength={20}
+
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addIngredient())}
+                    className={cn("w-32", ingredientError && "border-red-500 focus-visible:ring-red-500")}
+                    maxLength={20}
                   />
                   <Button type="button" onClick={addIngredient} variant="outline">
                     추가

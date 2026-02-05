@@ -709,7 +709,7 @@ export function StepCookMode({
     if (stompClientRef.current && stompClientRef.current.connected) {
       const token = getGlobalAccessToken()
       stompClientRef.current.publish({
-        destination: "/pub/recipes/ask",
+        destination: "/app/recipes/ask",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: JSON.stringify({
           content: userText,
