@@ -43,6 +43,8 @@ export default function ProfileEditPage() {
   // --- States ---
   const [isLoading, setIsLoading] = React.useState(false)
   const [isGettingLocation, setIsGettingLocation] = React.useState(false)
+  // Image Validation State
+  const [imageError, setImageError] = React.useState<string | null>(null)
 
   // Password States
   const [showCurrentPassword, setShowCurrentPassword] = React.useState(false)
@@ -83,7 +85,6 @@ export default function ProfileEditPage() {
         nickname: user.nickname || "",
         email: user.email,
         location: user.location || "",
-        location: user.location || "",
         categories: user.categories || [],
       })
       if (user.profileImageUrl) {
@@ -96,7 +97,16 @@ export default function ProfileEditPage() {
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    setImageError(null) // Reset error
+
     if (file) {
+      // Validate File Type
+      const validTypes = ["image/jpeg", "image/png", "image/jpg"];
+      if (!validTypes.includes(file.type)) {
+        setImageError("이미지 파일만 업로드할 수 있습니다.");
+        return;
+      }
+
       // 1. 파일 상태 저장 (저장 시 업로드용)
       setSelectedFile(file)
 
@@ -312,6 +322,9 @@ export default function ProfileEditPage() {
                     사진 변경
                   </Button>
                   <p className="text-xs text-muted-foreground">JPG, PNG 파일, 최대 10MB</p>
+                  {imageError && (
+                    <p className="text-xs text-red-500 font-medium">{imageError}</p>
+                  )}
                 </div>
               </div>
             </CardContent>
