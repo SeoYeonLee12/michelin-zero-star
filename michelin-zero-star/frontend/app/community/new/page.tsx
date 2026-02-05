@@ -207,10 +207,16 @@ function CommunityNewForm() {
         setPriceError("가격을 입력하거나 무료 나눔을 선택해주세요.")
         isValid = false
       } else {
-        const numericPrice = parseInt(formData.price.replace(/,/g, ""), 10)
-        if (isNaN(numericPrice) || numericPrice < 1) {
-          setPriceError("가격은 1원 이상이어야 합니다.")
+        // 숫자만 있는지 재확인
+        if (!/^\d*$/.test(formData.price)) {
+          setPriceError("숫자만 입력해주세요.")
           isValid = false
+        } else {
+          const numericPrice = parseInt(formData.price.replace(/,/g, ""), 10)
+          if (isNaN(numericPrice) || numericPrice < 1) {
+            setPriceError("가격은 1원 이상이어야 합니다.")
+            isValid = false
+          }
         }
       }
     }
@@ -467,21 +473,22 @@ function CommunityNewForm() {
                 value={formData.price}
                 onChange={(e) => {
                   const val = e.target.value
+                  setFormData({ ...formData, price: val })
+
                   if (val === "") {
-                    setFormData({ ...formData, price: "" })
                     setPriceError(null)
                     return
                   }
+
+                  // 숫자 이외의 문자가 포함된 경우 에러 표시
                   if (!/^\d*$/.test(val)) {
-                    // alert("문자는 입력 할 수 없습니다.") // Remove alert
-                    return
+                    setPriceError("숫자만 입력해주세요.")
+                  } else {
+                    setPriceError(null)
                   }
-                  setFormData({ ...formData, price: val })
-                  setPriceError(null)
                 }}
                 disabled={isFree}
-                type="number"
-                min="0"
+                type="text"
                 className={cn(priceError && "border-red-500 focus-visible:ring-red-500")}
               />
               {priceError && <p className="text-red-500 text-xs mt-1">{priceError}</p>}

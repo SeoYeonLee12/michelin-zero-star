@@ -105,7 +105,7 @@ export async function updatePost(
 
     // 2. 새로운 이미지 파일들
     newImages.forEach((file) => {
-        formData.append("newImages", file)
+        formData.append("images", file)
     })
 
     // 3. 유지할 기존 이미지 URL들
