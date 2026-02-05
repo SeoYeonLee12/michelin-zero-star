@@ -220,13 +220,13 @@ export default function LoginPage() {
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Checkbox id="remember" />
+                {/* <Checkbox id="remember" /> */}
                 <Label htmlFor="remember" className="text-sm font-normal cursor-pointer">
-                  로그인 상태 유지
+                  {/* 로그인 상태 유지 */}
                 </Label>
               </div>
               <Link href="/forgot-password" className="text-sm text-[#800020] hover:underline">
-                비밀번호 찾기
+                {/* 비밀번호 찾기 */}
               </Link>
             </div>
 

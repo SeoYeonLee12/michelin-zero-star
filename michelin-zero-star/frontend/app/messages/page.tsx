@@ -137,10 +137,10 @@ export default function MessagesPage() {
   if (!isLoggedIn) return null
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex h-screen flex-col bg-background overflow-hidden">
       <Navbar />
 
-      <main className="flex-1 container mx-auto max-w-7xl px-0 py-0 flex overflow-hidden h-[calc(100vh-64px)]">
+      <main className="flex-1 container mx-auto max-w-7xl px-0 py-0 flex overflow-hidden min-h-0">
         {/* 좌측 패널 (목록) */}
         <div className="w-80 border-r bg-white flex flex-col">
           <div className="h-16 px-6 flex items-center border-b">
@@ -203,8 +203,8 @@ export default function MessagesPage() {
 
         {/* 우측 패널 (대화창) */}
         {selectedRoomId ? (
-          <div className="flex-1 flex flex-col bg-white">
-            <div className="h-16 flex items-center justify-between px-6 border-b bg-white shadow-sm z-10">
+          <div className="flex-1 flex flex-col bg-white overflow-hidden">
+            <div className="h-16 flex items-center justify-between px-6 border-b bg-white shadow-sm z-10 shrink-0">
               <div className="flex items-center gap-3">
                 <Avatar className="h-10 w-10 border">
                   <AvatarImage src={selectedConversation.recipientAvatar || "/placeholder.svg"} />
@@ -224,7 +224,7 @@ export default function MessagesPage() {
               </Button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f9fafb]">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f9fafb] min-h-0">
               {currentMessages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50">
                   <p>대화를 시작해보세요!</p>
