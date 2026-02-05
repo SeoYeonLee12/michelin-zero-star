@@ -273,6 +273,7 @@ export default function HomePage() {
 
   const handleCompleteCooking = () => {
     setShowCompleteDialog(true)
+    fetchRandomRecipes() // Fetch random recipes for recommendation
   }
 
   const handleBack = () => {
