@@ -62,6 +62,11 @@ public class AiTransferClient {
         if (response == null) {
             throw new GlobalException(AiChatMessageErrorCode.EMPTY_AI_CLIENT_RESPONSE);
         }
+        log.info("AI 응답 원본: {}", response);
+
+        if (response != null && response.recommended_recipes() != null) {
+            log.info("추천 레시피 개수: {}", response.recommended_recipes().size());
+        }
         return response.toCommonAiAnswer();
     }
 }
