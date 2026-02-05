@@ -2,11 +2,8 @@
 const nextConfig = {
   typescript: { ignoreBuildErrors: true },
   images: { unoptimized: true },
-  output: "standalone",
 
   // Docker/Windows 환경에서 파일 변경 감지 및 성능 최적화를 위한 Polling 설정
-  devIndicators: false,
-
   webpack: (config, { dev }) => {
     if (dev) {
       config.watchOptions = {

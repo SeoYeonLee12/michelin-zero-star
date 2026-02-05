@@ -635,7 +635,7 @@ function NewRecipeForm() {
                     maxLength={20}
                   />
                   <Input
-                    placeholder="용량 (예: 200g)"
+                    placeholder="용량 (예: 200g, 약간, 1큰술, 1.5컵)"
                     value={ingredientAmount}
                     onChange={(e) => {
                       setIngredientAmount(e.target.value)
