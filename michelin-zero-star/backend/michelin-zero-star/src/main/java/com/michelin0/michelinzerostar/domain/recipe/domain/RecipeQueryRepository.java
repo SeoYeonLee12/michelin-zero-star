@@ -274,11 +274,17 @@ public class RecipeQueryRepository {
         if (!StringUtils.hasText(categoryName)) {
             return null;
         }
+
+        // 1. 카테고리 이름으로 ID 조회 (서브쿼리)
+        // SELECT categories_id FROM categories WHERE category_name = '면'
         return recipe.recipeId.in(
                 JPAExpressions.select(recipeCategory.recipe.recipeId)
                         .from(recipeCategory)
-                        .join(recipeCategory.category, category)
-                        .where(category.categoryName.eq(categoryName))
+                        .where(recipeCategory.category.categoryId.eq(
+                                JPAExpressions.select(category.categoryId)
+                                        .from(category)
+                                        .where(category.categoryName.eq(categoryName))
+                        ))
         );
     }
 
