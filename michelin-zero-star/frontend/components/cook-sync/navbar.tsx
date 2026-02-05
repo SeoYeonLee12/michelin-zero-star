@@ -41,7 +41,9 @@ interface NavbarProps {
 
 function formatKST(isoString?: string) {
   if (!isoString) return ""
-  const d = new Date(isoString)
+  // If timestamp is ISO string without Z, treat as UTC
+  const timeStr = isoString.endsWith("Z") ? isoString : isoString + "Z"
+  const d = new Date(timeStr)
   if (Number.isNaN(d.getTime())) return ""
 
   return new Intl.DateTimeFormat("ko-KR", {
@@ -82,7 +84,7 @@ function NavbarContent({ onLogoClick }: NavbarProps) {
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [dmOpen, setDmOpen] = useState(false)
 
-  // ✅ Store 기반 알림 상태 (B)
+  // Store 기반 알림 상태
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => getNotificationsSnapshot())
   useEffect(() => {
     return subscribeNotifications(() => {
@@ -101,7 +103,6 @@ function NavbarContent({ onLogoClick }: NavbarProps) {
   const userLocation = user?.location ? user.location.split(" ").slice(-1)[0] : "우리 동네"
 
   const handleLogoClick = (e: React.MouseEvent) => {
-    // ✅ 라우팅 전 오디오 셧다운
     window.dispatchEvent(new Event("cooksync:audio-shutdown"))
 
     if (onLogoClick) {
@@ -112,7 +113,10 @@ function NavbarContent({ onLogoClick }: NavbarProps) {
   }
 
   const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications])
-  const unreadDmCount = conversations.reduce((acc, c) => acc + c.unreadCount, 0)
+
+  // ✅ [수정 1] 안 읽은 메시지가 있는 채팅방만 필터링
+  const unreadConversations = useMemo(() => conversations.filter(c => c.unreadCount > 0), [conversations])
+  const unreadDmCount = unreadConversations.reduce((acc, c) => acc + c.unreadCount, 0)
 
   const handleNotificationClick = (notif: NotificationItem) => {
     window.dispatchEvent(new Event("cooksync:audio-shutdown"))
@@ -125,7 +129,14 @@ function NavbarContent({ onLogoClick }: NavbarProps) {
     notificationsActions.clearAll()
   }
 
-  // ✅ 로고 애니메이션 토글 (텍스트 ↔ 별) — 흔들림 해결한 버전 유지
+  // ✅ [수정 2] 팝업 클릭 시 '채팅방 ID'로 이동 (이동하면 자동으로 읽음 처리되어 목록에서 사라짐)
+  const handleDmClick = (roomId: string) => {
+    window.dispatchEvent(new Event("cooksync:audio-shutdown"))
+    setDmOpen(false)
+    router.push(`/messages/${roomId}`)
+  }
+
+  // 로고 애니메이션
   const [logoMode, setLogoMode] = useState<"text" | "stars">("text")
   const [logoTick, setLogoTick] = useState(0)
 
@@ -144,7 +155,6 @@ function NavbarContent({ onLogoClick }: NavbarProps) {
   return (
     <header
       className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
-      // ✅ Navbar 전체: 링크 클릭이면 라우팅 전에 오디오 종료 이벤트 발사
       onClickCapture={(e) => {
         const t = e.target as HTMLElement | null
         const a = t?.closest?.("a[href]")
@@ -232,20 +242,9 @@ function NavbarContent({ onLogoClick }: NavbarProps) {
         <div className="flex items-center gap-4 shrink-0">
           {isLoggedIn && (
             <>
+              {/* 채팅 팝업 */}
               <Popover open={dmOpen} onOpenChange={setDmOpen}>
                 <PopoverTrigger asChild>
-                  {/* <Button
-                    variant="ghost"
-                    size="icon"
-                    className="hidden lg:flex text-muted-foreground hover:text-foreground hover:bg-accent relative h-9 w-9"
-                  >
-                    <Send className="h-5 w-5" />
-                    {unreadDmCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-red-500 text-[10px] text-white flex items-center justify-center font-medium">
-                        {unreadDmCount}
-                      </span>
-                    )}
-                  </Button> */}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -261,21 +260,23 @@ function NavbarContent({ onLogoClick }: NavbarProps) {
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-80 p-0">
                   <div className="p-3 border-b flex items-center justify-between">
-                    <h4 className="font-semibold">채팅</h4>
+                    <h4 className="font-semibold">새로운 메시지</h4>
                   </div>
                   <div className="max-h-80 overflow-y-auto">
-                    {conversations.length === 0 ? (
+                    {/* ✅ [수정 3] unreadConversations 사용 */}
+                    {unreadConversations.length === 0 ? (
                       <div className="p-6 text-center text-muted-foreground text-sm">
                         <Send className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p>아직 쪽지가 없습니다</p>
+                        <p>새로운 메시지가 없습니다</p>
                       </div>
                     ) : (
-                      conversations.map((conv) => (
-                        <Link
+                      unreadConversations.map((conv) => (
+                        <div
                           key={conv.id}
-                          href={`/messages/${conv.recipientId}`}
+                          // ✅ [수정 4] conv.id (채팅방 ID) 사용
+                          onClick={() => handleDmClick(conv.id)}
                           className="flex items-center gap-3 p-3 border-b last:border-b-0 hover:bg-accent cursor-pointer transition-colors"
-                          onClick={() => setDmOpen(false)}
+                          role="button"
                         >
                           <Avatar className="h-10 w-10">
                             <AvatarImage src={conv.recipientAvatar || "/placeholder.svg"} />
@@ -293,87 +294,25 @@ function NavbarContent({ onLogoClick }: NavbarProps) {
                               {conv.unreadCount}
                             </span>
                           )}
-                        </Link>
-                      ))
-                    )}
-                  </div>
-                  {/* <div className="p-2 border-t">
-                    <Button variant="ghost" size="sm" className="w-full text-[#800020]" asChild>
-                      <Link href="/messages">모든 채팅 보기</Link>
-                    </Button>
-                  </div> */}
-                  <div className="p-2 border-t">
-                    <Button variant="ghost" size="sm" className="w-full text-[#800020] hover:bg-transparent hover:text-[#800020]
-                        focus-visible:ring-0 focus-visible:ring-offset-0" asChild>
-                      <Link href="/messages">모든 채팅 보기</Link>
-                    </Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-
-              {/* <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="hidden lg:flex text-muted-foreground hover:text-foreground hover:bg-accent relative h-9 w-9"
-                  >
-                    <Bell className="h-5 w-5" />
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-red-500 text-[10px] text-white flex items-center justify-center font-medium">
-                        {unreadCount}
-                      </span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-
-                <PopoverContent align="end" className="w-80 p-0">
-                  <div className="p-3 border-b flex items-center justify-between">
-                    <h4 className="font-semibold">알림</h4>
-                    {notifications.length > 0 && (
-                      <button
-                        onClick={handleDeleteAllNotifications}
-                        className="text-sm text-red-500 hover:text-red-600 font-medium flex items-center gap-1"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        모두 삭제
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="max-h-80 overflow-y-auto">
-                    {notifications.length === 0 ? (
-                      <div className="p-4 text-center text-muted-foreground text-sm">알림이 없습니다</div>
-                    ) : (
-                      notifications.map((notif) => (
-                        <div
-                          key={notif.id}
-                          onClick={() => handleNotificationClick(notif)}
-                          className={cn(
-                            "p-3 border-b last:border-b-0 hover:bg-accent cursor-pointer transition-colors",
-                            !notif.read && "bg-[#800020]/5",
-                          )}
-                        >
-                          <div className="flex items-start gap-2">
-                            <div className="mt-0.5">{getNotificationIcon(notif.type)}</div>
-                            <div className="flex-1">
-                              <p className="text-xs font-semibold text-[#800020] mb-0.5">{notif.title}</p>
-                              <p className="text-sm">{notif.message}</p>
-                              <p className="text-xs text-muted-foreground mt-1">{notif.time}</p>
-                            </div>
-                          </div>
                         </div>
                       ))
                     )}
                   </div>
-
                   <div className="p-2 border-t">
-                    <Button variant="ghost" size="sm" className="w-full text-[#800020]" asChild>
-                      <Link href="/notifications">모든 알림 보기</Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-[#800020] hover:bg-transparent hover:text-[#800020] focus-visible:ring-0 focus-visible:ring-offset-0"
+                      onClick={() => {
+                        setDmOpen(false);
+                        router.push("/messages");
+                      }}
+                    >
+                      모든 채팅 보기
                     </Button>
                   </div>
                 </PopoverContent>
-              </Popover> */}
+              </Popover>
             </>
           )}
 
@@ -382,7 +321,7 @@ function NavbarContent({ onLogoClick }: NavbarProps) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full h-9 w-9">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user?.profileImageUrl || "/placeholder.svg"} />
+                    <AvatarImage src={user?.profileImage || "/placeholder.svg"} />
                     <AvatarFallback>{user?.name?.charAt(0) || <User className="h-4 w-4" />}</AvatarFallback>
                   </Avatar>
                 </Button>
@@ -414,9 +353,6 @@ function NavbarContent({ onLogoClick }: NavbarProps) {
             </DropdownMenu>
           ) : (
             <div className="flex items-center gap-2">
-              {/* <Button variant="ghost" asChild className="hidden sm:inline-flex">
-                <Link href="/login">로그인</Link>
-              </Button> */}
               <Button
                 variant="ghost"
                 asChild

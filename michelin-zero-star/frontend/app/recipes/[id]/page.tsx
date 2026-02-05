@@ -32,6 +32,7 @@ export default function RecipeDetailPage() {
   const [viewState, setViewState] = React.useState<ViewState>("detail")
   const [currentStepIndex, setCurrentStepIndex] = React.useState(0)
   const [showCompleteDialog, setShowCompleteDialog] = React.useState(false)
+  const [isAwarded, setIsAwarded] = React.useState(false) // ✅ Added state
   const [recommendedRecipes, setRecommendedRecipes] = React.useState<Recipe[]>([])
 
   // Fetch random chef recipes for recommendations
@@ -180,12 +181,18 @@ export default function RecipeDetailPage() {
     try {
       const response = await completeCooking(recipeId)
       console.log("Cooking completed:", response)
+      console.log("Cooking completed:", response)
       if (response.isAwardedCookingCompleteReward) {
-        alert("요리 완료 보상을 획득했습니다!")
+        // alert("요리 완료 보상을 획득했습니다!") // Remove alert, dialog handles it
+        setIsAwarded(true) // ✅ Correctly set state
+      } else {
+        setIsAwarded(false)
       }
     } catch (error) {
       console.error("Failed to complete cooking:", error)
-      // 계속 진행 (Dialog 표시)
+      // 계속 진행 (Dialog 표시), but maybe handle error state? 
+      // For now, assume failure means no reward if network error, but we want to show dialog.
+      setIsAwarded(false)
     }
     setShowCompleteDialog(true)
   }
@@ -291,6 +298,7 @@ export default function RecipeDetailPage() {
         completedRecipe={recipe}
         leftoverRecipes={recommendedRecipes}
         onSelectLeftover={handleSelectLeftover}
+        isAwarded={isAwarded} // ✅ Pass prop
       />
     </div>
   )

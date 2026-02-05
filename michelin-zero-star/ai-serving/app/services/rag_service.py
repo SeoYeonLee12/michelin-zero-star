@@ -32,8 +32,8 @@ class RagService:
         # GMS Base URL
         gms_base_url = "https://gms.ssafy.io/gmsapi/api.openai.com/v1"
         self.embeddings = OpenAIEmbeddings(model="text-embedding-3-large",
-                                           openai_api_key=settings.OPENAI_API_KEY,
-                                           base_url=gms_base_url)
+                                             openai_api_key=settings.OPENAI_API_KEY,
+                                             base_url=gms_base_url)
         self.llm = ChatOpenAI(model="gpt-4o-mini", 
                               temperature=0.7,
                               openai_api_key=settings.OPENAI_API_KEY,
@@ -44,6 +44,18 @@ class RagService:
         # 1. 사용자 질의를 벡터로 변환
         query_vector = await self.embeddings.aembed_query(query)
         
+        # [수정] knn 파라미터 동적 생성 (None이나 빈 리스트가 filter에 들어가는 것을 방지)
+        knn_params = {
+            "field": "embedding",
+            "query_vector": query_vector, # Langchain이 생성한 벡터
+            "k": 10, # 의미적으로 가장 가까운 문서 상위 10개를 후보로 선택
+            "num_candidates": 100, # 정확도를 몇개를 탐색할지
+        }
+
+        # [수정] 카테고리가 있을 때만 필터를 추가 (비어있으면 전체 검색)
+        if categories:
+            knn_params["filter"] = { "terms": { "category_name": categories } }
+
         es_query = {
             "size": 5,
             "_source": ["recipes_id", 
@@ -54,14 +66,7 @@ class RagService:
                         "calories", 
                         "tags", 
                         "description"],
-            "knn": {
-                "field": "embedding",
-                "query_vector": query_vector, # Langchain이 생성한 벡터
-                "k": 10, # 의미적으로 가장 가까운 문서 상위 10개를 후보로 선택
-                "num_candidates": 100, # 정확도를 몇개를 탐색할지
-                # 벡터 유사도 계산 전에 특정 카테고리에 속한 문서만 대상으로 제한 (terms: 카테고리 중 하나라도 포함되면 OK)
-                "filter": { "terms": { "category_name": categories } } if categories else None # 카테고리 없으면 전체를 바탕으로 검색 됨
-            }
+            "knn": knn_params # [수정] 위에서 만든 안전한 params 사용
         }
         
         try:
@@ -75,7 +80,7 @@ class RagService:
         max_score = 0.0 # 가장 높은 유사도 점수 저장
 
         if hits:
-            max_score = hits[0]['_score'] # 1등의 점수 (보통 0.7~0.8 이상이면 관련성 높음)
+            max_score = hits[0]['_score'] # 1등의 점수
             
             for hit in hits:
                 src = hit['_source']
@@ -92,17 +97,20 @@ class RagService:
         # 1. 검색 수행 (유사도 점수까지 불러오기)
         recipes, context_text, max_score = await self.search_es(query, user_favorite_categories)
         
+        # [수정] 임계값 완화 (테스트를 위해 0.7 -> 0.35로 낮춤)
+        # 0.7은 매우 높은 수치라 데이터가 조금만 달라도 검색이 안 될 수 있음
+        THRESHOLD_SCORE = 0.35 
+        
         # 2. 상황별 시스템 프롬프트 분기
-        # 임계값(0.75)은 테스트하면서 조절 필요. -> 튜닝 시기에 시도
         # 점수가 낮으면 -> 연결 멘트 유도
         if not recipes:
             # 아예 검색 결과가 없으면
             sys_prompt = (
                 "너는 '미슐랭 0스타'의 셰프야. "
-                "사용자 질문이 요리와 관련 없으면 재치 있는 농담으로 받아치고, "
-                "레시피 추천을 원하면 구체적으로 물어봐달라고 해."
+                "사용자 질문에 맞는 레시피를 냉장고(DB)에서 찾을 수 없어. "
+                "정중하게 '죄송하지만 찾으시는 메뉴가 없네요'라고 말하고, 다른 메뉴를 물어봐달라고 해."
             )
-        elif max_score < 0.7:
+        elif max_score < THRESHOLD_SCORE: # [수정] 0.7 대신 완화된 값 사용
             # [Case: 관련도 낮은 질문] "오늘 날씨 어때?"
             sys_prompt = (
                 "너는 '미슐랭 0스타'서비스의 친절한 셰프 AI야. "

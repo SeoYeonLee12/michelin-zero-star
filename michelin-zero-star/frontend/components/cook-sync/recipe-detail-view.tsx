@@ -187,7 +187,7 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
   const [recipeRating, setRecipeRating] = React.useState(4.5)
   const [nutritionOpen, setNutritionOpen] = React.useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = React.useState(false)
+
 
   const handleEditRecipe = () => {
     router.push(`/recipes/new?id=${recipe.id}`)
@@ -408,78 +408,33 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
           <div className="space-y-2">
             <h1 className="text-2xl font-bold">{recipe.name}</h1>
             {recipe.description && (
-              <div>
-                {!isDescriptionExpanded ? (
-                  <div>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {recipe.description}
-                    </p>
-                    {recipe.description.length > 100 && (
-                      <button
-                        onClick={() => setIsDescriptionExpanded(true)}
-                        className="text-xs text-[#800020] hover:underline mt-1 font-medium"
-                      >
-                        전체보기
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="relative animate-in slide-in-from-top-1 fade-in duration-200 w-full">
-                    <div className="min-h-[200px] max-h-[400px] overflow-y-auto overflow-x-hidden p-4 border rounded-xl bg-muted/30 text-sm text-muted-foreground whitespace-pre-wrap break-all leading-relaxed shadow-sm">
-                      {recipe.description}
-                    </div>
-                    <button
-                      onClick={() => setIsDescriptionExpanded(false)}
-                      className="text-xs text-[#800020] hover:underline mt-1 font-medium"
-                    >
-                      접기
-                    </button>
+              <div className="space-y-4">
+                <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap break-all">
+                  {recipe.description}
+                </p>
+
+                {/* Tags */}
+                {filteredTags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {filteredTags.map((tag, index) => (
+                      <span key={index} className="text-xs text-primary font-medium">
+                        #{tag}
+                      </span>
+                    ))}
                   </div>
                 )}
               </div>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              className={`rounded-full bg-transparent ${isLiked ? "text-red-500 border-red-500 hover:text-red-600" : ""}`}
-              onClick={handleScrap}
-            >
-              <Heart className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`} />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-full bg-transparent"
-              onClick={() => setShareDialogOpen(true)}
-            >
-              <Share2 className="h-4 w-4" />
-            </Button>
-            {recipe.isMine && (
-              <>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="rounded-full bg-transparent"
-                  onClick={handleEditRecipe}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="rounded-full bg-transparent text-red-500 hover:text-red-700 hover:bg-red-50"
-                  onClick={() => setDeleteDialogOpen(true)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </>
-            )}
-          </div>
 
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            {/* Rating */}
+            <div className="flex items-center gap-1.5">
+              <Image src="/michelin-star.png" alt="Star" width={16} height={16} />
+              <span className="text-sm font-bold text-[#800020]">{recipe.averageRating ? recipe.averageRating.toFixed(1) : "0.0"}</span>
+            </div>
+
             <div className="flex items-center gap-1.5">
               <Clock className="h-4 w-4 text-[#800020]" />
               <span>
@@ -563,6 +518,44 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
                   </CollapsibleContent>
                 </Collapsible>
               </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className={`rounded-full bg-transparent ${isLiked ? "text-red-500 border-red-500 hover:text-red-600" : ""}`}
+              onClick={handleScrap}
+            >
+              <Heart className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`} />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="rounded-full bg-transparent"
+              onClick={() => setShareDialogOpen(true)}
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
+            {recipe.isMine && (
+              <>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="rounded-full bg-transparent"
+                  onClick={handleEditRecipe}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="rounded-full bg-transparent text-red-500 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
             )}
           </div>
         </div>

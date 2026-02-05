@@ -239,7 +239,7 @@ public class MarketPostService {
     }
 
     private void validateExtension(String ext) {
-        if (!Arrays.asList("jpg", "jpeg", "png").contains(ext)) {
+        if (!Arrays.asList("jpg", "jpeg", "png", "webp").contains(ext)) {
             throw new RuntimeException("허용되지 않는 파일 형식: " + ext);
         }
     }

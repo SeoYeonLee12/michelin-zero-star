@@ -10,6 +10,10 @@ VALUES ('밥'), ('반찬'), ('국물'), ('면'), ('디저트'),
        ('야식&술안주'), ('한식'), ('일식');
 
 -- [2] 유저 데이터 생성
+-- 시스템 관리자 (크롤링 봇)
+INSERT INTO users (email, password, name, nickname, role, total_star, created_at, updated_at)
+VALUES ('crawling_bot@michelin0.com', '$2a$10$DUMMYHASHFOREXAMPLE', '시스템 관리자', 'CRAWLINGBOT', 'USER', 5.0, NOW(), NOW());
+
 -- 사용자 1 (찜을 누를 사람)
 INSERT INTO users (email, password, name, nickname, role, total_star, created_at, updated_at)
 VALUES ('user1@example.com', '$2a$10$DUMMYHASH1', '사용자1', '역삼동주민', 'USER', 0.0, NOW(), NOW());
@@ -26,7 +30,7 @@ VALUES
     (@user1_id, '서울 강남구 역삼동', '1168010100', 37.500628, 127.036392, 1, NOW(), NOW()),
     (@user2_id, '서울 강남구 역삼동', '1168010100', 37.500628, 127.036392, 1, NOW(), NOW());
 
--- [4] 마켓 게시글 생성 (유저 2가 작성)
+-- [4] 마켓 게시글 생성 (유저 2가 작성, category 컬럼 제거됨)
 INSERT INTO market_posts (
     users_id,
     title,
@@ -36,7 +40,6 @@ INSERT INTO market_posts (
     location_text,
     location_code,
     meeting_place,
-    category,
     chat_count,
     like_count,
     latitude,
@@ -53,7 +56,6 @@ VALUES (
            '서울 강남구 역삼동',
            '1168010100',
            '역삼역 3번 출구 앞',
-           '식재료',
            0,
            1, -- 유저 1이 찜할 예정이므로 초기값 1 설정
            37.500628,
@@ -76,7 +78,3 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 -- [8] 데이터 삽입 결과 확인
 SELECT 'DATA_INSERT_SUCCESS' as status;
-SELECT * FROM categories;
-SELECT * FROM users WHERE users_id IN (@user1_id, @user2_id);
-SELECT * FROM market_posts WHERE market_posts_id = @post1_id;
-SELECT * FROM market_likes WHERE post_id = @post1_id;

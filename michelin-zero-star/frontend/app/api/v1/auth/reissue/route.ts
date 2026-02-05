@@ -3,7 +3,6 @@ import { cookies } from "next/headers"
 
 export async function POST(request: NextRequest) {
     try {
-        // 1. 프론트엔드 쿠키에서 refreshToken 가져오기
         const cookieStore = await cookies()
         const refreshToken = cookieStore.get("refreshToken")?.value
 
@@ -14,61 +13,89 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // 2. 백엔드로 토큰 재발급 요청 (쿠키 포함)
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://backend:8080"
-        const response = await fetch(`${backendUrl}/api/v1/auth/reissue`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Cookie: `refreshToken=${refreshToken}`, // 백엔드로 쿠키 전달
-            },
-        })
+        // 1. Backend URL 설정
+        let backendUrl = process.env.INTERNAL_API_URL
 
-        // 3. 백엔드 응답 처리
-        const rawText = await response.text()
-        let data
-        try {
-            data = JSON.parse(rawText)
-        } catch (jsonError) {
-            console.error("[Reissue] Non-JSON response:", rawText)
-
-            // 리프레시 실패 시 쿠키 삭제
-            cookieStore.delete("refreshToken")
-
-            return NextResponse.json(
-                { message: rawText || "토큰 재발급 실패" },
-                { status: response.status || 401 }
-            )
-        }
-
-        if (!response.ok) {
-            // 리프레시 실패 시 쿠키 삭제
-            cookieStore.delete("refreshToken")
-            return NextResponse.json(data, { status: response.status })
-        }
-
-        // 4. 백엔드가 새로운 refreshToken을 보냈다면 업데이트
-        const setCookieHeader = response.headers.get("set-cookie")
-        if (setCookieHeader) {
-            const refreshTokenMatch = setCookieHeader.match(/refreshToken=([^;]+)/)
-            if (refreshTokenMatch) {
-                const newRefreshToken = refreshTokenMatch[1]
-                cookieStore.set("refreshToken", newRefreshToken, {
-                    httpOnly: true,
-                    secure: false,
-                    sameSite: "lax",
-                    path: "/",
-                    maxAge: 7 * 24 * 60 * 60,
-                })
+        if (!backendUrl) {
+            // Docker 환경에서 localhost는 127.0.0.1이 아니라 서비스명을 써야 함
+            if (process.env.NEXT_PUBLIC_API_URL?.includes("localhost")) {
+                // Docker Compose 서비스명 'backend'를 우선 시도
+                backendUrl = "http://backend:8080/api/v1";
+            } else {
+                backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8080/api/v1";
             }
         }
 
-        // 5. 새로운 액세스 토큰 반환
-        return NextResponse.json(data, { status: 200 })
+        // 2. 백엔드 요청
+        try {
+            const response = await fetch(`${backendUrl}/auth/reissue`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Cookie: `refreshToken=${refreshToken}`,
+                },
+            })
+
+            // 3. 응답 처리
+            const contentType = response.headers.get("content-type")
+            let data
+            if (contentType && contentType.includes("application/json")) {
+                data = await response.json()
+            } else {
+                const text = await response.text()
+                data = { message: text || "Error" }
+            }
+
+            if (!response.ok) {
+                console.warn("[Reissue API] Refresh Failed:", data)
+                // 유효하지 않은 토큰이면 쿠키 삭제
+                cookieStore.delete("refreshToken")
+                return NextResponse.json(data, { status: response.status })
+            }
+
+            // 4. 쿠키 갱신 (Backend가 Set-Cookie를 준다면)
+            const setCookieHeader = response.headers.get("set-cookie")
+            if (setCookieHeader) {
+                const refreshTokenMatch = setCookieHeader.match(/refreshToken=([^;]+)/)
+                if (refreshTokenMatch) {
+                    cookieStore.set("refreshToken", refreshTokenMatch[1], {
+                        httpOnly: true,
+                        secure: process.env.NODE_ENV === "production",
+                        sameSite: "lax",
+                        path: "/",
+                        maxAge: 7 * 24 * 60 * 60,
+                    })
+                }
+            }
+
+            return NextResponse.json(data, { status: 200 })
+
+        } catch (fetchError) {
+            console.warn(`[Reissue API] 1차 시도 실패 (${backendUrl})... host.docker.internal로 재시도합니다.`);
+
+            // Fallback: 로컬 Docker Desktop 환경용
+            const fallbackUrl = "http://host.docker.internal:8080/api/v1";
+            try {
+                const response = await fetch(`${fallbackUrl}/auth/reissue`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Cookie: `refreshToken=${refreshToken}`,
+                    },
+                })
+
+                const data = await response.json()
+                return NextResponse.json(data, { status: 200 });
+            } catch (fallbackError) {
+                console.error("[Reissue API] Backend Unreachable:", fallbackError)
+                return NextResponse.json({ message: "Backend Unreachable" }, { status: 502 })
+            }
+        }
+
     } catch (error) {
-        console.error("[Reissue API Route] Error:", error)
+        console.error("[Reissue API Route] Fatal Error:", error)
         return NextResponse.json(
-            { message: "Internal Server Error" },
+            { message: "Internal Server Error (Reissue Route)" },
             { status: 500 }
         )
     }
