@@ -111,6 +111,7 @@ export default function MyPage() {
           rating: item.averageRating,
           author: item.nickName,
           tags: item.tags.map(t => t.tag_name),
+          recipeType: item.recipeType,
           // Fill missing required fields with defaults
           difficulty: "중급", // Default
           duration: 0,
@@ -429,7 +430,7 @@ export default function MyPage() {
                         key={recipe.id}
                         recipe={recipe}
                         onClick={() => router.push(`/recipes/${recipe.id}`)}
-                        showAuthor
+                        showAuthor={recipe.recipeType === "USER"}
                       />
                     ))}
                   </div>

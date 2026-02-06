@@ -233,8 +233,8 @@ export function CompleteCookDialog({
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-xl mb-0.5 leading-tight">{completedRecipe.name}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-xl mb-0.5 leading-tight line-clamp-2 break-words">{completedRecipe.name}</p>
                   <p className="text-sm text-muted-foreground font-normal">
                     {completedScrapped ? "즐겨찾기에 저장됨" : "하트를 눌러 즐겨찾기에 저장하세요"}
                   </p>

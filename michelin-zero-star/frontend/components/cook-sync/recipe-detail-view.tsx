@@ -55,6 +55,7 @@ interface RecipeDetailViewProps {
   recipe: Recipe
   onStartCooking: () => void
   hasCompletedCooking?: boolean
+  onScrapChange?: (isScrapped: boolean) => void
 }
 
 function AnimatedNumber({ value, prevValue }: { value: number; prevValue: number }) {
@@ -131,7 +132,7 @@ function StarRating({ rating, onRatingChange, disabled }: { rating: number; onRa
 
 const COMMENTS_PER_PAGE = 5
 
-export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking = false }: RecipeDetailViewProps) {
+export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking, onScrapChange }: RecipeDetailViewProps) {
   const router = useRouter()
   const { user, hasUserReviewedRecipe, markRecipeAsReviewed } = useAuth()
 
@@ -202,6 +203,9 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
 
       // API Call
       await toggleScrap(Number(recipe.id))
+
+      // Notify parent of scrap change
+      onScrapChange?.(newStatus)
     } catch (error) {
       console.error("Failed to toggle scrap:", error)
       setIsScrapped(!isScrapped) // Revert on error

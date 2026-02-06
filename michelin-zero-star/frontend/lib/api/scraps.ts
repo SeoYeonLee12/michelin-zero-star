@@ -9,6 +9,7 @@ export interface ScrapRecipeItem {
     mainImageUrl: string
     averageRating: number
     nickName: string
+    recipeType: "USER" | "CHEF"
     tags: { tag_name: string }[]
 }
 

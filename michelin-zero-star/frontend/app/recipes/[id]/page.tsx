@@ -256,6 +256,9 @@ export default function RecipeDetailPage() {
                 recipe={recipe}
                 onStartCooking={handleStartCooking}
                 hasCompletedCooking={completedRecipes.has(recipe.id)}
+                onScrapChange={(isScrapped) => {
+                  setRecipe(prev => prev ? { ...prev, isLiked: isScrapped } : null)
+                }}
               />
             </motion.div>
           )}

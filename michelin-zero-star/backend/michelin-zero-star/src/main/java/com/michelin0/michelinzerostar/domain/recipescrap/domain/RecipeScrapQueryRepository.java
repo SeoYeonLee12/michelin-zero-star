@@ -34,7 +34,8 @@ public class RecipeScrapQueryRepository {
                                 recipe.title,
                                 recipe.mainImageUrl,
                                 recipe.averageRating,
-                                recipe.user.nickname
+                                recipe.user.nickname,
+                                recipe.recipeType
                         ))
                 .from(recipeScrap)
                 .join(recipeScrap.recipe, recipe)

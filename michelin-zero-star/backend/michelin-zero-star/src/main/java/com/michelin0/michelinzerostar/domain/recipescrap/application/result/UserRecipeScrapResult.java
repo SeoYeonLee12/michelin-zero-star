@@ -1,5 +1,6 @@
 package com.michelin0.michelinzerostar.domain.recipescrap.application.result;
 
+import com.michelin0.michelinzerostar.domain.recipe.domain.enums.RecipeType;
 import com.michelin0.michelinzerostar.domain.recipescrap.domain.projection.ScrapRecipeListProjection;
 import java.util.List;
 
@@ -9,6 +10,7 @@ public record UserRecipeScrapResult(
         String mainImageUrl,
         Double averageRating,
         String nickName,
+        RecipeType recipeType,
         List<String> tags
 ) {
 
@@ -19,6 +21,7 @@ public record UserRecipeScrapResult(
                 projection.mainImageUrl(),
                 projection.averageRating(),
                 projection.nickName(),
+                projection.recipeType(),
                 projection.tags()
         );
     }
