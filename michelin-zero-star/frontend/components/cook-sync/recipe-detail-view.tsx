@@ -38,8 +38,8 @@ import {
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
 import { deleteRecipe } from "@/lib/api/recipes"
-import { toggleScrap } from "@/lib/api/scraps" // Import Scrap API
-import { createReview } from "@/lib/api/reviews"
+import { toggleScrap } from "@/lib/api/scraps"
+import { createReview, getRecipeReviews } from "@/lib/api/reviews"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -129,34 +129,38 @@ function StarRating({ rating, onRatingChange, disabled }: { rating: number; onRa
   )
 }
 
-const mockComments: any[] = []
-
 const COMMENTS_PER_PAGE = 5
 
 export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking = false }: RecipeDetailViewProps) {
   const router = useRouter()
-  const { user, hasUserReviewedRecipe, markRecipeAsReviewed } = useAuth() // Removed isRecipeLiked, toggleLikeRecipe
+  const { user, hasUserReviewedRecipe, markRecipeAsReviewed } = useAuth()
 
   const [newComment, setNewComment] = React.useState("")
   const [userRating, setUserRating] = React.useState<number>(0)
 
-  const [comments, setComments] = React.useState(mockComments)
+  /* State for Review API */
+  const [reviews, setReviews] = React.useState<any[]>([])
+  const [pageInfo, setPageInfo] = React.useState({
+    currentPage: 1,
+    size: 20,
+    totalElements: 0,
+    totalPages: 1,
+    hasNext: false,
+    hasPrevious: false
+  })
+  const [isReviewsLoading, setIsReviewsLoading] = React.useState(false)
   const [showScrapFeedback, setShowScrapFeedback] = React.useState(false)
   const [isScrapped, setIsScrapped] = React.useState(recipe.isLiked || false)
   const [isScrapLoading, setIsScrapLoading] = React.useState(false)
   const [shareDialogOpen, setShareDialogOpen] = React.useState(false)
   const [copied, setCopied] = React.useState(false)
-  const [editingCommentId, setEditingCommentId] = React.useState<number | null>(null)
-  const [editingText, setEditingText] = React.useState("")
-  const [currentPage, setCurrentPage] = React.useState(1)
-  const [recipeRating, setRecipeRating] = React.useState(4.5)
   const [nutritionOpen, setNutritionOpen] = React.useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
 
   // Update effect if recipe prop changes
   React.useEffect(() => {
     setIsScrapped(recipe.isLiked || false)
-  }, [recipe.isLiked])
+  }, [recipe.isLiked]) // Added back this effect
 
   const handleEditRecipe = () => {
     router.push(`/recipes/new?id=${recipe.id}`)
@@ -206,41 +210,28 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
     }
   }
 
-  const allIngredients = React.useMemo(() => {
-    const ingredientMap = new Map<string, string>()
-    recipe.steps.forEach((step) => {
-      if (step.ingredients && Array.isArray(step.ingredients)) {
-        step.ingredients.forEach((ing) => {
-          const match = ing.match(/^(.+?)\s*([\d.]+.*)$/)
-          if (match) {
-            ingredientMap.set(match[1], match[2])
-          } else {
-            ingredientMap.set(ing, "적당량")
-          }
-        })
-      }
-    })
 
-    // Also check for recipe-level ingredients (from new recipe form)
-    if (ingredientMap.size === 0 && recipe.ingredients) {
-      if (Array.isArray(recipe.ingredients)) {
-        recipe.ingredients.forEach((ing) => {
-          ingredientMap.set(ing.name, ing.amount || "적당량")
-        })
+  // Fetch Reviews
+  const fetchReviews = React.useCallback(async (page: number = 1) => {
+    try {
+      setIsReviewsLoading(true)
+      const data = await getRecipeReviews(Number(recipe.id), page)
+      if (data && data.reviews) {
+        setReviews(data.reviews)
+        setPageInfo(data.pageInfo)
+      } else {
+        setReviews([])
       }
+    } catch (error) {
+      console.error("Failed to fetch reviews:", error)
+    } finally {
+      setIsReviewsLoading(false)
     }
+  }, [recipe.id])
 
-    return Array.from(ingredientMap.entries())
-  }, [recipe])
-
-  const sortedComments = React.useMemo(() => {
-    // Force latest order (newest first)
-    return [...comments].sort((a, b) => b.id - a.id)
-  }, [comments])
-
-  const totalPages = Math.ceil(sortedComments.length / COMMENTS_PER_PAGE)
-  const paginatedComments = sortedComments.slice((currentPage - 1) * COMMENTS_PER_PAGE, currentPage * COMMENTS_PER_PAGE)
-
+  React.useEffect(() => {
+    fetchReviews(1)
+  }, [fetchReviews])
 
   const handleSubmitComment = async () => {
     if (!hasCompletedCooking) return
@@ -263,22 +254,10 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
         content: newComment
       })
 
-      // Optimistic update or refetch
-      const newCommentObj = {
-        id: Date.now(),
-        visitorId: user?.id || "current-user",
-        user: user?.nickname || user?.name || "나",
-        avatar: user?.profileImage || "/placeholder.svg",
-        text: newComment,
-        rating: userRating,
-        time: "방금 전",
-        totalStar: user?.stars || 0,
-      }
-
-      setComments((prev) => [newCommentObj, ...prev])
+      // Refresh reviews after submission
+      await fetchReviews(1)
       setNewComment("")
       setUserRating(0)
-      setCurrentPage(1)
 
       if (!hasUserReviewedRecipe(recipe.id)) {
         markRecipeAsReviewed(recipe.id)
@@ -289,27 +268,11 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
     }
   }
 
-
-
-  const handleRatingClick = (star: number) => {
-    if (!hasCompletedCooking) return
-    if (userRating === star) setUserRating(0)
-    else setUserRating(star)
-  }
-
-  const handleDeleteComment = (commentId: number) => {
-    setComments((prev) => prev.filter((c) => c.id !== commentId))
-  }
-
-  const handleEditComment = (commentId: number, text: string) => {
-    setEditingCommentId(commentId)
-    setEditingText(text)
-  }
-
-  const handleSaveEdit = (commentId: number) => {
-    setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, text: editingText } : c)))
-    setEditingCommentId(null)
-    setEditingText("")
+  // Calculate pages for pagination UI
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= pageInfo.totalPages) {
+      fetchReviews(newPage)
+    }
   }
 
   const handleCopyUrl = () => {
@@ -334,43 +297,6 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
     if (minutes === 0) return `${remainingSeconds}초`
     if (remainingSeconds === 0) return `${minutes}분`
     return `${minutes}분 ${remainingSeconds}초`
-  }
-
-  // ✅ 레시피 평점 표시 전용(부분 채움: 4.5 -> 4 full + 1 half)
-  const renderRecipeRatingFlowers = (value: number) => {
-    const rating = Number.isFinite(value) ? value : 0
-    const fullCount = Math.floor(rating)
-    const hasHalf = rating % 1 !== 0
-
-    return (
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-1">
-          {[1, 2, 3, 4, 5].map((idx) => {
-            if (idx <= fullCount) {
-              return (
-                <img key={idx} src="/michelin-full-star.png" alt="미슐랭" className="h-5 w-5" draggable={false} />
-              )
-            }
-
-            if (idx === fullCount + 1 && hasHalf) {
-              return <img key={idx} src="/michelin-star-half.png" alt="미슐랭 반" className="h-5 w-5" draggable={false} />
-            }
-
-            return (
-              <img
-                key={idx}
-                src="/michelin-star.png"
-                alt="미슐랭 빈"
-                className="h-5 w-5"
-                draggable={false}
-              />
-            )
-          })}
-        </div>
-
-        <span className="text-sm text-[#800020] font-medium">{rating.toFixed(1)}</span>
-      </div>
-    )
   }
 
   return (
@@ -551,30 +477,12 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
 
       <Separator />
 
-      {/* Ingredients */}
-      <div className="space-y-3">
-        <h2 className="text-base font-bold text-[#800020]">재료</h2>
-        <div className="grid grid-cols-3 gap-2 text-sm">
-          {allIngredients.map(([name, amount], idx) => (
-            <div key={idx} className="flex justify-between items-center px-3 py-2 rounded-lg bg-muted">
-              <span className="font-medium text-sm">{name}</span>
-              <span className="text-muted-foreground text-xs">{amount}</span>
-            </div>
-          ))}
-        </div>
-        {/* ✅ 수정사항 반영: '대체 재료 알아보기' 및 AI 챗봇(다이얼로그) 삭제 */}
-      </div>
-
-      <Separator />
-
       <div className="space-y-4">
         <h2 className="text-base font-bold text-[#800020]">레시피</h2>
         <div className="relative space-y-0 pl-1 sm:pl-4">
-          {/* Simple Modern Timeline Line */}
           <div className="absolute left-[23px] sm:left-[31px] top-10 bottom-10 w-px bg-gray-200" />
 
           {recipe.steps.map((step, idx) => {
-            // TIP Extraction Logic
             const tipMatch = step.description.match(/\[TIP\]\s*(.*)/i);
             const cleanDescription = tipMatch ? step.description.replace(/\[TIP\].*/i, "").trim() : step.description;
             const extractedTip = tipMatch ? tipMatch[1].trim() : step.tips;
@@ -582,14 +490,12 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
             return (
               <div key={step.id} className="relative group pb-12 last:pb-4">
                 <div className="flex flex-col md:flex-row gap-8 items-start">
-                  {/* Minimal Step Number Badge */}
                   <div className="relative z-10 flex-shrink-0 mt-2">
                     <div className="w-12 h-12 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center transition-colors group-hover:border-[#800020]/30 group-hover:bg-[#800020] group-hover:text-white duration-300">
                       <span className="text-lg font-bold">{step.stepNumber}</span>
                     </div>
                   </div>
 
-                  {/* Minimal Step Plate (No cards, no tags) */}
                   <div className="flex-1 w-full flex flex-col lg:flex-row gap-8 items-start min-w-0">
                     {step.imageUrl && (
                       <div className="relative w-full lg:w-[240px] aspect-[4/3] rounded-2xl overflow-hidden bg-muted shadow-sm hover:shadow-md transition-shadow shrink-0">
@@ -639,9 +545,8 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
         <div className="flex items-center justify-between">
           <h2 className="text-base font-bold text-[#800020] flex items-center gap-2">
             <MessageCircle className="h-4 w-4" />
-            댓글 {comments.length}개
+            댓글 {pageInfo.totalElements}개
           </h2>
-
         </div>
 
         <div
@@ -694,87 +599,54 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
         </div>
 
         <div className="space-y-4 mt-6">
-          {comments.length === 0 ? (
+          {reviews.length === 0 ? (
             <div className="text-center py-12 bg-muted/30 rounded-2xl border border-dashed">
               <MessageCircle className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
               <p className="text-muted-foreground font-medium">아직 댓글이 없습니다. 첫 번째 댓글을 남겨보세요!</p>
             </div>
           ) : (
-            paginatedComments.map((comment: any) => (
+            reviews.map((review: any) => (
               <div
-                key={comment.id}
+                key={review.reviewId}
                 className="group p-4 bg-background border border-gray-100 rounded-2xl shadow-sm hover:border-[#800020]/20 transition-all duration-300"
               >
                 <div className="flex items-start gap-4">
                   <Avatar className="h-10 w-10 border border-[#800020]/10 flex-shrink-0">
-                    <AvatarImage src={comment.avatar} />
+                    <AvatarImage src={review.userProfileImage || "/placeholder.svg"} />
                     <AvatarFallback className="bg-[#800020]/5 text-[#800020] font-bold">
-                      {comment.user[0]}
+                      {review.nickName[0]}
                     </AvatarFallback>
                   </Avatar>
 
                   <div className="flex-1 min-w-0">
                     {/* Header: User Info */}
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-sm text-foreground">{comment.user}</span>
+                      <span className="font-bold text-sm text-foreground">{review.nickName}</span>
                       <div className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-red-200 bg-white shadow-sm">
                         <img src="/michelin-star.png" alt="Michelin" className="w-3 h-3" />
-                        <span className="text-[10px] font-bold text-[#800020] leading-none pt-0.5">미슐랭 {comment.totalStar || 0}스타</span>
+                        <span className="text-[10px] font-bold text-[#800020] leading-none pt-0.5">미슐랭 {review.totalStar || 0}스타</span>
                       </div>
                       <span className="text-[10px] text-muted-foreground ml-auto">
-                        {comment.time}
+                        {new Date(review.reviewCreateDate).toLocaleDateString()}
                       </span>
                     </div>
 
                     {/* Sub-header: Rating */}
                     <div className="flex items-center gap-1 mt-1">
-                      {/* Display stars based on rating */}
                       {Array.from({ length: 5 }).map((_, i) => (
                         <img
                           key={i}
-                          src={i < comment.rating ? "/michelin-full-star.png" : "/michelin-star.png"}
+                          src={i < review.rating ? "/michelin-full-star.png" : "/michelin-star.png"}
                           alt=""
-                          className={cn("h-3 w-3", i >= comment.rating && "opacity-30")}
+                          className={cn("h-3 w-3", i >= review.rating && "opacity-30")}
                         />
                       ))}
                     </div>
 
                     {/* Body: Comment Text */}
-                    {editingCommentId === comment.id ? (
-                      <div className="mt-3 space-y-2">
-                        <Textarea
-                          value={editingText}
-                          onChange={(e) => setEditingText(e.target.value)}
-                          className="min-h-[80px]"
-                        />
-                        <div className="flex gap-2 justify-end">
-                          <Button size="sm" variant="ghost" onClick={() => setEditingCommentId(null)}>취소</Button>
-                          <Button size="sm" onClick={() => handleSaveEdit(comment.id)}>저장</Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="mt-2 text-sm text-foreground/80 leading-relaxed whitespace-pre-line break-words">
-                        {comment.text}
-                      </p>
-                    )}
-
-                    {/* Footer: Actions */}
-                    {(comment.visitorId === user?.id) && !editingCommentId && (
-                      <div className="flex items-center gap-2 mt-2">
-                        <button
-                          onClick={() => handleEditComment(comment.id, comment.text)}
-                          className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
-                        >
-                          수정
-                        </button>
-                        <button
-                          onClick={() => handleDeleteComment(comment.id)}
-                          className="text-xs text-muted-foreground hover:text-red-500 underline underline-offset-2"
-                        >
-                          삭제
-                        </button>
-                      </div>
-                    )}
+                    <p className="mt-2 text-sm text-foreground/80 leading-relaxed whitespace-pre-line break-words">
+                      {review.content}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -782,24 +654,24 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
           )}
         </div>
 
-        {totalPages > 1 && (
+        {pageInfo.totalPages > 1 && (
           <div className="flex items-center justify-center gap-4 mt-8">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
+              onClick={() => handlePageChange(pageInfo.currentPage - 1)}
+              disabled={!pageInfo.hasPrevious}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="text-sm">
-              {currentPage} / {totalPages}
+              {pageInfo.currentPage} / {pageInfo.totalPages}
             </span>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
+              onClick={() => handlePageChange(pageInfo.currentPage + 1)}
+              disabled={!pageInfo.hasNext}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -871,6 +743,6 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div >
+    </div>
   )
 }
