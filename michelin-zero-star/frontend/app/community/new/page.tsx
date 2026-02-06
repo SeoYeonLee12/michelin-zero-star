@@ -63,6 +63,14 @@ function CommunityNewForm() {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [isFree, setIsFree] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  // Validation States
+  const [titleError, setTitleError] = useState<string | null>(null)
+  const [descError, setDescError] = useState<string | null>(null)
+  const [priceError, setPriceError] = useState<string | null>(null)
+  const [placeError, setPlaceError] = useState<string | null>(null)
+  const [imageError, setImageError] = useState<string | null>(null)
+
   // Edit Mode Logic
   const searchParams = useSearchParams()
   const editPostId = searchParams.get("edit")
@@ -107,6 +115,7 @@ function CommunityNewForm() {
     setIsFree(checked)
     if (checked) {
       setFormData((prev) => ({ ...prev, price: "무료 나눔" }))
+      setPriceError(null)
     } else {
       setFormData((prev) => ({ ...prev, price: "" }))
     }
@@ -120,6 +129,13 @@ function CommunityNewForm() {
     const filesToProcess = Array.from(fileList).slice(0, remainingSlots)
 
     filesToProcess.forEach(async (file) => {
+      // 0. 파일 타입 검증
+      if (!file.type.startsWith("image/")) {
+        setImageError("이미지 파일만 업로드할 수 있습니다.")
+        return
+      }
+      setImageError(null)
+
       // 1. 이미지 압축
       try {
         const compressedFile = await compressImage(file)
@@ -162,45 +178,58 @@ function CommunityNewForm() {
   }
 
   const handleSubmit = () => {
+    let isValid = true
+
+    // Clear previous errors
+    setTitleError(null)
+    setDescError(null)
+    setPriceError(null)
+    setPlaceError(null)
+
     if (!formData.title || formData.title.length < 2) {
-      alert("제목은 2자 이상 입력해주세요.")
-      return
+      setTitleError("제목은 2자 이상 입력해주세요.")
+      isValid = false
+    } else if (formData.title.length > 40) {
+      setTitleError("제목은 40자 이하로 입력해주세요.")
+      isValid = false
     }
 
     if (!formData.description || formData.description.length < 5) {
-      alert("내용은 5자 이상 입력해주세요.")
-      return
-    }
-    if (formData.title.length < 2 || formData.title.length > 40) {
-      alert("제목은 2자 이상 40자 이하로 입력해주세요.")
-      return
-    }
-    if (formData.description.length < 5 || formData.description.length > 150) {
-      alert("내용은 5자 이상 150자 이하로 상세히 작성해주세요.")
-      return
+      setDescError("내용은 5자 이상 입력해주세요.")
+      isValid = false
+    } else if (formData.description.length > 150) {
+      setDescError("내용은 150자 이하로 작성해주세요.")
+      isValid = false
     }
 
     if (!isFree) {
       if (!formData.price) {
-        alert("가격을 입력하거나 무료 나눔을 선택해주세요.")
-        return
-      }
-      const numericPrice = parseInt(formData.price.replace(/,/g, ""), 10)
-      if (isNaN(numericPrice) || numericPrice < 1) {
-        alert("가격은 1원 이상이어야 합니다.")
-        return
+        setPriceError("가격을 입력하거나 무료 나눔을 선택해주세요.")
+        isValid = false
+      } else {
+        // 숫자만 있는지 재확인
+        if (!/^\d*$/.test(formData.price)) {
+          setPriceError("숫자만 입력해주세요.")
+          isValid = false
+        } else {
+          const numericPrice = parseInt(formData.price.replace(/,/g, ""), 10)
+          if (isNaN(numericPrice) || numericPrice < 1) {
+            setPriceError("가격은 1원 이상이어야 합니다.")
+            isValid = false
+          }
+        }
       }
     }
 
     if (!formData.place) {
-      alert("거래 장소를 입력해주세요.")
-      return
+      setPlaceError("거래 장소를 입력해주세요.")
+      isValid = false
+    } else if (formData.place.length > 30) {
+      setPlaceError("거래 장소는 30자 이내로 입력해주세요.")
+      isValid = false
     }
 
-    if (formData.place.length > 30) {
-      alert("거래 장소는 30자 이내로 입력해주세요.")
-      return
-    }
+    if (!isValid) return
 
     setShowConfirmDialog(true)
   }
@@ -210,7 +239,7 @@ function CommunityNewForm() {
       const priceValue = isFree ? 0 : parseInt(formData.price.toString().replace(/,/g, "")) || 0
 
       if (priceValue < 0) {
-        alert("가격은 0원 이상이어야 합니다.")
+        setPriceError("가격은 0원 이상이어야 합니다.")
         return
       }
 
@@ -351,7 +380,8 @@ function CommunityNewForm() {
                 className="hidden"
                 onChange={handleImageUpload}
               />
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+              {imageError && <p className="text-red-500 text-sm mt-1">{imageError}</p>}
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm mt-2">
                 <Receipt className="h-4 w-4 shrink-0" />
                 <span>신뢰를 위해 영수증을 함께 첨부해보세요</span>
               </div>
@@ -366,11 +396,18 @@ function CommunityNewForm() {
                 id="title"
                 placeholder="예: 양배추 반 통 같이 나눠요 (2~40자)"
                 value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, title: e.target.value })
+                  if (e.target.value.length >= 2) setTitleError(null)
+                }}
                 maxLength={40}
-                className={formData.title.length === 40 ? "focus-visible:ring-amber-500 ring-1 ring-amber-500" : ""}
+                className={cn(
+                  titleError ? "border-red-500 focus-visible:ring-red-500" :
+                    formData.title.length === 40 ? "focus-visible:ring-amber-500 ring-1 ring-amber-500" : ""
+                )}
               />
-              <div className="flex justify-end mt-1">
+              <div className="flex justify-between mt-1">
+                <span className="text-xs text-red-500 min-h-[16px]">{titleError}</span>
                 <span className={cn("text-xs", formData.title.length === 40 ? "text-amber-500 font-medium" : "text-muted-foreground")}>
                   {formData.title.length} / 40
                 </span>
@@ -391,12 +428,19 @@ function CommunityNewForm() {
     - 반 통씩 나눠서 가져가시면 됩니다
     - 둔산동 롯데마트 앞에서 직거래 원해요`}
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, description: e.target.value })
+                  if (e.target.value.length >= 5) setDescError(null)
+                }}
                 rows={6}
                 maxLength={150}
-                className={formData.description.length === 150 ? "focus-visible:ring-amber-500 ring-1 ring-amber-500" : ""}
+                className={cn(
+                  descError ? "border-red-500 focus-visible:ring-red-500" :
+                    formData.description.length === 150 ? "focus-visible:ring-amber-500 ring-1 ring-amber-500" : ""
+                )}
               />
-              <div className="flex justify-end mt-1">
+              <div className="flex justify-between mt-1">
+                <span className="text-xs text-red-500 min-h-[16px]">{descError}</span>
                 <span className={cn("text-xs", formData.description.length === 150 ? "text-amber-500 font-medium" : "text-muted-foreground")}>
                   {formData.description.length} / 150
                 </span>
@@ -429,22 +473,25 @@ function CommunityNewForm() {
                 value={formData.price}
                 onChange={(e) => {
                   const val = e.target.value
-                  if (val === "") {
-                    setFormData({ ...formData, price: "" })
-                    return
-                  }
-                  if (!/^\d*$/.test(val)) {
-                    alert("문자는 입력 할 수 없습니다.")
-                    return
-                  }
-                  // 숫자만 입력된 경우
-                  // 0으로 시작하는 경우 제거 (옵션)
                   setFormData({ ...formData, price: val })
+
+                  if (val === "") {
+                    setPriceError(null)
+                    return
+                  }
+
+                  // 숫자 이외의 문자가 포함된 경우 에러 표시
+                  if (!/^\d*$/.test(val)) {
+                    setPriceError("숫자만 입력해주세요.")
+                  } else {
+                    setPriceError(null)
+                  }
                 }}
                 disabled={isFree}
-                type="number"
-                min="0"
+                type="text"
+                className={cn(priceError && "border-red-500 focus-visible:ring-red-500")}
               />
+              {priceError && <p className="text-red-500 text-xs mt-1">{priceError}</p>}
             </div>
 
             {/* Place */}
@@ -458,12 +505,19 @@ function CommunityNewForm() {
                   id="place"
                   placeholder="예: 둔산동 롯데마트 앞"
                   value={formData.place}
-                  onChange={(e) => setFormData({ ...formData, place: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, place: e.target.value })
+                    if (e.target.value) setPlaceError(null)
+                  }}
                   maxLength={30}
-                  className={cn("pl-10", formData.place.length === 30 ? "focus-visible:ring-amber-500 ring-1 ring-amber-500" : "")}
+                  className={cn("pl-10",
+                    placeError ? "border-red-500 focus-visible:ring-red-500" :
+                      formData.place.length === 30 ? "focus-visible:ring-amber-500 ring-1 ring-amber-500" : ""
+                  )}
                 />
               </div>
-              <div className="flex justify-end mt-1">
+              <div className="flex justify-between mt-1">
+                <span className="text-xs text-red-500 min-h-[16px]">{placeError}</span>
                 <span className={cn("text-xs", formData.place.length === 30 ? "text-amber-500 font-medium" : "text-muted-foreground")}>
                   {formData.place.length} / 30
                 </span>

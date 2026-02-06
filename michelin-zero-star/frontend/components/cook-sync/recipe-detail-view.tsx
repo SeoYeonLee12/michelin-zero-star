@@ -41,6 +41,7 @@ import {
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
 import { deleteRecipe } from "@/lib/api/recipes"
+import { toggleScrap } from "@/lib/api/scraps" // Import Scrap API
 import {
   AlertDialog,
   AlertDialogAction,
@@ -170,12 +171,17 @@ const COMMENTS_PER_PAGE = 5
 
 export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking = false }: RecipeDetailViewProps) {
   const router = useRouter()
-  const { user, hasUserReviewedRecipe, toggleLikeRecipe, isRecipeLiked } = useAuth()
+  const { user, hasUserReviewedRecipe } = useAuth() // Removed isRecipeLiked, toggleLikeRecipe
 
   const [newComment, setNewComment] = React.useState("")
   const [userRating, setUserRating] = React.useState<number>(0)
   const [likedComments, setLikedComments] = React.useState<Set<number>>(new Set())
   const [showScrapFeedback, setShowScrapFeedback] = React.useState(false)
+
+  // Local scrap state
+  const [isScrapped, setIsScrapped] = React.useState(recipe.isLiked || false)
+  const [isScrapLoading, setIsScrapLoading] = React.useState(false)
+
   const [prevLikeCounts, setPrevLikeCounts] = React.useState<Record<number, number>>({})
   const [comments, setComments] = React.useState(mockComments)
   const [commentSort, setCommentSort] = React.useState<"latest" | "likes">("latest")
@@ -188,6 +194,10 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
   const [nutritionOpen, setNutritionOpen] = React.useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
 
+  // Update effect if recipe prop changes
+  React.useEffect(() => {
+    setIsScrapped(recipe.isLiked || false)
+  }, [recipe.isLiked])
 
   const handleEditRecipe = () => {
     router.push(`/recipes/new?id=${recipe.id}`)
@@ -207,7 +217,35 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
   }
 
   const userAlreadyReviewed = hasUserReviewedRecipe(recipe.id)
-  const isLiked = isRecipeLiked(recipe.id)
+
+  const handleScrap = async () => {
+    if (!user) {
+      alert("로그인이 필요한 서비스입니다.")
+      return
+    }
+
+    if (isScrapLoading) return
+    setIsScrapLoading(true)
+
+    try {
+      // Optimistic update
+      const newStatus = !isScrapped
+      setIsScrapped(newStatus)
+
+      if (newStatus) {
+        setShowScrapFeedback(true)
+        setTimeout(() => setShowScrapFeedback(false), 2000)
+      }
+
+      // API Call
+      await toggleScrap(Number(recipe.id))
+    } catch (error) {
+      console.error("Failed to toggle scrap:", error)
+      setIsScrapped(!isScrapped) // Revert on error
+    } finally {
+      setIsScrapLoading(false)
+    }
+  }
 
   const allIngredients = React.useMemo(() => {
     const ingredientMap = new Map<string, string>()
@@ -284,23 +322,6 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
       else newSet.add(commentId)
       return newSet
     })
-  }
-
-  const handleScrap = () => {
-    const wasLiked = isRecipeLiked(recipe.id)
-
-    toggleLikeRecipe({
-      id: recipe.id,
-      title: recipe.name,
-      image: recipe.thumbnail || "/placeholder.svg",
-      author: typeof recipe.author === "object" ? recipe.author?.name || "" : recipe.author || "",
-      savedAt: "",
-    })
-
-    if (!wasLiked) {
-      setShowScrapFeedback(true)
-      setTimeout(() => setShowScrapFeedback(false), 2000)
-    }
   }
 
   const handleRatingClick = (star: number) => {
@@ -404,9 +425,9 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
         </div>
 
         {/* Right: Info */}
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold">{recipe.name}</h1>
+            <h1 className="text-2xl font-bold break-words">{recipe.name}</h1>
             {recipe.description && (
               <div className="space-y-4">
                 <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap break-all">
@@ -524,10 +545,10 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
             <Button
               variant="outline"
               size="icon"
-              className={`rounded-full bg-transparent ${isLiked ? "text-red-500 border-red-500 hover:text-red-600" : ""}`}
+              className={`rounded-full bg-transparent ${isScrapped ? "text-red-500 border-red-500 hover:text-red-600" : ""}`}
               onClick={handleScrap}
             >
-              <Heart className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`} />
+              <Heart className={`h-4 w-4 ${isScrapped ? "fill-current" : ""}`} />
             </Button>
             <Button
               variant="outline"
@@ -602,9 +623,9 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
                   </div>
 
                   {/* Minimal Step Plate (No cards, no tags) */}
-                  <div className="flex-1 w-full flex flex-col lg:flex-row gap-8 items-start">
+                  <div className="flex-1 w-full flex flex-col lg:flex-row gap-8 items-start min-w-0">
                     {step.imageUrl && (
-                      <div className="relative w-full lg:w-[240px] aspect-[4/3] rounded-2xl overflow-hidden bg-muted shadow-sm hover:shadow-md transition-shadow">
+                      <div className="relative w-full lg:w-[240px] aspect-[4/3] rounded-2xl overflow-hidden bg-muted shadow-sm hover:shadow-md transition-shadow shrink-0">
                         <Image
                           src={step.imageUrl}
                           alt={`Step ${step.stepNumber}`}
@@ -614,8 +635,8 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
                       </div>
                     )}
 
-                    <div className="flex-1 flex flex-col justify-center space-y-5 pt-1">
-                      <p className="text-base sm:text-lg text-foreground/90 leading-relaxed font-normal">
+                    <div className="flex-1 flex flex-col justify-center space-y-5 pt-1 min-w-0">
+                      <p className="text-base sm:text-lg text-foreground/90 leading-relaxed font-normal whitespace-pre-wrap break-all">
                         {cleanDescription}
                       </p>
 

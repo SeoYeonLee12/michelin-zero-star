@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { getPostList, deletePost, updatePost, getMyPostList, getLikedPosts } from "@/lib/api/market" // Import APIs
+import { getScrappedRecipes, type ScrapRecipeItem } from "@/lib/api/scraps" // Import Scrap API
 import Link from "next/link"
 import Image from "next/image"
 
@@ -63,8 +64,8 @@ export default function MyPage() {
     user,
     isLoggedIn,
     isLoading, // ✅ 로딩 상태 가져오기
-    likedRecipes = [],
-    toggleLikeRecipe,
+    // likedRecipes = [], // Remove dummy likedRecipes usage
+    // toggleLikeRecipe, // We will use API directly or rely on local state
     userRecipes = [],
     // userPosts, // Context에서 제거됨 -> 로컬 State로 대체
     deleteUserRecipe,
@@ -86,8 +87,47 @@ export default function MyPage() {
   const [myPosts, setMyPosts] = React.useState<any[]>([])
   const [isLoadingPosts, setIsLoadingPosts] = React.useState(false) // 내 나눔 로딩
 
-  const [likedMarketPosts, setLikedMarketPosts] = React.useState<any[]>([]) // API 데이터 저장
+  const [likedMarketPosts, setLikedMarketPosts] = React.useState<any[]>([]) // 찜 목록 로딩
   const [isLoadingLiked, setIsLoadingLiked] = React.useState(false) // 찜 목록 로딩
+
+  // ✅ Saved Recipes State
+  const [savedRecipes, setSavedRecipes] = React.useState<any[]>([]) // Using any[] for now to map quickly, or strictly map to Recipe[]
+  const [isLoadingSaved, setIsLoadingSaved] = React.useState(false)
+
+  // ✅ Fetch Saved Recipes
+  React.useEffect(() => {
+    const fetchSavedRecipes = async () => {
+      if (!isLoggedIn || activeTab !== "saved") return
+
+      setIsLoadingSaved(true)
+      try {
+        const response = await getScrappedRecipes()
+        // Map ScrapRecipeItem to Recipe compatible structure for RecipeCard
+        const mappedRecipes = response.recipes.map(item => ({
+          id: String(item.recipeId),
+          name: item.title,
+          thumbnail: item.mainImageUrl || "/placeholder.svg",
+          image: item.mainImageUrl || "/placeholder.svg",
+          rating: item.averageRating,
+          author: item.nickName,
+          tags: item.tags.map(t => t.tag_name),
+          // Fill missing required fields with defaults
+          difficulty: "중급", // Default
+          duration: 0,
+          servings: 1,
+          isLiked: true, // It's in saved list, so it is liked
+        }))
+        setSavedRecipes(mappedRecipes)
+      } catch (error) {
+        console.error("Failed to fetch saved recipes:", error)
+      } finally {
+        setIsLoadingSaved(false)
+      }
+    }
+
+    fetchSavedRecipes()
+  }, [isLoggedIn, activeTab])
+
 
   // ✅ 로딩이 끝난 후에만 리다이렉트 체크 (깜빡임 방지)
   React.useEffect(() => {
@@ -361,33 +401,35 @@ export default function MyPage() {
               </div>
 
               {/* 저장한 레시피 */}
-              <TabsContent value="saved" className="space-y-4 outline-none m-0">
-                <TabInfoBox icon={tabInfo.saved.icon} title={tabInfo.saved.title} description={tabInfo.saved.description} />
-                {likedRecipes.length === 0 ? (
-                  <Card><CardContent className="p-8 text-center">
-                    <Heart className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                    <p className="text-muted-foreground">{tabInfo.saved.emptyTitle}</p>
-                    <Button className="mt-4 bg-[#800020]" onClick={() => router.push("/recipes")}>레시피 둘러보기</Button>
-                  </CardContent></Card>
+              <TabsContent value="saved" className="space-y-6 animate-fade-in">
+                <TabInfoBox {...tabInfo.saved} />
+
+                {isLoadingSaved ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="aspect-[4/3] bg-muted/30 rounded-2xl animate-pulse" />
+                    ))}
+                  </div>
+                ) : savedRecipes.length === 0 ? (
+                  <div className="text-center py-20 bg-muted/30 rounded-3xl border border-dashed">
+                    <Bookmark className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-muted-foreground">{tabInfo.saved.emptyTitle}</h3>
+                    <Button
+                      onClick={() => router.push("/")}
+                      variant="link"
+                      className="mt-2 text-[#800020]"
+                    >
+                      레시피 찾아보기
+                    </Button>
+                  </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {likedRecipes.map((recipe) => (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {savedRecipes.map((recipe) => (
                       <RecipeCard
                         key={recipe.id}
-                        recipe={{
-                          ...recipe,
-                          name: recipe.title, // LikedRecipe uses title, Recipe uses name. Map it.
-                          thumbnail: recipe.image, // LikedRecipe uses image
-                          tags: [],
-                          description: "",
-                          servings: 1,
-                          steps: [],
-                          duration: 0,
-                          difficulty: "초보"
-                        }}
-                        isLiked={true}
-                        onHeartClick={() => toggleLikeRecipe(recipe)}
+                        recipe={recipe}
                         onClick={() => router.push(`/recipes/${recipe.id}`)}
+                        showAuthor
                       />
                     ))}
                   </div>

@@ -65,3 +65,17 @@ export function leaveChatRoom(roomId: number) {
     method: "DELETE",
   })
 }
+
+// --- AI Chat ---
+export interface AiChatHistoryDto {
+  senderType: "AI" | "USER"
+  content?: string
+  answer?: string
+  recommended_recipes?: any[]
+  recommendedRecipes?: any[] // Backwards compatibility if needed
+  sendDate: string
+}
+
+export async function getAiChatHistory(): Promise<AiChatHistoryDto[]> {
+  return apiFetch<AiChatHistoryDto[]>("/api/chat") // Note: The requested endpoint is /api/chat not /api/v1/chat per user request
+}

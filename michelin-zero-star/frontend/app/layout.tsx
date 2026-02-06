@@ -13,20 +13,7 @@ export const metadata: Metadata = {
   description: "단계별 요리 가이드와 AI 레시피 추천 서비스",
   generator: "v0.app",
   icons: {
-    icon: [
-      {
-        url: "/icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
-      },
-      {
-        url: "/icon.svg",
-        type: "image/svg+xml",
-      },
-    ],
+    icon: "/michelin-star.png",
     apple: "/apple-icon.png",
   },
 }
@@ -39,7 +26,9 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className={`font-sans antialiased scroll-smooth`}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         <Analytics />
       </body>
     </html>
