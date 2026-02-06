@@ -8,9 +8,12 @@ import static com.michelin0.michelinzerostar.domain.recipe.domain.QRecipeStep.re
 import static com.michelin0.michelinzerostar.domain.recipe.domain.QRecipeTag.recipeTag;
 import static com.michelin0.michelinzerostar.domain.recipescrap.domain.QRecipeScrap.recipeScrap;
 import static com.michelin0.michelinzerostar.domain.user.entity.QUser.user;
+import static com.querydsl.core.group.GroupBy.groupBy;
+import static com.querydsl.core.group.GroupBy.list;
 
 import com.michelin0.michelinzerostar.domain.recipe.domain.enums.RecipeSortType;
 import com.michelin0.michelinzerostar.domain.recipe.domain.enums.RecipeType;
+import com.michelin0.michelinzerostar.domain.recipe.domain.pr.MyRecipeListProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModeProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModeRecipeStepProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeDetailProjection;
@@ -28,6 +31,7 @@ import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.JPAExpressions;
+import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.util.Collections;
 import java.util.List;
@@ -39,6 +43,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
@@ -226,6 +231,51 @@ public class RecipeQueryRepository {
                 .toList();
 
         return new PageImpl<>(finalContent, pageable, totalCount != null ? totalCount : 0);
+    }
+
+    public Page<MyRecipeListProjection> findMyRecipeAllByUserId(Long userId, Pageable pageable) {
+        List<MyRecipeListProjection> content = queryFactory.select(
+                        Projections.constructor(
+                                MyRecipeListProjection.class,
+                                recipe.recipeId,
+                                recipe.title,
+                                recipe.mainImageUrl,
+                                recipe.averageRating,
+                                user.nickname
+                        ))
+                .from(recipe)
+                .join(recipe.user, user)
+                .where(recipe.user.id.eq(userId))
+                .orderBy(recipe.recipeId.desc())
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        List<Long> recipeIds = content.stream()
+                .map(MyRecipeListProjection::recipeId)
+                .toList();
+
+        Map<Long, List<String>> tagsMap = queryFactory
+                .from(recipeTag)
+                .where(recipeTag.recipe.recipeId.in(recipeIds))
+                .transform(
+                        groupBy(recipeTag.recipe.recipeId).as(
+                                list(recipeTag.tagName)
+                        )
+                );
+
+        List<MyRecipeListProjection> finalContent = content.stream()
+                .map(p -> p.updateTags(
+                        tagsMap.getOrDefault(p.recipeId(), Collections.emptyList())
+                ))
+                .toList();
+
+        JPAQuery<Long> countQuery = queryFactory
+                .select(recipe.count())
+                .from(recipe)
+                .where(recipe.user.id.eq(userId));
+
+        return PageableExecutionUtils.getPage(finalContent, pageable, countQuery::fetchOne);
     }
 
     private OrderSpecifier<?> getOrderSpecifier(RecipeSortType sortType) {
