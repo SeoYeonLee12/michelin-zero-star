@@ -4,6 +4,7 @@ import com.michelin0.michelinzerostar.domain.auth.UserPrincipal;
 import com.michelin0.michelinzerostar.domain.recipereview.application.RecipeReviewService;
 import com.michelin0.michelinzerostar.domain.recipereview.application.command.RecipeReviewCommand;
 import com.michelin0.michelinzerostar.domain.recipereview.presentation.dto.RecipeReviewSaveRequest;
+import com.michelin0.michelinzerostar.domain.recipereview.presentation.dto.RecipeReviewSaveResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,12 +28,7 @@ public class RecipeReviewController {
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
         Long userId = userPrincipal.getId();
-        RecipeReviewCommand command = new RecipeReviewCommand(
-                userId,
-                request.recipeId(),
-                request.content(),
-                request.rating()
-        );
+        RecipeReviewCommand command = RecipeReviewCommand.of(userId, request);
         Long recipeId = recipeReviewService.saveRecipeReview(command);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new RecipeReviewSaveResponse(recipeId));
