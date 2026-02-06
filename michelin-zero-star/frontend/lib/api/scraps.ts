@@ -55,3 +55,5 @@ export async function toggleScrap(recipeId: number): Promise<ToggleScrapResponse
         body: JSON.stringify({ recipeId }),
     })
 }
+
+

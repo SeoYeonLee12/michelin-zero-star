@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils"
 import { StarRewardBadge } from "./star-reward-badge"
 import { AnimatePresence } from "framer-motion"
 import { toggleScrap } from "@/lib/api/scraps"
+import { createReview } from "@/lib/api/reviews"
 
 interface CompleteCookDialogProps {
   open: boolean
@@ -130,13 +131,32 @@ export function CompleteCookDialog({
   }
 
 
-  const handleSubmitReview = () => {
+  const handleSubmitReview = async () => {
     if (rating === 0 || !isLoggedIn) return
-    console.log("Review submitted as recipe comment:", { rating, comment, recipeId: completedRecipe.id, userId: user?.id })
-    if (!hasUserReviewedRecipe(completedRecipe.id)) {
-      markRecipeAsReviewed(completedRecipe.id)
+    if (!comment.trim()) {
+      alert("후기 내용을 입력해주세요.")
+      return
     }
-    setReviewSubmitted(true)
+    if (comment.length > 100) {
+      alert("후기는 100자 이내로 작성해주세요.")
+      return
+    }
+
+    try {
+      await createReview({
+        recipeId: Number(completedRecipe.id),
+        rating: rating,
+        content: comment
+      })
+
+      if (!hasUserReviewedRecipe(completedRecipe.id)) {
+        markRecipeAsReviewed(completedRecipe.id)
+      }
+      setReviewSubmitted(true)
+    } catch (error) {
+      console.error("Failed to submit review:", error)
+      alert("리뷰 등록에 실패했습니다.")
+    }
   }
 
   const handleGoHomeClick = () => {
@@ -234,13 +254,10 @@ export function CompleteCookDialog({
               <div className="p-6 bg-green-50 dark:bg-green-950 rounded-xl border border-green-200 dark:border-green-800 text-center">
                 <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
                 <h3 className="font-semibold text-lg text-green-700 dark:text-green-300">후기가 등록되었습니다!</h3>
-                <p className="text-sm text-green-600 dark:text-green-400 mt-1">레시피 댓글에 후기가 추가되었어요</p>
-              </div>
-            ) : userHasReviewed ? (
-              <div className="p-6 bg-blue-50 dark:bg-blue-950 rounded-xl border border-blue-200 dark:border-blue-800 text-center">
-                <CheckCircle className="h-12 w-12 text-blue-500 mx-auto mb-3" />
-                <h3 className="font-semibold text-lg text-blue-700 dark:text-blue-300">이미 후기를 남기셨습니다!</h3>
-                <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">한 레시피당 하나의 후기만 남길 수 있습니다</p>
+                <p className="text-sm text-green-600 dark:text-green-400 mt-1">소중한 의견 감사합니다</p>
+                <Button variant="link" className="mt-2 text-green-700" onClick={() => setReviewSubmitted(false)}>
+                  다른 후기 또 남기기
+                </Button>
               </div>
             ) : (
               <div className="space-y-4 p-6 bg-white border border-[#800020]/10 shadow-[0_4px_20px_-4px_rgba(128,0,32,0.08)] rounded-2xl">
@@ -274,13 +291,23 @@ export function CompleteCookDialog({
                   <Label htmlFor="comment" className="text-base font-medium">
                     댓글 남기기
                   </Label>
-                  <Textarea
-                    id="comment"
-                    placeholder="요리 후기를 남겨주세요..."
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    rows={3}
-                  />
+                  <div className="relative">
+                    <Textarea
+                      id="comment"
+                      placeholder="요리 후기를 남겨주세요... (최대 100자)"
+                      value={comment}
+                      onChange={(e) => {
+                        if (e.target.value.length <= 100) {
+                          setComment(e.target.value)
+                        }
+                      }}
+                      rows={3}
+                      className="resize-none pr-2 pb-6"
+                    />
+                    <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
+                      <span className={comment.length >= 100 ? "text-[#800020] font-bold" : ""}>{comment.length}</span>/100
+                    </div>
+                  </div>
                 </div>
                 <Button
                   onClick={handleSubmitReview}
