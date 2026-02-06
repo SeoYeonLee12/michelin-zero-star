@@ -5,6 +5,7 @@ import com.michelin0.michelinzerostar.domain.recipe.application.RecipeService;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.CookModeCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeDetailCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeListCommand;
+import com.michelin0.michelinzerostar.domain.recipe.application.result.MyRecipeListResult;
 import com.michelin0.michelinzerostar.domain.recipe.application.result.RecipeSaveResult;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request.RecipeListSearchCondition;
 import com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request.RecipeRegisterRequest;
@@ -106,5 +107,15 @@ public class RecipeController {
                 userId
         );
         return ResponseEntity.status(HttpStatus.OK).body(RecipeListResponse.from(result));
+    }
+
+    @GetMapping("/mypage")
+    public ResponseEntity<MyRecipeListResponse> getMyRecipeList(
+            @AuthenticationPrincipal UserPrincipal principle,
+            @PageableDefault(page = 0, size = 20) Pageable pageable
+    ) {
+        Long userId = (principle != null) ? principle.getId() : null;
+        Page<MyRecipeListResult> result = recipeService.getMyRecipeList(userId, pageable);
+        return ResponseEntity.status(HttpStatus.OK).body(MyRecipeListResponse.from(result));
     }
 }

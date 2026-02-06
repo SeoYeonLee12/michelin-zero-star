@@ -6,6 +6,7 @@ import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeDe
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeListCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeRegisterCommand;
 import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeUpdateCommand;
+import com.michelin0.michelinzerostar.domain.recipe.application.result.MyRecipeListResult;
 import com.michelin0.michelinzerostar.domain.recipe.application.result.RecipeSaveResult;
 import com.michelin0.michelinzerostar.domain.recipe.domain.Recipe;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeIngredient;
@@ -15,6 +16,7 @@ import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeRepository;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeStep;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeTag;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeUpdate;
+import com.michelin0.michelinzerostar.domain.recipe.domain.pr.MyRecipeListProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModeProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeDetailProjection;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.RecipeListProjection;
@@ -102,5 +104,14 @@ public class RecipeService {
                 pageable,
                 userId);
         return result.map(RecipeListCommand::from);
+    }
+
+    public Page<MyRecipeListResult> getMyRecipeList(
+            Long userId,
+            Pageable pageable
+    ) {
+        Page<MyRecipeListProjection> projections = recipeQueryRepository.findMyRecipeAllByUserId(
+                userId, pageable);
+        return projections.map(MyRecipeListResult::from);
     }
 }
