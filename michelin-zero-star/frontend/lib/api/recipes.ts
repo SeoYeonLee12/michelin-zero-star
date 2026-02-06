@@ -95,6 +95,41 @@ export async function getRecipeList(params: GetRecipeListParams): Promise<Recipe
   })
 }
 
+
+export interface MyRecipeListItem {
+  recipeId: number
+  title: string
+  mainImageUrl: string
+  averageRating: number
+  nickName: string
+  tags: string[]
+}
+
+export interface MyRecipeListResponse {
+  recipes: MyRecipeListItem[]
+  pageInfo: {
+    currentPage: number
+    size: number
+    totalElements: number
+    totalPages: number
+    hasNext: boolean
+    hasPrevious: boolean
+  }
+}
+
+/**
+ * 내 레시피 목록 조회 API
+ */
+export async function getMyRecipeList(page: number = 0, size: number = 20): Promise<MyRecipeListResponse> {
+  const query = new URLSearchParams()
+  query.append("page", page.toString())
+  query.append("size", size.toString())
+
+  return apiFetch<MyRecipeListResponse>(`/api/recipes/mypage?${query.toString()}`, {
+    method: "GET",
+  })
+}
+
 /**
  * 레시피 단일 조회 API
  * @param recipeId 레시피 ID (문자열 또는 숫자)

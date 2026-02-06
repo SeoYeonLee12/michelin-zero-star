@@ -31,6 +31,7 @@ import {
 import { useAuth } from "@/lib/auth-context"
 import { getPostList, deletePost, updatePost, getMyPostList, getLikedPosts } from "@/lib/api/market" // Import APIs
 import { getScrappedRecipes, type ScrapRecipeItem } from "@/lib/api/scraps" // Import Scrap API
+import { getMyRecipeList } from "@/lib/api/recipes" // Import My Recipe API
 import Link from "next/link"
 import Image from "next/image"
 
@@ -66,7 +67,7 @@ export default function MyPage() {
     isLoading, // ✅ 로딩 상태 가져오기
     // likedRecipes = [], // Remove dummy likedRecipes usage
     // toggleLikeRecipe, // We will use API directly or rely on local state
-    userRecipes = [],
+    // userRecipes = [], // Removed context usage
     // userPosts, // Context에서 제거됨 -> 로컬 State로 대체
     deleteUserRecipe,
     // deleteUserPost, // Context에서 제거됨
@@ -89,6 +90,10 @@ export default function MyPage() {
 
   const [likedMarketPosts, setLikedMarketPosts] = React.useState<any[]>([]) // 찜 목록 로딩
   const [isLoadingLiked, setIsLoadingLiked] = React.useState(false) // 찜 목록 로딩
+
+  // ✅ My Recipes State
+  const [myRecipes, setMyRecipes] = React.useState<any[]>([])
+  const [isLoadingMyRecipes, setIsLoadingMyRecipes] = React.useState(false)
 
   // ✅ Saved Recipes State
   const [savedRecipes, setSavedRecipes] = React.useState<any[]>([]) // Using any[] for now to map quickly, or strictly map to Recipe[]
@@ -137,14 +142,13 @@ export default function MyPage() {
     }
   }, [isLoading, isLoggedIn, router])
 
-  // ✅ 내 나눔글 가져오기 (API 연동)
+  // ✅ My Recipes, My Posts, Liked Posts Fetch
   React.useEffect(() => {
     async function fetchMyPosts() {
       if (!user || !user.id) return
       setIsLoadingPosts(true)
       try {
-        // ✅ API 호출로 변경
-        const response = await getMyPostList(0, 50) // 일단 50개 조회
+        const response = await getMyPostList(0, 50)
         setMyPosts(response.content)
       } catch (e) {
         console.error("Failed to fetch my posts", e)
@@ -166,10 +170,40 @@ export default function MyPage() {
       }
     }
 
+    async function fetchMyRecipes() {
+      if (!user || !user.id) return
+      setIsLoadingMyRecipes(true)
+      try {
+        const response = await getMyRecipeList()
+        // Map MyRecipeListItem to Recipe-like structure
+        const mappedRecipes = response.recipes.map(item => ({
+          id: String(item.recipeId),
+          name: item.title,
+          thumbnail: item.mainImageUrl,
+          rating: item.averageRating,
+          author: item.nickName,
+          tags: item.tags,
+          isUserRecipe: true,
+          // Defaults
+          difficulty: "초보",
+          duration: 0,
+          servings: 1,
+          steps: []
+        }))
+        setMyRecipes(mappedRecipes)
+      } catch (e) {
+        console.error("Failed to fetch my recipes", e)
+      } finally {
+        setIsLoadingMyRecipes(false)
+      }
+    }
+
     if (activeTab === "myPosts") {
       fetchMyPosts()
     } else if (activeTab === "likedPosts") {
       fetchLikedPosts()
+    } else if (activeTab === "myRecipes") {
+      fetchMyRecipes()
     }
   }, [activeTab, user])
 
@@ -442,7 +476,13 @@ export default function MyPage() {
                 <div className="flex justify-end mb-2">
                   <Button variant="link" className="text-[#800020]" onClick={() => router.push("/recipes/new")}>새 레시피 등록</Button>
                 </div>
-                {userRecipes.length === 0 ? (
+                {isLoadingMyRecipes ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="aspect-[4/3] bg-muted/30 rounded-2xl animate-pulse" />
+                    ))}
+                  </div>
+                ) : myRecipes.length === 0 ? (
                   <Card><CardContent className="p-8 text-center">
                     <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
                     <p className="text-muted-foreground">아직 등록한 레시피가 없어요</p>
@@ -450,20 +490,10 @@ export default function MyPage() {
                   </CardContent></Card>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {userRecipes.map((recipe) => (
+                    {myRecipes.map((recipe) => (
                       <RecipeCard
                         key={recipe.id}
-                        recipe={{
-                          ...recipe,
-                          isUserRecipe: true,
-                          name: recipe.title,
-                          image: recipe.thumbnail,
-                          hashtags: recipe.tags,
-                          // Add missing
-                          duration: 0,
-                          difficulty: "초보",
-                          steps: []
-                        }}
+                        recipe={recipe}
                         onEdit={() => router.push(`/recipes/edit/${recipe.id}`)}
                         onDelete={() => { setSelectedRecipeId(recipe.id); setDeleteRecipeDialogOpen(true); }}
                         onClick={() => router.push(`/recipes/${recipe.id}`)}
