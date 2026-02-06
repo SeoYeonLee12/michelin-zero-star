@@ -115,6 +115,7 @@ export default function RecipeDetailPage() {
       isLiked: data.isScrapped,
       isMine: data.isMine,
       createdAt: data.createdAt,
+      averageRating: data.averageRating,
     }
   }
 

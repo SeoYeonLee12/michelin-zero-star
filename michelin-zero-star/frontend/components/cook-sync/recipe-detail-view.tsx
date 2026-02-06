@@ -4,11 +4,9 @@ import * as React from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -26,7 +24,6 @@ import {
   Lightbulb,
   Send,
   MessageCircle,
-  ThumbsUp,
   Copy,
   Check,
   MoreVertical,
@@ -42,6 +39,7 @@ import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
 import { deleteRecipe } from "@/lib/api/recipes"
 import { toggleScrap } from "@/lib/api/scraps" // Import Scrap API
+import { createReview } from "@/lib/api/reviews"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -131,60 +129,21 @@ function StarRating({ rating, onRatingChange, disabled }: { rating: number; onRa
   )
 }
 
-const mockComments = [
-  {
-    id: 1,
-    visitorId: "user1",
-    user: "김대전",
-    avatar: "/korean-woman-avatar.jpg",
-    text: "정말 맛있게 만들었어요! 가족들이 너무 좋아했어요.",
-    rating: 5,
-    time: "2일 전",
-    likes: 12,
-    starLevel: 3,
-  },
-  {
-    id: 2,
-    visitorId: "user2",
-    user: "박요리",
-    avatar: "/korean-man-avatar.jpg",
-    text: "초보자도 따라하기 쉬웠습니다. 감사합니다!",
-    rating: 4,
-    time: "5일 전",
-    likes: 8,
-    starLevel: 1,
-  },
-  {
-    id: 3,
-    visitorId: "user3",
-    user: "이맛집",
-    avatar: "/young-korean-woman-avatar.jpg",
-    text: "양념 비율이 딱 좋아요. 다음에 또 만들 예정!",
-    rating: 5,
-    time: "1주 전",
-    likes: 5,
-    starLevel: 5,
-  },
-]
+const mockComments: any[] = []
 
 const COMMENTS_PER_PAGE = 5
 
 export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking = false }: RecipeDetailViewProps) {
   const router = useRouter()
-  const { user, hasUserReviewedRecipe } = useAuth() // Removed isRecipeLiked, toggleLikeRecipe
+  const { user, hasUserReviewedRecipe, markRecipeAsReviewed } = useAuth() // Removed isRecipeLiked, toggleLikeRecipe
 
   const [newComment, setNewComment] = React.useState("")
   const [userRating, setUserRating] = React.useState<number>(0)
-  const [likedComments, setLikedComments] = React.useState<Set<number>>(new Set())
-  const [showScrapFeedback, setShowScrapFeedback] = React.useState(false)
 
-  // Local scrap state
+  const [comments, setComments] = React.useState(mockComments)
+  const [showScrapFeedback, setShowScrapFeedback] = React.useState(false)
   const [isScrapped, setIsScrapped] = React.useState(recipe.isLiked || false)
   const [isScrapLoading, setIsScrapLoading] = React.useState(false)
-
-  const [prevLikeCounts, setPrevLikeCounts] = React.useState<Record<number, number>>({})
-  const [comments, setComments] = React.useState(mockComments)
-  const [commentSort, setCommentSort] = React.useState<"latest" | "likes">("latest")
   const [shareDialogOpen, setShareDialogOpen] = React.useState(false)
   const [copied, setCopied] = React.useState(false)
   const [editingCommentId, setEditingCommentId] = React.useState<number | null>(null)
@@ -275,54 +234,62 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
   }, [recipe])
 
   const sortedComments = React.useMemo(() => {
-    const sorted = [...comments]
-    if (commentSort === "likes") {
-      sorted.sort((a, b) => {
-        const aLikes = a.likes + (likedComments.has(a.id) ? 1 : 0)
-        const bLikes = b.likes + (likedComments.has(b.id) ? 1 : 0)
-        return bLikes - aLikes
-      })
-    }
-    return sorted
-  }, [comments, commentSort, likedComments])
+    // Force latest order (newest first)
+    return [...comments].sort((a, b) => b.id - a.id)
+  }, [comments])
 
   const totalPages = Math.ceil(sortedComments.length / COMMENTS_PER_PAGE)
   const paginatedComments = sortedComments.slice((currentPage - 1) * COMMENTS_PER_PAGE, currentPage * COMMENTS_PER_PAGE)
 
-  const handleSubmitComment = () => {
-    if (!hasCompletedCooking) return
-    if (!newComment.trim()) return
 
-    const newCommentObj = {
-      id: Date.now(),
-      visitorId: user?.id || "current-user",
-      user: user?.name || "나",
-      avatar: user?.profileImage || "/placeholder.svg",
-      text: newComment,
-      rating: userRating,
-      time: "방금 전",
-      likes: 0,
-      starLevel: 0,
+  const handleSubmitComment = async () => {
+    if (!hasCompletedCooking) return
+    if (userRating === 0) {
+      alert("평점을 선택해주세요.")
+      return
+    }
+    if (!newComment.trim()) {
+      alert("댓글 내용을 입력해주세요.")
+      return
+    }
+    if (newComment.length > 100) {
+      return
     }
 
-    setComments((prev) => [newCommentObj, ...prev])
-    setNewComment("")
-    setUserRating(0)
-    setCurrentPage(1)
+    try {
+      await createReview({
+        recipeId: Number(recipe.id),
+        rating: userRating,
+        content: newComment
+      })
+
+      // Optimistic update or refetch
+      const newCommentObj = {
+        id: Date.now(),
+        visitorId: user?.id || "current-user",
+        user: user?.nickname || user?.name || "나",
+        avatar: user?.profileImage || "/placeholder.svg",
+        text: newComment,
+        rating: userRating,
+        time: "방금 전",
+        totalStar: user?.stars || 0,
+      }
+
+      setComments((prev) => [newCommentObj, ...prev])
+      setNewComment("")
+      setUserRating(0)
+      setCurrentPage(1)
+
+      if (!hasUserReviewedRecipe(recipe.id)) {
+        markRecipeAsReviewed(recipe.id)
+      }
+    } catch (error) {
+      console.error("Failed to submit comment:", error)
+      alert("댓글 등록에 실패했습니다.")
+    }
   }
 
-  const handleLikeComment = (commentId: number, currentLikes: number) => {
-    const isCurrentlyLiked = likedComments.has(commentId)
-    const newLikeCount = currentLikes + (isCurrentlyLiked ? -1 : 1)
-    setPrevLikeCounts((prev) => ({ ...prev, [commentId]: newLikeCount }))
 
-    setLikedComments((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(commentId)) newSet.delete(commentId)
-      else newSet.add(commentId)
-      return newSet
-    })
-  }
 
   const handleRatingClick = (star: number) => {
     if (!hasCompletedCooking) return
@@ -674,22 +641,13 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
             <MessageCircle className="h-4 w-4" />
             댓글 {comments.length}개
           </h2>
-          <Select value={commentSort} onValueChange={(v: string) => setCommentSort(v as "latest" | "likes")}>
-            <SelectTrigger className="w-24 h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="latest">최신순</SelectItem>
-              <SelectItem value="likes">추천순</SelectItem>
-            </SelectContent>
-          </Select>
+
         </div>
 
         <div
           className={cn(
             "p-3 bg-muted/50 rounded-xl space-y-2",
             !hasCompletedCooking && "opacity-60",
-            userAlreadyReviewed && "bg-amber-50/50 border border-amber-100",
           )}
         >
           {!hasCompletedCooking && (
@@ -698,38 +656,41 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
               <span className="text-amber-700">요리를 완료한 후 평점과 댓글을 남길 수 있습니다</span>
             </div>
           )}
-          {userAlreadyReviewed && (
-            <div className="flex items-center gap-2 text-sm text-amber-700 mb-2 p-2 bg-amber-50 rounded-lg border border-amber-200">
-              <CheckCircle className="h-4 w-4 text-amber-600" />
-              <span>이미 이 레시피에 평점과 댓글을 남기셨습니다</span>
-            </div>
-          )}
 
           <div className="flex items-center gap-2">
             <div className="flex-1">
-              <StarRating rating={userRating} onRatingChange={setUserRating} disabled={!hasCompletedCooking || userAlreadyReviewed} />
+              <StarRating rating={userRating} onRatingChange={setUserRating} disabled={!hasCompletedCooking} />
             </div>
             <Button
               onClick={handleSubmitComment}
-              disabled={!hasCompletedCooking || userAlreadyReviewed || !newComment.trim()}
+              disabled={!hasCompletedCooking || !newComment.trim()}
               className="bg-[#800020] hover:bg-[#800020]/90 text-white"
             >
               등록
             </Button>
           </div>
-          <Textarea
-            placeholder={
-              !hasCompletedCooking
-                ? "요리를 완료한 후 댓글을 작성할 수 있습니다"
-                : userAlreadyReviewed
-                  ? "이미 댓글을 작성하셨습니다"
-                  : "이 레시피에 대한 의견을 남겨주세요"
-            }
-            value={newComment}
-            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewComment(e.target.value)}
-            disabled={!hasCompletedCooking || userAlreadyReviewed}
-            className="min-h-[100px] bg-background resize-none focus-visible:ring-[#800020]"
-          />
+          <div className="relative">
+            <Textarea
+              placeholder={
+                !hasCompletedCooking
+                  ? "요리를 완료한 후 댓글을 작성할 수 있습니다"
+                  : "이 레시피에 대한 의견을 남겨주세요 (최대 100자)"
+              }
+              value={newComment}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                if (e.target.value.length <= 100) {
+                  setNewComment(e.target.value)
+                }
+              }}
+              disabled={!hasCompletedCooking}
+              className="min-h-[100px] bg-background resize-none focus-visible:ring-[#800020] pr-2 pb-6"
+            />
+            {hasCompletedCooking && !userAlreadyReviewed && (
+              <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
+                <span className={newComment.length > 100 ? "text-red-500 font-bold" : ""}>{newComment.length}</span>/100
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="space-y-4 mt-6">
@@ -744,52 +705,77 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
                 key={comment.id}
                 className="group p-4 bg-background border border-gray-100 rounded-2xl shadow-sm hover:border-[#800020]/20 transition-all duration-300"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10 border border-[#800020]/10">
-                      <AvatarImage src={comment.avatar} />
-                      <AvatarFallback className="bg-[#800020]/5 text-[#800020] font-bold">
-                        {comment.user[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-foreground">{comment.user}</span>
-                        <div className="flex items-center bg-amber-50 px-1.5 py-0.5 rounded text-[10px] font-bold text-amber-600 border border-amber-100">
-                          <img src="/michelin-full-star.png" className="h-2.5 w-2.5 mr-0.5" />
-                          {comment.rating.toFixed(1)}
-                        </div>
+                <div className="flex items-start gap-4">
+                  <Avatar className="h-10 w-10 border border-[#800020]/10 flex-shrink-0">
+                    <AvatarImage src={comment.avatar} />
+                    <AvatarFallback className="bg-[#800020]/5 text-[#800020] font-bold">
+                      {comment.user[0]}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div className="flex-1 min-w-0">
+                    {/* Header: User Info */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-sm text-foreground">{comment.user}</span>
+                      <div className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-red-200 bg-white shadow-sm">
+                        <img src="/michelin-star.png" alt="Michelin" className="w-3 h-3" />
+                        <span className="text-[10px] font-bold text-[#800020] leading-none pt-0.5">미슐랭 {comment.totalStar || 0}스타</span>
                       </div>
-                      <span className="text-[10px] text-muted-foreground font-medium">
+                      <span className="text-[10px] text-muted-foreground ml-auto">
                         {comment.time}
                       </span>
                     </div>
-                  </div>
-                  {(comment.visitorId === user?.id) && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => handleDeleteComment(comment.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-                <p className="mt-3 text-sm text-foreground/80 leading-relaxed whitespace-pre-line pl-13">
-                  {comment.text}
-                </p>
-                <div className="mt-3 flex items-center gap-4 pl-13">
-                  <button
-                    onClick={() => handleLikeComment(comment.id, comment.likes)}
-                    className={cn(
-                      "flex items-center gap-1.5 text-xs font-semibold transition-colors",
-                      likedComments.has(comment.id) ? "text-[#800020]" : "text-muted-foreground hover:text-[#800020]"
+
+                    {/* Sub-header: Rating */}
+                    <div className="flex items-center gap-1 mt-1">
+                      {/* Display stars based on rating */}
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <img
+                          key={i}
+                          src={i < comment.rating ? "/michelin-full-star.png" : "/michelin-star.png"}
+                          alt=""
+                          className={cn("h-3 w-3", i >= comment.rating && "opacity-30")}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Body: Comment Text */}
+                    {editingCommentId === comment.id ? (
+                      <div className="mt-3 space-y-2">
+                        <Textarea
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          className="min-h-[80px]"
+                        />
+                        <div className="flex gap-2 justify-end">
+                          <Button size="sm" variant="ghost" onClick={() => setEditingCommentId(null)}>취소</Button>
+                          <Button size="sm" onClick={() => handleSaveEdit(comment.id)}>저장</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm text-foreground/80 leading-relaxed whitespace-pre-line break-words">
+                        {comment.text}
+                      </p>
                     )}
-                  >
-                    <ThumbsUp className={cn("h-3.5 w-3.5", likedComments.has(comment.id) && "fill-current")} />
-                    <span>좋아요 {comment.likes + (likedComments.has(comment.id) ? 1 : 0)}</span>
-                  </button>
+
+                    {/* Footer: Actions */}
+                    {(comment.visitorId === user?.id) && !editingCommentId && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <button
+                          onClick={() => handleEditComment(comment.id, comment.text)}
+                          className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+                        >
+                          수정
+                        </button>
+                        <button
+                          onClick={() => handleDeleteComment(comment.id)}
+                          className="text-xs text-muted-foreground hover:text-red-500 underline underline-offset-2"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))
