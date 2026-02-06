@@ -3,26 +3,33 @@ package com.michelin0.michelinzerostar.domain.recipereview.presentation;
 import com.michelin0.michelinzerostar.domain.auth.UserPrincipal;
 import com.michelin0.michelinzerostar.domain.recipereview.application.RecipeReviewService;
 import com.michelin0.michelinzerostar.domain.recipereview.application.command.RecipeReviewCommand;
+import com.michelin0.michelinzerostar.domain.recipereview.application.command.RecipeReviewListResult;
+import com.michelin0.michelinzerostar.domain.recipereview.presentation.dto.RecipeReviewListResponse;
 import com.michelin0.michelinzerostar.domain.recipereview.presentation.dto.RecipeReviewSaveRequest;
 import com.michelin0.michelinzerostar.domain.recipereview.presentation.dto.RecipeReviewSaveResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 @Controller
-@RequestMapping("/api/reviews")
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class RecipeReviewController {
 
     private final RecipeReviewService recipeReviewService;
 
-    @PostMapping
+    @PostMapping("/reviews")
     public ResponseEntity<RecipeReviewSaveResponse> registerReview(
             @RequestBody @Valid RecipeReviewSaveRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal
@@ -32,5 +39,18 @@ public class RecipeReviewController {
         Long recipeId = recipeReviewService.saveRecipeReview(command);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new RecipeReviewSaveResponse(recipeId));
+    }
+
+    @GetMapping("recipes/{recipeId}/reviews")
+    public ResponseEntity<RecipeReviewListResponse> getRecipeReviews(
+            @PathVariable Long recipeId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PageableDefault(page = 0, size = 20) Pageable pageable
+    ) {
+        Long userId = userPrincipal.getId();
+        Page<RecipeReviewListResult> result = recipeReviewService.getReviewList(recipeId, userId,
+                pageable);
+        RecipeReviewListResponse response = RecipeReviewListResponse.from(result);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 }
