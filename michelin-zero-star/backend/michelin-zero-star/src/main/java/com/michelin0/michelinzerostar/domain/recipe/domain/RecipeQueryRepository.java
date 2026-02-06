@@ -8,8 +8,7 @@ import static com.michelin0.michelinzerostar.domain.recipe.domain.QRecipeStep.re
 import static com.michelin0.michelinzerostar.domain.recipe.domain.QRecipeTag.recipeTag;
 import static com.michelin0.michelinzerostar.domain.recipescrap.domain.QRecipeScrap.recipeScrap;
 import static com.michelin0.michelinzerostar.domain.user.entity.QUser.user;
-import com.michelin0.michelinzerostar.domain.category.domain.QCategory;
-import com.michelin0.michelinzerostar.domain.category.domain.QRecipeCategory;
+
 import com.michelin0.michelinzerostar.domain.recipe.domain.enums.RecipeSortType;
 import com.michelin0.michelinzerostar.domain.recipe.domain.enums.RecipeType;
 import com.michelin0.michelinzerostar.domain.recipe.domain.projection.CookModeProjection;
@@ -36,6 +35,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -44,6 +44,7 @@ import org.springframework.util.StringUtils;
 
 @Repository
 @RequiredArgsConstructor
+@Slf4j
 public class RecipeQueryRepository {
 
     private final JPAQueryFactory queryFactory;
