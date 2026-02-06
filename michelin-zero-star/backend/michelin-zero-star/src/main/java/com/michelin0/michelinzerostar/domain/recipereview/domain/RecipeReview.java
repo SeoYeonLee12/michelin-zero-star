@@ -51,6 +51,11 @@ public class RecipeReview extends BaseDomain {
         this.content = content;
     }
 
+    public void updateRatingAndContent(Double rating, String content) {
+        this.rating = rating;
+        this.content = content;
+    }
+
     private void isContentNull(String content) {
         if (content == null) {
             throw new GlobalException(RecipeReviewErrorCode.CONTENT_IS_NULL);
