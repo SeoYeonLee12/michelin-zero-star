@@ -168,6 +168,19 @@ public class Recipe extends SoftDeleteDomain {
         }
     }
 
+    public StarHistoryType getRewardCompleteType() {
+        return StarHistoryType.COOK_COMPLETE;
+    }
+
+    public void updateAverageRating(double ratingAmount, int totalReviews) {
+        int previousCount = totalReviews - 1;
+        if (previousCount == 0) {
+            this.averageRating = ratingAmount;
+        }
+        double previousTotalScore = this.averageRating * previousCount;
+        this.averageRating = (previousTotalScore + ratingAmount) / totalReviews;
+    }
+
     private <T> void isMatchedRecipeId(
             List<T> list,
             Function<T, Recipe> recipeExtractor,
@@ -186,10 +199,6 @@ public class Recipe extends SoftDeleteDomain {
         if (list == null || list.isEmpty()) {
             throw new GlobalException(emptyError);
         }
-    }
-
-    public StarHistoryType getRewardCompleteType() {
-        return StarHistoryType.COOK_COMPLETE;
     }
 }
 
