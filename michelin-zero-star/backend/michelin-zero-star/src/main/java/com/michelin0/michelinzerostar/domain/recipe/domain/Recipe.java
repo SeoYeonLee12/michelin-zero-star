@@ -191,6 +191,17 @@ public class Recipe extends SoftDeleteDomain {
         this.averageRating = newTotalScore / totalCount;
     }
 
+    public void removeRatingFromAverage(double ratingToRemove, int currentTotalCount) {
+        if (currentTotalCount <= 1) {
+            this.averageRating = 0.0;
+            return;
+        }
+        double currentAvg = (this.averageRating != null) ? this.averageRating : 0.0;
+        double currentTotalScore = currentAvg * currentTotalCount;
+        double newTotalScore = currentTotalScore - ratingToRemove;
+        this.averageRating = newTotalScore / (currentTotalCount - 1);
+    }
+
     private <T> void isMatchedRecipeId(
             List<T> list,
             Function<T, Recipe> recipeExtractor,
