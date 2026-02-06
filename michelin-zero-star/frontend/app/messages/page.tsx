@@ -292,7 +292,7 @@ export default function MessagesPage() {
                   <h2 className="font-bold text-base">{selectedConversation.recipientName}</h2>
                   {selectedConversation.postTitle && (
                     <p className="text-xs text-muted-foreground truncate max-w-[300px]">
-                      {selectedConversation.postTitle} 관련 대화
+                      {selectedConversation.postTitle} 나눔 채팅
                     </p>
                   )}
                 </div>

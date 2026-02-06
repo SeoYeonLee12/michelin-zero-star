@@ -79,7 +79,7 @@ export function CompleteCookDialog({
       markRecipeAsCompleted(completedRecipe.id)
 
       if (isAwarded) {
-        earnStars(0.5, "cook")
+        // earnStars(0.5, "cook") // ❌ Removed local optimistic update to prevent sync issues
         refreshUser()
       }
 

@@ -23,7 +23,7 @@ services:
       - AI_SERVER_URL=http://ai-serving:8000
 
       # [중요] OAuth2 로그인 후 리다이렉트될 프론트엔드 도메인
-      - APP_FRONTEND_URL=${APP_FRONTEND_URL:-http://localhost:3000}
+      - APP_FRONTEND_URL=https://i14b208.p.ssafy.io
 
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
@@ -142,8 +142,8 @@ services:
     environment:
       - ES_URL=http://elasticsearch:9200
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - SPEECH_KEY=${NEXT_PUBLIC_SPEECH_KEY}
-      - SPEECH_REGION=${NEXT_PUBLIC_SPEECH_REGION}
+      - SPEECH_KEY=${SPEECH_KEY}
+      - SPEECH_REGION=${SPEECH_REGION}
       - PYTHONUNBUFFERED=1
       - PROJECT_NAME="Michelin Zero Star AI"
     volumes:
@@ -161,29 +161,25 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_SPEECH_KEY=${NEXT_PUBLIC_SPEECH_KEY}
-        - NEXT_PUBLIC_SPEECH_REGION=${NEXT_PUBLIC_SPEECH_REGION:-koreacentral}
     restart: always
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
       # [Hybrid Merge] Localhost value with Remote Variable Name
-      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-https://i14b208.p.ssafy.io/api/v1}
-      - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-wss://i14b208.p.ssafy.io/ws-stomp}
-      - NEXT_PUBLIC_SPEECH_KEY=${NEXT_PUBLIC_SPEECH_KEY}
-      - NEXT_PUBLIC_SPEECH_REGION=${NEXT_PUBLIC_SPEECH_REGION:-koreacentral}
-    # volumes:  <-- PROD: Keep commented out to use built artifacts
-    #   - ./frontend:/app
-    #   - /app/node_modules
-    #   - /app/.next
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api/v1
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
     networks:
       - mzs-network
     depends_on:
       - backend
-    # command: npm run dev ... <-- PROD: Remove command, use Dockerfile CMD
+    command: npm run dev -- --webpack -H 0.0.0.0 -p 3000
 
 #===============================================#
 # Network & Volume Definition

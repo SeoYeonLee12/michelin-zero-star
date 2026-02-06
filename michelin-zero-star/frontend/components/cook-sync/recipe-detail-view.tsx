@@ -579,6 +579,27 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
               </>
             )}
           </div>
+
+          {/* Author Info */}
+          {recipe.recipeType !== "CHEF" && typeof recipe.author !== "string" && recipe.author && (
+            <div className="flex items-center gap-2 pt-4 border-t mt-4">
+              <Avatar className="h-10 w-10 border border-border">
+                <AvatarImage src={recipe.author.image} className="object-cover" />
+                <AvatarFallback className="bg-muted text-muted-foreground font-medium">
+                  {recipe.author.name[0]}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-medium text-foreground">{recipe.author.name}</span>
+                <div className="flex items-center gap-1 bg-[#FFF0F0] px-2.5 py-1 rounded-full border border-[#FFE0E0]">
+                  <img src="/michelin-star.png" alt="Michelin" className="h-3.5 w-3.5" />
+                  <span className="text-xs font-bold text-[#800020]">
+                    미슐랭 {(recipe.author.totalStars ?? 0).toFixed(1)}스타
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

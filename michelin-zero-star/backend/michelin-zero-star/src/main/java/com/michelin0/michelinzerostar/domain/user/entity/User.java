@@ -88,8 +88,12 @@ public class User extends SoftDeleteDomain {
             this.nickname = nickname;
         }
 
-        if (profileImageUrl != null && !profileImageUrl.isBlank()) {
-            this.profileImageUrl = profileImageUrl;
+        if (profileImageUrl != null) {
+            if (profileImageUrl.isBlank()) {
+                this.profileImageUrl = null;
+            } else {
+                this.profileImageUrl = profileImageUrl;
+            }
         }
     }
 

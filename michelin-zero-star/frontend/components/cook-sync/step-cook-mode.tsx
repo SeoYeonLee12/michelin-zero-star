@@ -467,14 +467,7 @@ export function StepCookMode({
       stopAllAudio()
       setIsListening(false)
 
-      try {
-        await completeCooking({ recipeId })
-      } catch (err) {
-        console.error("요리 완료 API 오류:", err)
-      } finally {
-        // 성공하든 실패하든 일단 완료 처리
-        onComplete()
-      }
+      onComplete()
     }
   }, [steps.length, onStepChange, onComplete, stopAllAudio, recipeId])
 

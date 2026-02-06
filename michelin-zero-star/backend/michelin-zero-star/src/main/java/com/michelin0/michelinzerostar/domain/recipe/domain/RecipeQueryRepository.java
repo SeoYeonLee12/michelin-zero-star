@@ -349,6 +349,8 @@ public class RecipeQueryRepository {
                 recipe.getCreatedAt(),
                 recipe.getUpdatedAt(),
                 recipe.getUser().getNickname(),
+                recipe.getUser().getProfileImageUrl(),
+                recipe.getUser().getTotalStar(),
                 isScrapped,
                 isMine,
                 categoryNames,

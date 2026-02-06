@@ -25,6 +25,8 @@ public record RecipeDetailProjection(
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         String nickname,
+        String userProfileImageUrl,
+        Double userTotalStar,
         Boolean isScrapped,
         Boolean isMine,
         List<String> categoryNames,
