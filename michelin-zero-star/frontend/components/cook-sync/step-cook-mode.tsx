@@ -573,7 +573,7 @@ export function StepCookMode({
           if (stompClientRef.current && stompClientRef.current.connected) {
             const token = getGlobalAccessToken()
             stompClientRef.current.publish({
-              destination: "/pub/recipes/ask",
+              destination: "/app/recipes/ask",
               headers: token ? { Authorization: `Bearer ${token}` } : {},
               body: JSON.stringify({
                 content: raw,
@@ -613,9 +613,17 @@ export function StepCookMode({
 
   // 언마운트 cleanup
   React.useEffect(() => {
-    return () => {
+    const cleanup = () => {
       try { azureSttRef.current?.stop() } catch { }
       azureSttRef.current = null
+    }
+
+    // 페이지 벗어날 때 (탭 닫기, 뒤로가기, 새로고침 등)
+    window.addEventListener("beforeunload", cleanup)
+
+    return () => {
+      cleanup()
+      window.removeEventListener("beforeunload", cleanup)
     }
   }, [])
 
