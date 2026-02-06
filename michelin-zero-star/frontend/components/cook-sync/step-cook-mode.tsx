@@ -360,13 +360,17 @@ export function StepCookMode({
 
         // 구독
         client.subscribe(`/topic/recipe/${recipeId}`, (message) => {
+          console.log('[WS] Message received:', message.body)
           if (message.body) {
             const body = JSON.parse(message.body)
+            console.log('[WS] Parsed body:', body)
             // { content: "...", senderType: "USER" | "AI", ... }
             if (body.senderType === "AI") {
+              console.log('[WS] Adding AI message to chat')
               setAiMessages((prev) => [...prev, { role: "ai", content: body.content }])
               setAiTurnSafe("listening") // AI 응답 오면 듣기 모드 복귀? (기획 확인 필요하나 일단 자연스러움)
             } else if (body.senderType === "USER") {
+              console.log('[WS] Ignoring USER message (already added optimistically)')
               // 내 메시지도 소켓으로 오면 여기서 추가? 
               // 보통 optimistic update 로 내가 보낸 건 미리 추가함.
               // 중복 방지 로직이 필요할 수도 있음. 일단은 내가 보낸건 aiSend에서 추가하니 여기선 AI만 처리하거나
