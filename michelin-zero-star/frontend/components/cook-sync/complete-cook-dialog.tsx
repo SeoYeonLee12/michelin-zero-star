@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { StarRewardBadge } from "./star-reward-badge"
 import { AnimatePresence } from "framer-motion"
+import { toggleScrap } from "@/lib/api/scraps"
 
 interface CompleteCookDialogProps {
   open: boolean
@@ -20,7 +21,7 @@ interface CompleteCookDialogProps {
   leftoverRecipes: Recipe[]
   onSelectLeftover: (recipe: Recipe) => void
   onGoHome?: () => void
-  isAwarded?: boolean // ✅ Added prop
+  isAwarded?: boolean
 }
 
 export function CompleteCookDialog({
@@ -30,12 +31,10 @@ export function CompleteCookDialog({
   leftoverRecipes,
   onSelectLeftover,
   onGoHome,
-  isAwarded = true, // Default to true for backward compatibility
+  isAwarded = true,
 }: CompleteCookDialogProps) {
   const router = useRouter()
   const {
-    toggleLikeRecipe,
-    isRecipeLiked,
     isLoggedIn,
     user,
     markRecipeAsCompleted,
@@ -50,31 +49,38 @@ export function CompleteCookDialog({
   const [reviewSubmitted, setReviewSubmitted] = useState(false)
   const [scrapFeedback, setScrapFeedback] = useState<string | null>(null)
 
-  // ✅ Should show reward UI? Only if awarded OR limit exceeded (to show feedback)
-  // Logic: Always show the badge section, but change text based on isAwarded.
+  // Local scrap states
+  const [completedScrapped, setCompletedScrapped] = useState(false)
+  const [recommendationScrapped, setRecommendationScrapped] = useState<Record<string, boolean>>({})
+
   const [showRewardAnimation, setShowRewardAnimation] = useState(false)
 
-  // NOTE: "요리 완료"(completed)와 "리뷰 작성"(reviewed)은 의미가 다르므로 분리합니다.
-  // 리뷰 여부는 derived 값으로 계산해 상태 꼬임을 방지합니다.
   const userHasReviewed = completedRecipe ? hasUserReviewedRecipe(completedRecipe.id) : false
+  const rewardProcessed = useRef(false)
 
-  // Prevent double-execution in Strict Mode
-  const processedRef = useState(false) // Using state as ref for simplicity or verify imports? Standard is useRef.
-  // Actually, useRef is better. But I need to import it properly or reuse lines.
-  // Let's use a simpler approach: Check if recipe is already marked locally? 
-  // No, just use a ref.
-  const rewardProcessed = useRef(false) // Need to import useRef
+  // Initialize scrap states
+  useEffect(() => {
+    if (completedRecipe) {
+      setCompletedScrapped(!!completedRecipe.isLiked)
+    }
+  }, [completedRecipe])
 
-  // 다이얼로그가 열리는 시점 = 요리 완료 시점으로 보고 completed 기록
+  useEffect(() => {
+    const initialStates: Record<string, boolean> = {}
+    leftoverRecipes.forEach(recipe => {
+      initialStates[recipe.id] = !!recipe.isLiked
+    })
+    setRecommendationScrapped(initialStates)
+  }, [leftoverRecipes])
+
   useEffect(() => {
     if (open && completedRecipe?.id && !rewardProcessed.current) {
       rewardProcessed.current = true
       markRecipeAsCompleted(completedRecipe.id)
 
-      // If backend says awarded, we should refresh user data to get updated stars
       if (isAwarded) {
-        earnStars(0.5, "cook") // Optimistic update
-        refreshUser() // Sync with backend
+        earnStars(0.5, "cook")
+        refreshUser()
       }
 
       setShowRewardAnimation(true)
@@ -83,24 +89,43 @@ export function CompleteCookDialog({
 
 
   if (!completedRecipe) return null
+  if (!open) return null
 
-  const isCompletedRecipeLiked = isRecipeLiked(completedRecipe.id)
-
-  const handleLikeCompletedRecipe = () => {
+  const handleLikeCompletedRecipe = async () => {
     if (!isLoggedIn) return
-    const wasLiked = isRecipeLiked(completedRecipe.id)
 
-    toggleLikeRecipe({
-      id: completedRecipe.id,
-      title: completedRecipe.name,
-      image: completedRecipe.thumbnail || "/placeholder.svg",
-      author: completedRecipe.hashtags?.[0] || "미슐랭 0스타",
-      savedAt: "",
-    })
+    const wasLiked = completedScrapped
+    setCompletedScrapped(!wasLiked) // Optimistic
 
     if (!wasLiked) {
       setScrapFeedback("스크랩했습니다")
       setTimeout(() => setScrapFeedback(null), 2000)
+    }
+
+    try {
+      await toggleScrap(Number(completedRecipe.id))
+    } catch (error) {
+      console.error("Failed to toggle scrap:", error)
+      setCompletedScrapped(wasLiked) // Revert
+    }
+  }
+
+  const handleLikeRecommendation = async (recipeId: string) => {
+    if (!isLoggedIn) return
+
+    const wasLiked = recommendationScrapped[recipeId] || false
+    setRecommendationScrapped(prev => ({ ...prev, [recipeId]: !wasLiked })) // Optimistic
+
+    if (!wasLiked) {
+      setScrapFeedback("스크랩했습니다")
+      setTimeout(() => setScrapFeedback(null), 2000)
+    }
+
+    try {
+      await toggleScrap(Number(recipeId))
+    } catch (error) {
+      console.error("Failed to toggle scrap:", error)
+      setRecommendationScrapped(prev => ({ ...prev, [recipeId]: wasLiked })) // Revert
     }
   }
 
@@ -108,7 +133,6 @@ export function CompleteCookDialog({
   const handleSubmitReview = () => {
     if (rating === 0 || !isLoggedIn) return
     console.log("Review submitted as recipe comment:", { rating, comment, recipeId: completedRecipe.id, userId: user?.id })
-    // 리뷰는 레시피당 1회만 허용
     if (!hasUserReviewedRecipe(completedRecipe.id)) {
       markRecipeAsReviewed(completedRecipe.id)
     }
@@ -128,11 +152,6 @@ export function CompleteCookDialog({
     onOpenChange(false)
   }
 
-  // completedRecipe 없으면 렌더 안 함
-  if (!completedRecipe) return null
-  // open 아닐 때도 렌더 안 함 (Radix 제거 핵심)
-  if (!open) return null
-
   return (
     <div className="fixed inset-0 z-50">
       {/* Overlay */}
@@ -149,7 +168,7 @@ export function CompleteCookDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6">
-          {/* Header (DialogHeader 대체) */}
+          {/* Header */}
           <div className="text-center pt-6 pb-2">
             <div className="inline-flex items-center justify-center mb-6">
               <div className="relative">
@@ -197,14 +216,14 @@ export function CompleteCookDialog({
                 <div className="flex-1">
                   <p className="font-semibold text-xl mb-0.5 leading-tight">{completedRecipe.name}</p>
                   <p className="text-sm text-muted-foreground font-normal">
-                    {isCompletedRecipeLiked ? "즐겨찾기에 저장됨" : "하트를 눌러 즐겨찾기에 저장하세요"}
+                    {completedScrapped ? "즐겨찾기에 저장됨" : "하트를 눌러 즐겨찾기에 저장하세요"}
                   </p>
                 </div>
                 <Button variant="ghost" size="icon" className="h-10 w-10 hover:bg-transparent" onClick={handleLikeCompletedRecipe}>
                   <Heart
                     className={cn(
                       "h-8 w-8 transition-all",
-                      isCompletedRecipeLiked ? "fill-red-500 text-red-500" : "text-muted-foreground hover:text-red-500",
+                      completedScrapped ? "fill-red-500 text-red-500" : "text-muted-foreground hover:text-red-500",
                     )}
                   />
                 </Button>
@@ -238,7 +257,7 @@ export function CompleteCookDialog({
                           onMouseEnter={() => setHoverRating(star)}
                           onMouseLeave={() => setHoverRating(0)}
                           className="p-1 transition-transform hover:scale-110"
-                          aria-label={`${star}점`}
+                          aria-label={`${star} 점`}
                         >
                           <img
                             src={active ? "/michelin-full-star.png" : "/michelin-star.png"}
@@ -336,24 +355,18 @@ export function CompleteCookDialog({
                         size="sm"
                         className={cn(
                           "gap-2",
-                          isRecipeLiked(recipe.id) ? "text-red-500" : "text-muted-foreground",
+                          recommendationScrapped[recipe.id] ? "text-red-500" : "text-muted-foreground",
                           "hover:bg-transparent"
                         )}
                         onClick={(e) => {
                           e.stopPropagation()
-                          toggleLikeRecipe({
-                            id: recipe.id,
-                            title: recipe.name,
-                            image: recipe.thumbnail || "/placeholder.svg",
-                            author: typeof recipe.author === "object" ? recipe.author?.name || "" : String(recipe.author || ""),
-                            savedAt: "",
-                          })
+                          handleLikeRecommendation(recipe.id)
                         }}
                       >
                         <Heart
                           className={cn(
                             "h-5 w-5",
-                            isRecipeLiked(recipe.id) ? "fill-red-500 text-red-500" : "text-muted-foreground",
+                            recommendationScrapped[recipe.id] ? "fill-red-500 text-red-500" : "text-muted-foreground",
                           )}
                         />
                       </Button>
@@ -377,5 +390,5 @@ export function CompleteCookDialog({
       </div>
     </div>
   )
-
 }
+

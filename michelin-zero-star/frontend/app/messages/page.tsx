@@ -4,22 +4,59 @@
 import React, { useEffect, useState, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
-import { Send, MessageCircle, ChevronLeft, ChevronRight, LogOut } from "lucide-react"
+import { Send, MessageCircle, ChevronLeft, ChevronRight, LogOut, ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Navbar } from "@/components/cook-sync/navbar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/auth-context"
 
 const ITEMS_PER_PAGE = 5
+const MAX_CHAR_LIMIT = 500;
+const TRUNCATE_LENGTH = 300;
+
+// Message Bubble Component for handling expansion
+const MessageBubble = ({ content, isSentByMe, imgSrc }: { content: string, isSentByMe: boolean, imgSrc?: string }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const shouldTruncate = content.length > TRUNCATE_LENGTH;
+  const displayContent = isExpanded || !shouldTruncate ? content : content.slice(0, TRUNCATE_LENGTH) + "...";
+
+  return (
+    <div className={cn(
+      "px-4 py-2 rounded-2xl text-sm shadow-sm whitespace-pre-wrap break-all max-w-full", // break-all added
+      isSentByMe ? "bg-[#800020] text-white rounded-br-none" : "bg-white text-gray-800 border rounded-bl-none"
+    )}>
+      {imgSrc && (
+        <Image src={imgSrc} alt="첨부 이미지" width={200} height={200} className="rounded-lg mb-2 object-cover" />
+      )}
+      {displayContent}
+      {shouldTruncate && (
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className={cn(
+            "block mt-1 text-xs font-bold hover:underline focus:outline-none",
+            isSentByMe ? "text-red-100 hover:text-white" : "text-[#800020] hover:text-[#5a0016]"
+          )}
+        >
+          {isExpanded ? (
+            <span className="flex items-center gap-1">접기 <ChevronUp className="h-3 w-3" /></span>
+          ) : (
+            <span className="flex items-center gap-1">전체보기 <ChevronDown className="h-3 w-3" /></span>
+          )}
+        </button>
+      )}
+    </div>
+  )
+}
 
 export default function MessagesPage() {
   const {
     isLoggedIn,
     conversations,
     currentMessages,
+    isChatLoaded, // ✅ Get loaded state
     enterChatRoom,
     exitChatRoom,
     sendMessage,
@@ -39,6 +76,7 @@ export default function MessagesPage() {
   const [currentPage, setCurrentPage] = useState(1)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const isValidId = (id: string | null | undefined): boolean => {
     return !!id && id !== "undefined" && id !== "null" && !isNaN(Number(id));
@@ -51,10 +89,22 @@ export default function MessagesPage() {
 
   // 2. URL 변경 감지하여 방 입장 (★ 핵심: URL이 바뀌면 자동으로 방 입장, 없으면 퇴장)
   useEffect(() => {
+    if (!isChatLoaded) return; // ⏳ Wait for chat list to load
+
     const paramRoomId = searchParams.get("roomId")
 
     // URL에 roomId가 있고, 현재 선택된 방과 다르면 입장 시도
     if (isValidId(paramRoomId)) {
+      // 🛡️ Security Check: 방 목록에 있는지 확인
+      const hasRoom = conversations.some(c => c.id === paramRoomId);
+      if (!hasRoom) {
+        console.warn(`⛔ Access Denied: User is not in room ${paramRoomId}`);
+        router.replace("/messages"); // Redirect to list
+        if (selectedRoomId) exitChatRoom();
+        setSelectedRoomId(null);
+        return;
+      }
+
       if (paramRoomId !== selectedRoomId) {
         console.log(`🔄 URL 변경 감지: 방 ${paramRoomId} 입장`);
         setSelectedRoomId(paramRoomId!)
@@ -68,7 +118,7 @@ export default function MessagesPage() {
         exitChatRoom()
       }
     }
-  }, [searchParams, selectedRoomId])
+  }, [searchParams, selectedRoomId, isChatLoaded, conversations])
 
   // 페이지 언마운트 감지하여 채팅방 나가기 (Cleanup)
   useEffect(() => {
@@ -84,6 +134,14 @@ export default function MessagesPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [currentMessages])
 
+  // Auto-resize Textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px` // Max 5 lines approx
+    }
+  }, [messageText])
+
   // 방 선택 핸들러
   const handleSelectConversation = (roomId: string) => {
     if (!isValidId(roomId)) return;
@@ -97,10 +155,30 @@ export default function MessagesPage() {
 
   const handleSend = () => {
     if (!isValidId(selectedRoomId) || !messageText.trim()) return
+    if (messageText.length > MAX_CHAR_LIMIT) return; // Prevent sending if over limit
 
     const content = messageText
     sendMessage(selectedRoomId!, content)
     setMessageText("")
+
+    // Reset height manually after send
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter") {
+      if (!e.shiftKey) {
+        // Prevent default newline
+        e.preventDefault();
+        // Check composition for CJK
+        if (!e.nativeEvent.isComposing) {
+          handleSend();
+        }
+      }
+      // If shift + enter, default behavior (newline) is allowed
+    }
   }
 
   const handleDeleteConversation = async () => {
@@ -250,19 +328,12 @@ export default function MessagesPage() {
                             <AvatarFallback>{selectedConversation.recipientName.charAt(0)}</AvatarFallback>
                           </Avatar>
                         )}
-                        <div className={cn(
-                          "px-4 py-2 rounded-2xl text-sm shadow-sm whitespace-pre-wrap break-words",
-                          msg.isSentByMe ? "bg-[#800020] text-white rounded-br-none" : "bg-white text-gray-800 border rounded-bl-none"
-                        )}>
-                          {imgSrc && (
-                            <Image src={imgSrc} alt="첨부 이미지" width={200} height={200} className="rounded-lg mb-2 object-cover" />
-                          )}
-                          {content}
-                        </div>
+
+                        <MessageBubble content={content} isSentByMe={msg.isSentByMe} imgSrc={imgSrc} />
+
                         <span className="text-[10px] text-gray-400 mb-1 shrink-0">
                           {(() => {
                             const timeStr = msg.timestamp;
-                            // If timestamp is ISO string without Z (e.g. from Java LocalDateTime), treat as UTC
                             const date = new Date(timeStr.endsWith("Z") ? timeStr : timeStr + "Z");
                             return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                           })()}
@@ -277,30 +348,31 @@ export default function MessagesPage() {
 
             <div className="p-4 bg-white border-t">
               <div className="flex flex-col gap-1">
-                <div className="flex gap-2">
-                  <Input
+                <div className="flex gap-2 items-end">
+                  <Textarea
+                    ref={textareaRef}
                     value={messageText}
                     onChange={(e) => setMessageText(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && handleSend()}
+                    onKeyDown={handleKeyDown}
                     placeholder="메시지 입력..."
                     className={cn(
-                      "rounded-full bg-gray-100 border-none focus-visible:ring-1",
-                      messageText.length > 1000 ? "focus-visible:ring-red-500 ring-1 ring-red-500" : "focus-visible:ring-[#800020]"
+                      "min-h-[44px] max-h-[120px] rounded-2xl resize-none py-3 px-4 bg-gray-100 border-none focus-visible:ring-1",
+                      messageText.length > MAX_CHAR_LIMIT ? "focus-visible:ring-red-500 ring-1 ring-red-500" : "focus-visible:ring-[#800020]"
                     )}
                   />
                   <Button
                     onClick={handleSend}
-                    disabled={!messageText.trim() || messageText.length > 1000}
+                    disabled={!messageText.trim() || messageText.length > MAX_CHAR_LIMIT}
                     className={cn(
-                      "rounded-full w-10 h-10 p-0 shrink-0",
-                      messageText.length > 1000 ? "bg-gray-400 hover:bg-gray-400" : "bg-[#800020] hover:bg-[#800020]/90"
+                      "rounded-full w-10 h-10 p-0 shrink-0 mb-[2px]",
+                      messageText.length > MAX_CHAR_LIMIT ? "bg-gray-400 hover:bg-gray-400" : "bg-[#800020] hover:bg-[#800020]/90"
                     )}
                   >
                     <Send className="h-4 w-4 text-white" />
                   </Button>
                 </div>
-                <div className={cn("text-xs text-right px-2", messageText.length > 1000 ? "text-red-500 font-medium" : "text-gray-400")}>
-                  {messageText.length} / 1000
+                <div className={cn("text-xs text-right px-2", messageText.length > MAX_CHAR_LIMIT ? "text-red-500 font-medium" : "text-gray-400")}>
+                  {messageText.length} / {MAX_CHAR_LIMIT}
                 </div>
               </div>
             </div>

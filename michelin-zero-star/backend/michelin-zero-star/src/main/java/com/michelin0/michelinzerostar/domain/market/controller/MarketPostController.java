@@ -92,9 +92,10 @@ public class MarketPostController {
             @PathVariable Long postId,
             @RequestPart(value = "post") @Valid MarketPostUpdateRequest request,
             @RequestPart(value = "images", required = false) List<MultipartFile> images,
+            @RequestPart(value = "existingImages", required = false) List<String> existingImages,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        marketPostService.updatePost(postId, userPrincipal.getId(), request, images);
+        marketPostService.updatePost(postId, userPrincipal.getId(), request, images, existingImages);
         return ResponseEntity.ok("게시글이 업데이트 되었습니다.");
     }
 

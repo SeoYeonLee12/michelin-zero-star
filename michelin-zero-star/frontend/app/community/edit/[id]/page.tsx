@@ -27,6 +27,7 @@ import { ArrowLeft, Upload, X, MapPin, Receipt } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import Image from "next/image"
 import { compressImage } from "@/lib/image-utils"  // ✅ import 추가
+import { cn } from "@/lib/utils"
 
 import { getPostDetail, updatePost } from "@/lib/api/market"
 
@@ -47,7 +48,13 @@ export default function CommunityEditPage() {
   const [loading, setLoading] = useState(true)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showExitDialog, setShowExitDialog] = useState(false)
-  const [previewImage, setPreviewImage] = useState<string | null>(null)
+
+  // Validation States
+  const [titleError, setTitleError] = useState<string | null>(null)
+  const [descError, setDescError] = useState<string | null>(null)
+  const [priceError, setPriceError] = useState<string | null>(null)
+  const [placeError, setPlaceError] = useState<string | null>(null)
+  const [imageError, setImageError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -89,8 +96,22 @@ export default function CommunityEditPage() {
     if (selectedFiles.length === 0) return
 
     // 이미지 압축
+    const validFiles = selectedFiles.filter(file => {
+      if (!file.type.startsWith("image/")) {
+        setImageError("이미지 파일만 업로드할 수 있습니다.")
+        return false
+      }
+      return true
+    })
+
+    if (validFiles.length > 0) {
+      setImageError(null)
+    } else {
+      return
+    }
+
     const compressedFiles = await Promise.all(
-      selectedFiles.map((file) => compressImage(file))
+      validFiles.map((file) => compressImage(file))
     )
 
     setFiles((prev) => [...prev, ...compressedFiles])
@@ -103,15 +124,34 @@ export default function CommunityEditPage() {
   }
 
   const handleSubmit = () => {
+    let isValid = true
+
+    // Clear errors
+    setTitleError(null)
+    setDescError(null)
+    setPlaceError(null)
+
     if (!formData.title || formData.title.length < 2) {
-      alert("제목은 2자 이상 입력해주세요.")
-      return
+      setTitleError("제목은 2자 이상 입력해주세요.")
+      isValid = false
     }
 
     if (!formData.description || formData.description.length < 5) {
-      alert("내용은 5자 이상 입력해주세요.")
-      return
+      setDescError("내용은 5자 이상 입력해주세요.")
+      isValid = false
     }
+
+    // Validate Place (if required, matching new page logic)
+    if (!formData.place) {
+      setPlaceError("거래 장소를 입력해주세요.")
+      isValid = false
+    } else if (formData.place.length > 30) {
+      setPlaceError("거래 장소는 30자 이내로 입력해주세요.")
+      isValid = false
+    }
+
+    if (!isValid) return
+
     setShowConfirmDialog(true)
   }
 
@@ -125,7 +165,8 @@ export default function CommunityEditPage() {
           price: parseInt(formData.price.replace(/[^0-9]/g, "")) || 0,
           meetingPlace: formData.place,
         },
-        files.length > 0 ? files : undefined  // ✅ 새 이미지가 있으면 전송
+        files,
+        existingImages
       )
       alert("게시글이 수정되었습니다.")
       router.push(`/community/${postId}`)
@@ -208,6 +249,7 @@ export default function CommunityEditPage() {
                   />
                 </label>
               </div>
+              {imageError && <p className="text-red-500 text-sm mt-1">{imageError}</p>}
               {files.length > 0 && (
                 <p className="text-sm text-yellow-600">새 이미지를 업로드하면 기존 이미지가 모두 삭제됩니다.</p>
               )}
@@ -222,9 +264,14 @@ export default function CommunityEditPage() {
                 id="title"
                 placeholder="예: 양배추 반 통 같이 나눠요 (2~40자)"
                 value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, title: e.target.value })
+                  if (e.target.value.length >= 2) setTitleError(null)
+                }}
                 maxLength={40}
+                className={cn(titleError && "border-red-500 focus-visible:ring-red-500")}
               />
+              {titleError && <p className="text-red-500 text-xs mt-1">{titleError}</p>}
             </div>
 
             {/* Description */}
@@ -236,12 +283,19 @@ export default function CommunityEditPage() {
                 id="description"
                 placeholder="구매한 재료, 상태, 나눔 방법 등을 자세히 적어주세요."
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, description: e.target.value })
+                  if (e.target.value.length >= 5) setDescError(null)
+                }}
                 rows={6}
                 maxLength={150}
+                className={cn(descError && "border-red-500 focus-visible:ring-red-500")}
               />
-              <div className="text-right text-xs text-muted-foreground">
-                {formData.description.length}/150
+              <div className="flex justify-between mt-1">
+                <span className="text-xs text-red-500 min-h-[16px]">{descError}</span>
+                <span className="text-xs text-muted-foreground">
+                  {formData.description.length}/150
+                </span>
               </div>
             </div>
 
@@ -266,10 +320,19 @@ export default function CommunityEditPage() {
                   id="place"
                   placeholder="예: 둔산동 롯데마트 앞"
                   value={formData.place}
-                  onChange={(e) => setFormData({ ...formData, place: e.target.value })}
-                  className="pl-10"
+                  onChange={(e) => {
+                    setFormData({ ...formData, place: e.target.value })
+                    if (e.target.value) setPlaceError(null)
+                  }}
+                  className={cn("pl-10", placeError && "border-red-500 focus-visible:ring-red-500")}
                   maxLength={30}
                 />
+              </div>
+              <div className="flex justify-between mt-1">
+                <span className="text-xs text-red-500 min-h-[16px]">{placeError}</span>
+                <span className="text-xs text-muted-foreground">
+                  {formData.place.length} / 30
+                </span>
               </div>
             </div>
           </CardContent>
