@@ -23,6 +23,8 @@ export interface BackendRecipeResponse {
   createdAt: string
   updatedAt: string
   nickname: string
+  userProfileImageUrl?: string
+  userTotalStar?: number
   isScrapped: boolean
   isMine: boolean
   categoryNames: string[]

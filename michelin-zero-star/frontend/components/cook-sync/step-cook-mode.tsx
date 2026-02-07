@@ -360,13 +360,17 @@ export function StepCookMode({
 
         // 구독
         client.subscribe(`/topic/recipe/${recipeId}`, (message) => {
+          console.log('[WS] Message received:', message.body)
           if (message.body) {
             const body = JSON.parse(message.body)
+            console.log('[WS] Parsed body:', body)
             // { content: "...", senderType: "USER" | "AI", ... }
             if (body.senderType === "AI") {
+              console.log('[WS] Adding AI message to chat')
               setAiMessages((prev) => [...prev, { role: "ai", content: body.content }])
               setAiTurnSafe("listening") // AI 응답 오면 듣기 모드 복귀? (기획 확인 필요하나 일단 자연스러움)
             } else if (body.senderType === "USER") {
+              console.log('[WS] Ignoring USER message (already added optimistically)')
               // 내 메시지도 소켓으로 오면 여기서 추가? 
               // 보통 optimistic update 로 내가 보낸 건 미리 추가함.
               // 중복 방지 로직이 필요할 수도 있음. 일단은 내가 보낸건 aiSend에서 추가하니 여기선 AI만 처리하거나
@@ -467,14 +471,7 @@ export function StepCookMode({
       stopAllAudio()
       setIsListening(false)
 
-      try {
-        await completeCooking({ recipeId })
-      } catch (err) {
-        console.error("요리 완료 API 오류:", err)
-      } finally {
-        // 성공하든 실패하든 일단 완료 처리
-        onComplete()
-      }
+      onComplete()
     }
   }, [steps.length, onStepChange, onComplete, stopAllAudio, recipeId])
 
@@ -580,7 +577,7 @@ export function StepCookMode({
           if (stompClientRef.current && stompClientRef.current.connected) {
             const token = getGlobalAccessToken()
             stompClientRef.current.publish({
-              destination: "/pub/recipes/ask",
+              destination: "/app/recipes/ask",
               headers: token ? { Authorization: `Bearer ${token}` } : {},
               body: JSON.stringify({
                 content: raw,
@@ -620,9 +617,17 @@ export function StepCookMode({
 
   // 언마운트 cleanup
   React.useEffect(() => {
-    return () => {
+    const cleanup = () => {
       try { azureSttRef.current?.stop() } catch { }
       azureSttRef.current = null
+    }
+
+    // 페이지 벗어날 때 (탭 닫기, 뒤로가기, 새로고침 등)
+    window.addEventListener("beforeunload", cleanup)
+
+    return () => {
+      cleanup()
+      window.removeEventListener("beforeunload", cleanup)
     }
   }, [])
 

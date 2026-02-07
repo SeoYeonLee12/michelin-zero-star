@@ -55,6 +55,7 @@ interface RecipeDetailViewProps {
   recipe: Recipe
   onStartCooking: () => void
   hasCompletedCooking?: boolean
+  onScrapChange?: (isScrapped: boolean) => void
 }
 
 function AnimatedNumber({ value, prevValue }: { value: number; prevValue: number }) {
@@ -131,7 +132,7 @@ function StarRating({ rating, onRatingChange, disabled }: { rating: number; onRa
 
 const COMMENTS_PER_PAGE = 5
 
-export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking = false }: RecipeDetailViewProps) {
+export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking, onScrapChange }: RecipeDetailViewProps) {
   const router = useRouter()
   const { user, hasUserReviewedRecipe, markRecipeAsReviewed } = useAuth()
 
@@ -202,6 +203,9 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
 
       // API Call
       await toggleScrap(Number(recipe.id))
+
+      // Notify parent of scrap change
+      onScrapChange?.(newStatus)
     } catch (error) {
       console.error("Failed to toggle scrap:", error)
       setIsScrapped(!isScrapped) // Revert on error
@@ -472,6 +476,27 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking =
               </>
             )}
           </div>
+
+          {/* Author Info */}
+          {recipe.recipeType !== "CHEF" && typeof recipe.author !== "string" && recipe.author && (
+            <div className="flex items-center gap-2 pt-4 border-t mt-4">
+              <Avatar className="h-10 w-10 border border-border">
+                <AvatarImage src={recipe.author.image} className="object-cover" />
+                <AvatarFallback className="bg-muted text-muted-foreground font-medium">
+                  {recipe.author.name[0]}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-medium text-foreground">{recipe.author.name}</span>
+                <div className="flex items-center gap-1 bg-[#FFF0F0] px-2.5 py-1 rounded-full border border-[#FFE0E0]">
+                  <img src="/michelin-star.png" alt="Michelin" className="h-3.5 w-3.5" />
+                  <span className="text-xs font-bold text-[#800020]">
+                    미슐랭 {(recipe.author.totalStars ?? 0).toFixed(1)}스타
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

@@ -108,10 +108,11 @@ export async function updatePost(
         formData.append("images", file)
     })
 
-    // 3. 유지할 기존 이미지 URL들
-    existingImageUrls.forEach((url) => {
-        formData.append("existingImages", url)
+    // 3. 유지할 기존 이미지 URL들 (JSON Blob으로 변환하여 전송)
+    const existingImagesBlob = new Blob([JSON.stringify(existingImageUrls)], {
+        type: "application/json",
     })
+    formData.append("existingImages", existingImagesBlob)
 
     return apiFetch<string>(`/api/v1/market/posts/${postId}`, {
         method: "PUT",

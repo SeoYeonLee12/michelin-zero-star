@@ -34,6 +34,8 @@ export default function RecipeDetailPage() {
   const [showCompleteDialog, setShowCompleteDialog] = React.useState(false)
   const [isAwarded, setIsAwarded] = React.useState(false) // ✅ Added state
   const [recommendedRecipes, setRecommendedRecipes] = React.useState<Recipe[]>([])
+  const processingRef = React.useRef(false)
+
 
   // Fetch random chef recipes for recommendations
   React.useEffect(() => {
@@ -114,8 +116,14 @@ export default function RecipeDetailPage() {
       })),
       isLiked: data.isScrapped,
       isMine: data.isMine,
+      recipeType: data.recipeType, // Added mapping
       createdAt: data.createdAt,
       averageRating: data.averageRating,
+      author: {
+        name: data.nickname,
+        image: data.userProfileImageUrl,
+        totalStars: data.userTotalStar,
+      },
     }
   }
 
@@ -179,21 +187,21 @@ export default function RecipeDetailPage() {
   }
 
   const handleCompleteCooking = async () => {
+    if (processingRef.current) return
+    processingRef.current = true
     try {
       const response = await completeCooking(recipeId)
       console.log("Cooking completed:", response)
-      console.log("Cooking completed:", response)
       if (response.isAwardedCookingCompleteReward) {
-        // alert("요리 완료 보상을 획득했습니다!") // Remove alert, dialog handles it
-        setIsAwarded(true) // ✅ Correctly set state
+        setIsAwarded(true)
       } else {
         setIsAwarded(false)
       }
     } catch (error) {
       console.error("Failed to complete cooking:", error)
-      // 계속 진행 (Dialog 표시), but maybe handle error state? 
-      // For now, assume failure means no reward if network error, but we want to show dialog.
       setIsAwarded(false)
+    } finally {
+      setTimeout(() => { processingRef.current = false }, 1000)
     }
     setShowCompleteDialog(true)
   }
@@ -248,6 +256,9 @@ export default function RecipeDetailPage() {
                 recipe={recipe}
                 onStartCooking={handleStartCooking}
                 hasCompletedCooking={completedRecipes.has(recipe.id)}
+                onScrapChange={(isScrapped) => {
+                  setRecipe(prev => prev ? { ...prev, isLiked: isScrapped } : null)
+                }}
               />
             </motion.div>
           )}

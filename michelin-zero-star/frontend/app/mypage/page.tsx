@@ -116,6 +116,7 @@ export default function MyPage() {
           rating: item.averageRating,
           author: item.nickName,
           tags: item.tags.map(t => t.tag_name),
+          recipeType: item.recipeType,
           // Fill missing required fields with defaults
           difficulty: "중급", // Default
           duration: 0,
@@ -323,7 +324,7 @@ export default function MyPage() {
                       <h1 className="text-2xl font-bold text-foreground truncate">{user?.nickname || "사용자"}</h1>
                       <Badge className="gap-1 bg-[#800020]/5 text-[#800020] border-[#800020]/20 px-2 py-0.5 shrink-0">
                         <Image src="/michelin-star.png" alt="star" width={12} height={12} />
-                        <span className="text-xs font-semibold">미슐랭 {user?.totalStar ?? 0}스타</span>
+                        <span className="text-xs font-semibold">미슐랭 {(user?.totalStar ?? 0).toFixed(1)}스타</span>
                       </Badge>
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground p-0 ml-1" asChild>
                         <Link href="/profile">
@@ -370,7 +371,7 @@ export default function MyPage() {
                     </Collapsible>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xl font-bold text-[#800020]">{user?.totalStar ?? 0}</span>
+                    <span className="text-xl font-bold text-[#800020]">{(user?.totalStar ?? 0).toFixed(1)}</span>
                     <Image src="/michelin-star.png" alt="Star Icon" width={24} height={24} className="object-contain" />
                   </div>
                 </div>
@@ -463,7 +464,7 @@ export default function MyPage() {
                         key={recipe.id}
                         recipe={recipe}
                         onClick={() => router.push(`/recipes/${recipe.id}`)}
-                        showAuthor
+                        showAuthor={recipe.recipeType === "USER"}
                       />
                     ))}
                   </div>

@@ -49,6 +49,11 @@ export function NewRecipeContent() {
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      const validTypes = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/jpg"]
+      if (!validTypes.includes(file.type)) {
+        alert("이미지는 png, jpg, jpeg, gif, webp 형식만 등록 가능합니다.")
+        return
+      }
       setThumbnail(file)
       setThumbnailPreview(URL.createObjectURL(file))
     }
@@ -57,6 +62,11 @@ export function NewRecipeContent() {
   const handleStepImageChange = (stepId: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      const validTypes = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/jpg"]
+      if (!validTypes.includes(file.type)) {
+        alert("이미지는 png, jpg, jpeg, gif, webp 형식만 등록 가능합니다.")
+        return
+      }
       setSteps(
         steps.map((step) =>
           step.id === stepId ? { ...step, image: file, imagePreview: URL.createObjectURL(file) } : step,
@@ -181,7 +191,7 @@ export function NewRecipeContent() {
                 <input
                   id="thumbnail-input"
                   type="file"
-                  accept="image/*"
+                  accept="image/png, image/jpeg, image/gif, image/webp"
                   className="hidden"
                   onChange={handleThumbnailChange}
                 />
@@ -338,7 +348,7 @@ export function NewRecipeContent() {
                     <input
                       id={`step-image-${step.id}`}
                       type="file"
-                      accept="image/*"
+                      accept="image/png, image/jpeg, image/gif, image/webp"
                       className="hidden"
                       onChange={(e) => handleStepImageChange(step.id, e)}
                     />

@@ -428,7 +428,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         recipientAvatar: r.otherUserProfileImage,
         lastMessage: r.lastMessage || "대화가 시작되었습니다.",
         lastMessageTime: r.lastMessageAt,
-        unreadCount: r.unreadCount || 0
+        unreadCount: r.unreadCount || 0,
+        postTitle: r.postTitle,       // ✅ Added
+        postThumbnail: r.postThumbnail // ✅ Added
       }));
       // 중복 제거 (Backend issue guard)
       const unique = Array.from(new Map(mapped.map(item => [item.id, item])).values());
@@ -651,7 +653,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const payload: UpdateProfileRequest = {}
         if (data.nickname && data.nickname !== user.nickname) payload.nickname = data.nickname
-        if (data.profileImageUrl && data.profileImageUrl !== user.profileImageUrl) payload.profileImageUrl = data.profileImageUrl
+        if (data.profileImageUrl !== undefined && data.profileImageUrl !== user.profileImageUrl) payload.profileImageUrl = data.profileImageUrl
         if (data.categories) {
           const currentCats = new Set(user.categories || [])
           const newCats = new Set(data.categories)

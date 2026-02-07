@@ -185,9 +185,9 @@ services:
       - backend
     # command: npm run dev ... <-- PROD: Remove command, use Dockerfile CMD
 
-#===============================================#
-# Network & Volume Definition
-#===============================================#
+    #===============================================#
+    # Network & Volume Definition
+    #===============================================#
 networks:
   mzs-network:
     driver: bridge

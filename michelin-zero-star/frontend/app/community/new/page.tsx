@@ -130,8 +130,9 @@ function CommunityNewForm() {
 
     filesToProcess.forEach(async (file) => {
       // 0. 파일 타입 검증
-      if (!file.type.startsWith("image/")) {
-        setImageError("이미지 파일만 업로드할 수 있습니다.")
+      const validTypes = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/jpg"]
+      if (!validTypes.includes(file.type)) {
+        setImageError("이미지는 png, jpg, jpeg, gif, webp 형식만 등록 가능합니다.")
         return
       }
       setImageError(null)
@@ -375,7 +376,7 @@ function CommunityNewForm() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/png, image/jpeg, image/gif, image/webp"
                 multiple
                 className="hidden"
                 onChange={handleImageUpload}

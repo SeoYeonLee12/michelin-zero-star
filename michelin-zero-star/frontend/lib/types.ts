@@ -31,6 +31,7 @@ export interface Author {
   name: string
   image?: string
   isFollowing?: boolean
+  totalStars?: number
 }
 
 export interface Recipe {
@@ -39,6 +40,7 @@ export interface Recipe {
   thumbnail: string
   tags: string[]
   image?: string | null
+  recipeType?: string // Added to distinguish USER vs CHEF recipes
   hashtags?: string[] // Added hashtags field for creator/channel info
   author?: string | Author // Support both string and object
   rating?: number // Legacy field for michelin stars

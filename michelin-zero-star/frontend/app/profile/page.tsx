@@ -61,6 +61,7 @@ export default function ProfileEditPage() {
     name: user?.name || "",
     nickname: user?.nickname || "",
     email: user?.email || "",
+    location: user?.location || "",
     categories: [] as string[],
   })
 
@@ -87,9 +88,7 @@ export default function ProfileEditPage() {
         location: user.location || "",
         categories: user.categories || [],
       })
-      if (user.profileImageUrl) {
-        setProfileImagePreview(user.profileImageUrl)
-      }
+      setProfileImagePreview(user.profileImageUrl || "")
     }
   }, [user, isLoggedIn, router])
 
@@ -101,9 +100,9 @@ export default function ProfileEditPage() {
 
     if (file) {
       // Validate File Type
-      const validTypes = ["image/jpeg", "image/png", "image/jpg"];
+      const validTypes = ["image/jpeg", "image/png", "image/jpg", "image/gif", "image/webp"];
       if (!validTypes.includes(file.type)) {
-        setImageError("이미지 파일만 업로드할 수 있습니다.");
+        setImageError("이미지는 png, jpg, jpeg, gif, webp 형식만 등록 가능합니다.");
         return;
       }
 
@@ -116,6 +115,15 @@ export default function ProfileEditPage() {
         setProfileImagePreview(reader.result as string)
       }
       reader.readAsDataURL(file)
+    }
+
+  }
+
+  const handleRemovePhoto = () => {
+    setProfileImagePreview("")
+    setSelectedFile(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
     }
   }
 
@@ -221,6 +229,11 @@ export default function ProfileEditPage() {
     try {
       let finalProfileImageUrl = profileImagePreview
 
+      // If removed ("") and no file selected, we want to send "" to delete it
+      if (profileImagePreview === "" && !selectedFile) {
+        finalProfileImageUrl = ""
+      }
+
       // ✅ 이미지가 변경되었고, 선택된 파일이 있다면 서버에 업로드
       // (기존 profileImagePreview는 Base64일 수 있으므로 그대로 보내면 500 에러)
       if (selectedFile) {
@@ -296,24 +309,35 @@ export default function ProfileEditPage() {
               <div className="flex items-center gap-6">
                 <div className="relative">
                   <Avatar className="h-24 w-24">
-                    <AvatarImage src={profileImagePreview || user?.profileImageUrl || "/placeholder.svg"} />
+                    <AvatarImage src={profileImagePreview || "/placeholder.svg"} />
                     <AvatarFallback className="text-2xl">
                       {user?.nickname?.charAt(0) || user?.name?.charAt(0) || "U"}
                     </AvatarFallback>
                   </Avatar>
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    className="absolute bottom-0 right-0 h-8 w-8 rounded-full shadow-sm"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <Camera className="h-4 w-4" />
-                  </Button>
+                  {profileImagePreview ? (
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="absolute bottom-0 right-0 h-8 w-8 rounded-full shadow-sm"
+                      onClick={handleRemovePhoto}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="absolute bottom-0 right-0 h-8 w-8 rounded-full shadow-sm"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Camera className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/png, image/jpeg, image/gif, image/webp"
                     ref={fileInputRef}
                     className="hidden"
                     onChange={handlePhotoUpload}
@@ -321,7 +345,7 @@ export default function ProfileEditPage() {
                   <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                     사진 변경
                   </Button>
-                  <p className="text-xs text-muted-foreground">JPG, PNG 파일, 최대 10MB</p>
+                  <p className="text-xs text-muted-foreground">JPG, PNG, GIF, WEBP 파일, 최대 10MB</p>
                   {imageError && (
                     <p className="text-xs text-red-500 font-medium">{imageError}</p>
                   )}

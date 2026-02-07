@@ -97,8 +97,9 @@ export default function CommunityEditPage() {
 
     // 이미지 압축
     const validFiles = selectedFiles.filter(file => {
-      if (!file.type.startsWith("image/")) {
-        setImageError("이미지 파일만 업로드할 수 있습니다.")
+      const validTypes = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/jpg"]
+      if (!validTypes.includes(file.type)) {
+        setImageError("이미지는 png, jpg, jpeg, gif, webp 형식만 등록 가능합니다.")
         return false
       }
       return true
@@ -242,7 +243,7 @@ export default function CommunityEditPage() {
                   <span className="text-xs text-muted-foreground">추가</span>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/png, image/jpeg, image/gif, image/webp"
                     multiple
                     onChange={handleImageUpload}
                     className="hidden"
