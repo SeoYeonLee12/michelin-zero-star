@@ -21,7 +21,7 @@ public class WebSocketEventListener {
     private final SimpMessagingTemplate simpMessagingTemplate;
     private final RedisChatService redisChatService;
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @EventListener
     public void handleAiResponse(AiResponseArrivedEvent event) {
         log.info("이벤트 감지! 소켓 전송 시작");
         UserAiChatResponse response = UserAiChatResponse.from(event.aiChatMessage());
