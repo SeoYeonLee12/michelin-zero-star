@@ -503,6 +503,36 @@ export function RecipeDetailView({ recipe, onStartCooking, hasCompletedCooking, 
       <Separator />
 
       <div className="space-y-4">
+        <h2 className="text-base font-bold text-[#800020] flex items-center gap-2">
+          <span className="bg-[#800020]/10 p-1.5 rounded-full">
+            <Activity className="h-4 w-4 text-[#800020]" />
+          </span>
+          재료 준비
+        </h2>
+        <div className="bg-white border rounded-2xl p-6 shadow-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-3">
+            {recipe.ingredients && recipe.ingredients.length > 0 ? (
+              recipe.ingredients.map((ing, idx) => (
+                <div
+                  key={idx}
+                  className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0"
+                >
+                  <span className="text-sm font-medium text-gray-700">{ing.name}</span>
+                  <span className="text-sm font-bold text-[#800020]">{ing.amount}</span>
+                </div>
+              ))
+            ) : (
+              <p className="col-span-2 text-center text-sm text-muted-foreground py-4">
+                등록된 재료 정보가 없습니다.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-4">
         <h2 className="text-base font-bold text-[#800020]">레시피</h2>
         <div className="relative space-y-0 pl-1 sm:pl-4">
           <div className="absolute left-[23px] sm:left-[31px] top-10 bottom-10 w-px bg-gray-200" />
