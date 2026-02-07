@@ -6,7 +6,7 @@ import com.michelin0.michelinzerostar.domain.aichatmessage.application.result.Ch
 import com.michelin0.michelinzerostar.domain.aichatmessage.domain.AiChatMessage;
 import com.michelin0.michelinzerostar.domain.aichatmessage.domain.AiChatMessageQueryRepository;
 import com.michelin0.michelinzerostar.domain.aichatmessage.domain.RecipeAiService;
-import com.michelin0.michelinzerostar.domain.aichatmessage.domain.UserMessageSave;
+import com.michelin0.michelinzerostar.domain.aichatmessage.domain.messageSave;
 import com.michelin0.michelinzerostar.domain.recipe.domain.Recipe;
 import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeRepository;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
@@ -25,7 +25,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class AiChatMessageService {
 
-    private final UserMessageSave userMessageSave;
+    private final messageSave userMessageSave;
     private final RecipeAiService recipeAiService;
     private final UserRepository userRepository;
     private final RecipeRepository recipeRepository;
@@ -60,7 +60,6 @@ public class AiChatMessageService {
                 .toList();
     }
 
-    // TODO 여기부터 완성
     public void askCommonChatAI(CommonChatbotCommand command) {
         User searchedUser = userRepository.getById(command.userId());
         log.info("Redis Saved for User: {}", command.userId());
@@ -68,7 +67,6 @@ public class AiChatMessageService {
         redisChatService.saveUserMessage(command.userId(), command.content());
         // 비동기로 유저에게 응답보내고
         recipeAiService.processCommonChatbotAI(searchedUser, command.content());
-
     }
 
 }
