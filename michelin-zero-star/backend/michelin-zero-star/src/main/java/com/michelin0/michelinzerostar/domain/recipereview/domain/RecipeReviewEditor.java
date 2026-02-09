@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class ReviewModify {
+public class RecipeReviewEditor {
 
     private final RecipeReviewRepository recipeReviewRepository;
 
@@ -21,14 +21,7 @@ public class ReviewModify {
             String newContent,
             Double newRating
     ) {
-        // 내가 쓴 댓글인지
-        if (!recipeReview.getUser().getId().equals(user.getId())) {
-            throw new GlobalException(RecipeReviewErrorCode.NOT_MATCH_WRITER);
-        }
-        // 해당 레시피에 달린 댓글이 맞는지
-        if (!recipeReview.getRecipe().getRecipeId().equals(recipe.getRecipeId())) {
-            throw new GlobalException(RecipeReviewErrorCode.NOT_MATCH_RECIPE);
-        }
+        validateAuthority(user, recipe, recipeReview);
         if (!Objects.equals(recipeReview.getRating(), newRating)) {
             int totalReviews = recipeReviewRepository.countAllByRecipe(recipe);
             recipe.recalculateAverageRating(
@@ -40,4 +33,24 @@ public class ReviewModify {
         recipeReview.updateRatingAndContent(newRating, newContent);
         return recipe;
     }
+
+    public void deleteReview(User user, Recipe recipe, RecipeReview recipeReview) {
+        validateAuthority(user, recipe, recipeReview);
+        int currentTotalCount = recipeReviewRepository.countAllByRecipe(recipe);
+        recipe.removeRatingFromAverage(recipeReview.getRating(), currentTotalCount);
+        recipeReviewRepository.delete(recipeReview);
+    }
+
+    private void validateAuthority(User user, Recipe recipe, RecipeReview recipeReview) {
+        // 내가 쓴 댓글인지
+        if (!recipeReview.getUser().getId().equals(user.getId())) {
+            throw new GlobalException(RecipeReviewErrorCode.NOT_MATCH_WRITER);
+        }
+        // 해당 레시피에 달린 댓글이 맞는지
+        if (!recipeReview.getRecipe().getRecipeId().equals(recipe.getRecipeId())) {
+            throw new GlobalException(RecipeReviewErrorCode.NOT_MATCH_RECIPE);
+        }
+    }
+
+
 }

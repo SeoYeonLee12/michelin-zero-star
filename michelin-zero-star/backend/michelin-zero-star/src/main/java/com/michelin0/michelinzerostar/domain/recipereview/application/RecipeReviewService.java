@@ -7,9 +7,9 @@ import com.michelin0.michelinzerostar.domain.recipereview.application.command.Re
 import com.michelin0.michelinzerostar.domain.recipereview.application.command.RecipeReviewListResult;
 import com.michelin0.michelinzerostar.domain.recipereview.application.command.RecipeReviewModifyCommand;
 import com.michelin0.michelinzerostar.domain.recipereview.domain.RecipeReview;
+import com.michelin0.michelinzerostar.domain.recipereview.domain.RecipeReviewEditor;
 import com.michelin0.michelinzerostar.domain.recipereview.domain.RecipeReviewQueryRepository;
 import com.michelin0.michelinzerostar.domain.recipereview.domain.RecipeReviewRepository;
-import com.michelin0.michelinzerostar.domain.recipereview.domain.ReviewModify;
 import com.michelin0.michelinzerostar.domain.recipereview.domain.projection.RecipeReviewListProjection;
 import com.michelin0.michelinzerostar.domain.user.entity.User;
 import com.michelin0.michelinzerostar.domain.user.repository.UserRepository;
@@ -30,7 +30,7 @@ public class RecipeReviewService {
     private final RecipeRepository recipeRepository;
     private final CookingLogRepository cookingLogRepository;
     private final RecipeReviewQueryRepository recipeReviewQueryRepository;
-    private final ReviewModify reviewModify;
+    private final RecipeReviewEditor recipeReviewEditor;
 
     @Transactional
     public Long saveRecipeReview(RecipeReviewCommand command) {
@@ -71,7 +71,7 @@ public class RecipeReviewService {
         User searchedUser = userRepository.getById(userId);
         Recipe searchedRecipe = recipeRepository.getById(recipeId);
         RecipeReview searchedRecipeReview = recipeReviewRepository.getById(reviewId);
-        reviewModify.modifyReview(
+        recipeReviewEditor.modifyReview(
                 searchedUser,
                 searchedRecipe,
                 searchedRecipeReview,
@@ -79,5 +79,12 @@ public class RecipeReviewService {
                 command.rating()
         );
         return recipeId;
+    }
+
+    public void deleteRecipeReview(Long userId, Long recipeId, Long reviewId) {
+        User searchedUser = userRepository.getById(userId);
+        Recipe searchedRecipe = recipeRepository.getById(recipeId);
+        RecipeReview searchedRecipeReview = recipeReviewRepository.getById(reviewId);
+        recipeReviewEditor.deleteReview(searchedUser, searchedRecipe, searchedRecipeReview);
     }
 }
