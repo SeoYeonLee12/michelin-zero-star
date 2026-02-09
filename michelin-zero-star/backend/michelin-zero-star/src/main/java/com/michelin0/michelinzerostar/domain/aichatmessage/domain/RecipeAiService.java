@@ -15,6 +15,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 // ai 작업할 서비스임(얘는 비동기 작업)
+// TODO 비동기 처리하는 위치도 이상함.
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -25,6 +26,7 @@ public class RecipeAiService {
     private final RecipeStepRepository recipeStepRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final UserFavoriteCategoryRepository userFavoriteCategoryRepository;
+    private final messageSave userMessageSave;
 
     //TODO: 응답 필요할 시 변경 근데 아직은 모르겠는데 꼭 바꿔야될 거 같기는 함.(Future 타입으로)
     @Async
@@ -43,15 +45,7 @@ public class RecipeAiService {
                 steps
         );
         log.info("AI Response: {}", response.answer());
-        // 답변 받기
-        AiChatMessage aiChatMessage = AiChatMessage.createAIMessage(
-                user,
-                recipe,
-                response.answer()
-        );
-        aiChatMessageRepository.save(aiChatMessage);
-
-        applicationEventPublisher.publishEvent(new AiResponseArrivedEvent(aiChatMessage));
+        userMessageSave.saveAiMessageAndPublish(user, recipe, response.answer());
     }
 
     @Async
