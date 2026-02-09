@@ -1,0 +1,50 @@
+package com.michelin0.michelinzerostar.domain.user.dto;
+
+import com.michelin0.michelinzerostar.domain.user.entity.SocialProvider;
+import com.michelin0.michelinzerostar.domain.user.entity.User;
+import com.michelin0.michelinzerostar.domain.user.entity.UserRole;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.util.List;
+
+@Getter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class UserResponseDto {
+    private Long id;
+    private String email;
+    private String name;
+    private String nickname;
+    private String profileImageUrl;
+    private UserRole role;
+
+    private Double totalStar;
+    private Double todayStars;
+
+    private SocialProvider socialProvider;
+    private String location;
+
+    @com.fasterxml.jackson.annotation.JsonProperty("isVerified")
+    private boolean isVerified;
+    private List<String> categories;
+
+    public UserResponseDto(User user) {
+        this.id = user.getId();
+        this.email = user.getEmail();
+        this.name = user.getName();
+        this.nickname = user.getNickname();
+        this.profileImageUrl = user.getProfileImageUrl();
+        this.role = user.getRole();
+        this.totalStar = user.getTotalStar();
+        this.socialProvider = user.getSocialProvider();
+        this.todayStars = 0.0; // Default value, should be set by service
+    }
+
+    public void setTodayStars(Double todayStars) {
+        this.todayStars = todayStars;
+    }
+}

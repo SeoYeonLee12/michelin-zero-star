@@ -1,0 +1,153 @@
+# ===============================================
+# 1. Global / OS / IDE (공통 설정)
+# ===============================================
+# Mac & Windows
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE & Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+.settings/
+.classpath
+.project
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+
+# ===============================================
+# 2. Root Project & Infrastructure
+# ===============================================
+# 환경변수 (보안상 절대 커밋 금지)
+.env
+.env.*
+!.env.example
+
+# Docker (로컬 오버라이드 설정 등)
+docker-compose.override.yml
+
+# Jenkins (만약 사용한다면)
+infra/jenkins/jenkins_home/
+
+# ===============================================
+# 3. Backend (Spring Boot / Java / Gradle)
+# ===============================================
+# Gradle
+.gradle/
+backend/build/
+backend/out/
+backend/gradle/wrapper/gradle-wrapper.jar
+
+# Maven (혹시 사용할 경우)
+backend/target/
+backend/pom.xml.tag
+backend/pom.xml.releaseBackup
+backend/pom.xml.versionsBackup
+
+# Java Class Files
+*.class
+
+# Package Files
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Backend specific env
+backend/src/main/resources/application-secret.yml
+backend/src/main/resources/application-dev.yml
+
+
+# ===============================================
+# 4. Frontend (React / Node.js)
+# ===============================================
+# Frontend (Next.js) - 실제 경로 기준
+michelin-zero-star/frontend/node_modules/
+michelin-zero-star/frontend/.next/
+michelin-zero-star/frontend/out/
+michelin-zero-star/frontend/coverage/
+michelin-zero-star/frontend/.env*.local
+
+
+# React Environmet Variables
+michelin-zero-star/frontend/.env.local
+michelin-zero-star/frontend/.env.development.local
+michelin-zero-star/frontend/.env.test.local
+michelin-zero-star/frontend/.env.production.local
+
+
+# ===============================================
+# 5. AI Serving & Data Pipeline (Python)
+# ===============================================
+# Byte-compiled / Optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / Packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments (가상환경 폴더)
+venv/
+env/
+ENV/
+ai-serving/venv/
+data-pipeline/venv/
+
+# Jupyter Notebook (데이터팀 작업 흔적)
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# Model Files (대용량 모델 파일은 Git에 올리지 않음 - S3나 LFS 사용 권장)
+*.pkl
+*.h5
+*.pt
+*.pth
+*.onnx
+
+# AI/Data specific env
+ai-serving/.env
+data-pipeline/.env
+
+# ===============================================
+# 6. Crawling Data (임시 데이터 파일)
+# ===============================================
+*.csv
+*.xlsx
+# 단, 설정 파일용 json은 예외 처리하고 싶다면 아래처럼 추가
+# !data-pipeline/config/*.json
+# frontend json 파일은 전부 허용
+!michelin-zero-star/frontend/**/*.json
+
+# frontend lib 폴더 예외 처리 (lib/ 전역 ignore를 무력화)
+!michelin-zero-star/frontend/lib/
+!michelin-zero-star/frontend/lib/**

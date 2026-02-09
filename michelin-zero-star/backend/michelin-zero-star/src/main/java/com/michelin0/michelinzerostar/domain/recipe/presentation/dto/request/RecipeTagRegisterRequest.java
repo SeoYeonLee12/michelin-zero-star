@@ -1,0 +1,14 @@
+package com.michelin0.michelinzerostar.domain.recipe.presentation.dto.request;
+
+import com.michelin0.michelinzerostar.domain.recipe.application.command.RecipeTagCommand;
+import jakarta.validation.constraints.NotBlank;
+
+public record RecipeTagRegisterRequest(
+        @NotBlank(message = "태그를 입력하세요.")
+        String tagName
+) {
+
+    public RecipeTagCommand toCommand() {
+        return new RecipeTagCommand(tagName);
+    }
+}

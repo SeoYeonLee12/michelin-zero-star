@@ -1,0 +1,65 @@
+package com.michelin0.michelinzerostar.domain.recipe.application.command;
+
+import com.michelin0.michelinzerostar.domain.recipe.domain.Nutrition;
+import com.michelin0.michelinzerostar.domain.recipe.domain.Recipe;
+import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeIngredient;
+import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeStep;
+import com.michelin0.michelinzerostar.domain.recipe.domain.RecipeTag;
+import com.michelin0.michelinzerostar.domain.recipe.domain.enums.RecipeType;
+import com.michelin0.michelinzerostar.domain.user.entity.User;
+import java.util.List;
+
+public record RecipeUpdateCommand(
+        Long recipeId,
+        String title,
+        String mainImageUrl,
+        String recipeDescription,
+        Integer cookTime,
+        Integer servings,
+        Long userId,
+        Double calorie,
+        Double carbohydrate,
+        Double protein,
+        Double saturatedFat,
+        Double cholesterol,
+        Double sodium,
+        Double calcium,
+        List<RecipeStepCommand> steps,
+        List<RecipeTagCommand> tags,
+        List<RecipeIngredientCommand> ingredients,
+        List<Long> categoryIds
+) {
+
+    public Recipe toRecipe(User user) {
+        Nutrition nutrition = new Nutrition(calorie, carbohydrate, protein, saturatedFat,
+                cholesterol, sodium, calcium);
+        return new Recipe(title, mainImageUrl, recipeDescription, cookTime, servings,
+                RecipeType.USER, nutrition, user);
+    }
+
+    public List<RecipeIngredient> toIngredients() {
+        return this.ingredients.stream()
+                .map(command -> new RecipeIngredient(
+                        command.ingredientName(), command.ingredientAmount()
+                ))
+                .toList();
+    }
+
+    public List<RecipeStep> toSteps() {
+        return this.steps.stream()
+                .map(cmd -> new RecipeStep(
+                        cmd.stepNumber(),
+                        cmd.stepDescription(),
+                        cmd.timerSeconds(),
+                        cmd.stepImageUrl(),
+                        cmd.cookingTip()
+                ))
+                .toList();
+    }
+
+    public List<RecipeTag> toTags() {
+        return this.tags.stream()
+                .map(cmd -> new RecipeTag(cmd.tagName()))
+                .toList();
+    }
+}

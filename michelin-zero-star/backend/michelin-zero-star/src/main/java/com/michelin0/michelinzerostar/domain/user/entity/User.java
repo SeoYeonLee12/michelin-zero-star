@@ -1,0 +1,122 @@
+package com.michelin0.michelinzerostar.domain.user.entity;
+
+import com.michelin0.michelinzerostar.global.domain.SoftDeleteDomain;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Entity
+@Getter
+@Table(name = "users")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class User extends SoftDeleteDomain {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "users_id")
+    private Long id;
+
+    @Column(nullable = false, length = 255) // 이메일
+    private String email;
+
+    @Column(length = 255) // 비밀번호 (소셜 로그인은 null 가능하므로 nullable 허용)
+    private String password;
+
+    @Column(nullable = false, length = 100) // 이름
+    private String name;
+
+    @Column(nullable = false, length = 100) // 닉네임
+    private String nickname;
+
+    @Column(name = "profile_image_url", length = 255) // 프로필 이미지
+    private String profileImageUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UserRole role; // USER
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "social_provider")
+    private SocialProvider socialProvider; // KAKAO, NAVER, GOOGLE
+
+    @Column(name = "social_id")
+    private String socialId; // 소셜 로그인 고유 ID
+
+    @Column(name = "total_star", nullable = false)
+    private Double totalStar; // 누적 미슐랭 스타
+
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    private UserProfile userProfile;
+
+    @Builder
+    public User(String email, String password, String name, String nickname,
+            String profileImageUrl, UserRole role, SocialProvider socialProvider,
+            String socialId, Double totalStar) {
+        this.email = email;
+        this.password = password;
+        this.name = name;
+        this.nickname = nickname;
+        this.profileImageUrl = profileImageUrl;
+        this.role = role;
+        this.socialProvider = socialProvider;
+        this.socialId = socialId;
+        this.totalStar = (totalStar != null) ? totalStar : 0.0;
+    }
+
+    public void updatePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
+
+    public void updateProfile(String name, String nickname, String profileImageUrl) {
+        if (name != null && !name.isBlank()) {
+            this.name = name;
+        }
+
+        if (nickname != null && !nickname.isBlank()) {
+            this.nickname = nickname;
+        }
+
+        if (profileImageUrl != null) {
+            if (profileImageUrl.isBlank()) {
+                this.profileImageUrl = null;
+            } else {
+                this.profileImageUrl = profileImageUrl;
+            }
+        }
+    }
+
+    public void withdraw() {
+        // 이메일 마스킹 (중복 가입 방지 및 개인정보 보호)
+        this.email = "withdrawn_" + this.id + "@michelin.com";
+        this.nickname = "탈퇴한사용자";
+        this.profileImageUrl = null;
+        this.password = null;
+        this.socialProvider = null;
+        this.socialId = null;
+
+        recordDeleteTime();
+    }
+
+    public void awardComplete(Double amount) {
+        this.totalStar = this.totalStar + amount;
+    }
+
+    public boolean validAwardReward(double currentTodayStars, double newAmount) {
+        if (currentTodayStars + newAmount > 3.0) {
+            return false;
+        }
+        return true;
+    }
+}
